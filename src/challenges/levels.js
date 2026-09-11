@@ -49,9 +49,26 @@ export function tier(id) {
   return TIERS.find((t) => t.id === id) ?? null;
 }
 
-export const LEVELS = [
+const PACKS = [
   ...CORE,
 ];
+
+/**
+ * The campaign, ordered by how hard each problem is rather than by which pack
+ * it arrived in. Difficulty is worked out from what a level demands, so the
+ * ramp may as well be worked out the same way: hand-keeping the order right
+ * across several packs is a chore nobody will win, and `tests/tiers.test.js`
+ * would fail every time somebody guessed wrong.
+ *
+ * Stable within a tier, so a pack's own order still says what it meant to say
+ * about which problem to meet first.
+ */
+const RANK = TIERS.map((t) => t.id);
+
+export const LEVELS = PACKS
+  .map((level, at) => ({ level, at, rank: RANK.indexOf(tierOf(level)) }))
+  .sort((a, b) => (a.rank - b.rank) || (a.at - b.at))
+  .map((entry) => entry.level);
 
 export function getLevel(id) {
   return LEVELS.find((level) => level.id === id) ?? LEVELS[0];
