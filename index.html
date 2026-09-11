@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Contraption — build a machine, solve the problem</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <canvas id="view"></canvas>
+
+    <div id="loading"><span>Loading physics…</span></div>
+
+    <header id="topbar">
+      <div class="brand">CONTRAPTION</div>
+      <label class="field">
+        <span>Challenge</span>
+        <select id="level-select"></select>
+      </label>
+      <div class="mode-switch">
+        <button id="mode-studio" class="mode active" data-mode="studio">Studio</button>
+        <button id="mode-test" class="mode" data-mode="test">Test ▸</button>
+      </div>
+      <div class="spacer"></div>
+      <div id="budget" class="readout"></div>
+      <div class="actions">
+        <button id="btn-save" class="ghost">Save</button>
+        <button id="btn-load" class="ghost">Load</button>
+        <button id="btn-clear" class="ghost danger">Clear</button>
+      </div>
+    </header>
+
+    <aside id="palette">
+      <div class="panel-title">Parts</div>
+      <div id="palette-list"></div>
+      <div class="tools">
+        <button class="tool active" data-tool="place">1 Place</button>
+        <button class="tool" data-tool="select">2 Select</button>
+        <button class="tool" data-tool="delete">3 Delete</button>
+      </div>
+    </aside>
+
+    <aside id="inspector">
+      <div class="panel-title">Inspector</div>
+      <div id="inspector-body" class="empty">Select a part with the Select tool to set its controls.</div>
+    </aside>
+
+    <section id="brief">
+      <h2 id="brief-title"></h2>
+      <p id="brief-text"></p>
+      <p id="brief-hint" class="hint"></p>
+    </section>
+
+    <section id="objectives" hidden>
+      <div class="panel-title">Objectives</div>
+      <ul id="objective-list"></ul>
+      <div id="run-clock" class="readout"></div>
+      <div class="test-controls">
+        <button id="btn-respawn" class="ghost">Respawn (K)</button>
+        <button id="btn-back" class="ghost">Back to Studio (Tab)</button>
+      </div>
+    </section>
+
+    <footer id="help"></footer>
+    <div id="toast"></div>
+
+    <div id="win" hidden>
+      <div class="win-card">
+        <div class="win-kicker">Challenge complete</div>
+        <h2 id="win-title"></h2>
+        <div id="win-stats"></div>
+        <div class="win-actions">
+          <button id="win-again" class="ghost">Run again</button>
+          <button id="win-studio" class="primary">Back to Studio</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

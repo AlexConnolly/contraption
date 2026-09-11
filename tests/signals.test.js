@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { SignalBus, bindingLabel, keyLabel } from '../src/sim/signals.js';
+import { SignalBus, bindingLabel, keyLabel, driveSide } from '../src/sim/signals.js';
+import { IDENTITY_ORIENTATION, yawStep } from '../src/core/orientation.js';
 
 function fakeInput() {
   const down = new Set();
@@ -81,5 +82,44 @@ describe('signals', () => {
     expect(bindingLabel({ mode: 'toggle', pos: 'KeyG' })).toBe('toggle G');
     expect(bindingLabel(null)).toBe('unbound');
     expect(keyLabel('ShiftLeft')).toBe('Shift L');
+  });
+});
+
+describe('drive bindings', () => {
+  const binding = { mode: 'drive', pos: 'KeyW', neg: 'KeyS', left: 'KeyA', right: 'KeyD' };
+
+  it('drives both sides equally on throttle alone', () => {
+    const input = fakeInput();
+    const bus = new SignalBus(input);
+    input.down.add('KeyW');
+    expect(bus.resolve('r', { ...binding, side: 1 })).toBe(1);
+    expect(bus.resolve('l', { ...binding, side: -1 })).toBe(1);
+  });
+
+  it('slows the inside wheels when steering', () => {
+    const input = fakeInput();
+    const bus = new SignalBus(input);
+    input.down.add('KeyD');
+    expect(bus.resolve('r', { ...binding, side: 1 })).toBe(-1);
+    expect(bus.resolve('l', { ...binding, side: -1 })).toBe(1);
+  });
+
+  it('clamps throttle and steer together to the motor range', () => {
+    const input = fakeInput();
+    const bus = new SignalBus(input);
+    input.down.add('KeyW');
+    input.down.add('KeyA');
+    expect(bus.resolve('r', { ...binding, side: 1 })).toBe(1);
+    expect(bus.resolve('l', { ...binding, side: -1 })).toBe(0);
+  });
+
+  it('reads the machine side a wheel sits on from its rotation', () => {
+    expect(driveSide(IDENTITY_ORIENTATION)).toBe(1);
+    const flipped = yawStep(yawStep(IDENTITY_ORIENTATION));
+    expect(driveSide(flipped)).toBe(-1);
+  });
+
+  it('labels a drive binding with its four keys', () => {
+    expect(bindingLabel(binding)).toBe('WASD');
   });
 });

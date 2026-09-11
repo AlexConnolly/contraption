@@ -67,12 +67,18 @@ export function groupBlueprint(blueprint) {
   // One joint per articulated part: the first host connection wins.
   const joints = [];
   const jointed = new Set();
+  const seized = new Set();
   for (const edge of jointEdges) {
     if (jointed.has(edge.childId)) continue;
     const childBody = bodyOfPart.get(edge.childId);
     const hostBody = bodyOfPart.get(edge.hostId);
-    if (childBody === hostBody) continue;
+    // Something else bridges the two sides, so this joint cannot move.
+    if (childBody === hostBody) {
+      seized.add(edge.childId);
+      continue;
+    }
     jointed.add(edge.childId);
+    seized.delete(edge.childId);
     joints.push({
       partId: edge.childId,
       type: getPart(blueprint.get(edge.childId).type).joint,
@@ -93,6 +99,7 @@ export function groupBlueprint(blueprint) {
     bodyOfPart,
     rootBody,
     connections,
+    seized: [...seized],
     disconnected: findDisconnected(bodies, joints, rootBody),
   };
 }

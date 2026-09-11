@@ -101,3 +101,45 @@ describe('grouping', () => {
     expect(result.bodies[result.rootBody].members).toContain(core.id);
   });
 });
+
+describe('articulated parts', () => {
+  it('does not weld a hinge to a part its side face happens to touch', () => {
+    const bp = new Blueprint();
+    bp.place('core', [0, 0, 0]);
+    bp.place('hinge', [0, 0, 1]);
+    const result = groupBlueprint(bp);
+    expect(result.bodies).toHaveLength(2);
+    expect(result.joints).toHaveLength(0);
+    expect(result.disconnected).toEqual([bp.list()[1].id]);
+  });
+
+  it('carries whatever sits on a hinge output face', () => {
+    const bp = new Blueprint();
+    bp.place('core', [0, 0, 0]);
+    bp.place('hinge', [0, 1, 0]);
+    bp.place('block', [0, 2, 0]);
+    const result = groupBlueprint(bp);
+    expect(result.joints).toHaveLength(1);
+    const arm = result.bodies.find((b) => b.index !== result.rootBody);
+    expect(arm.members).toHaveLength(2);
+  });
+
+  it('reports a joint as seized when the build bridges both of its sides', () => {
+    const bp = new Blueprint();
+    bp.place('block', [0, 0, 0]);
+    bp.place('core', [0, 0, 1]);
+    const hinge = bp.place('hinge', [0, 1, 0]);
+    bp.place('block', [0, 2, 0]);
+    bp.place('block', [0, 2, 1]);
+    bp.place('block', [0, 1, 1]);
+    const result = groupBlueprint(bp);
+    expect(result.seized).toEqual([hinge.id]);
+    expect(result.joints).toHaveLength(0);
+  });
+
+  it('leaves seized empty for a clean build', () => {
+    const bp = chassis();
+    bp.place('wheel', [1, 1, 1], IDENTITY_ORIENTATION);
+    expect(groupBlueprint(bp).seized).toEqual([]);
+  });
+});

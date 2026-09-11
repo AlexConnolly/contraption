@@ -1,7 +1,8 @@
 import * as THREE from 'three';
-import { getPart, CELL } from '../parts/registry.js';
+import { getPart, partDensity, CELL } from '../parts/registry.js';
 import { orientationQuaternion, applyOrientation } from '../core/orientation.js';
 import { groupBlueprint } from './grouping.js';
+import { driveSide } from './signals.js';
 import { createPartMesh } from '../parts/geometry.js';
 
 export const GROUP_WORLD = 0x00010003;
@@ -96,7 +97,7 @@ export class Machine {
     }
     desc
       .setTranslation(local.x, local.y, local.z)
-      .setDensity(part.density)
+      .setDensity(partDensity(part))
       .setFriction(part.friction ?? 0.85)
       .setRestitution(0.04)
       .setCollisionGroups(GROUP_MACHINE);
@@ -155,7 +156,11 @@ export class Machine {
   }
 
   bindingFor(placed, part) {
-    return placed.config.binding ?? part.actuator?.defaultBinding ?? null;
+    const binding = placed.config.binding ?? part.actuator?.defaultBinding ?? null;
+    if (binding?.mode === 'drive' && binding.side === undefined) {
+      return { ...binding, side: driveSide(placed.rot) };
+    }
+    return binding;
   }
 
   worldPose(bodyIndex) {
@@ -208,6 +213,9 @@ export class Machine {
   }
 
   update(dt, bus) {
+    // Rapier keeps an applied force until it is cleared, so thrust has to be
+    // wiped and re-applied every step or it accumulates.
+    for (const body of this.bodies) body.resetForces(false);
     this.readSensors(bus);
     for (const actuator of this.actuators) {
       const { placed, part, joint } = actuator;
@@ -217,7 +225,7 @@ export class Machine {
       switch (part.actuator.kind) {
         case 'motor':
           joint?.configureMotorVelocity(
-            signal * part.actuator.maxSpeed * power,
+            signal * driveSide(placed.rot) * part.actuator.maxSpeed * power,
             part.actuator.maxForce,
           );
           break;

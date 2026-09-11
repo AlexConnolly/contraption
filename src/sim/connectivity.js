@@ -12,14 +12,21 @@ function sameVec(a, b) {
   return a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
 }
 
-// Does `placed` accept a connection through the given world-space face normal,
-// and is that face the one that bolts it to its host?
+/**
+ * How `placed` treats a connection through the given world-space face normal:
+ * 'host' bolts it to the body it pivots against, 'rigid' fuses whatever is
+ * there into its own body, and 'none' passes straight through. An articulated
+ * part only connects on its attach and carry faces — otherwise a hinge that
+ * brushed the chassis would weld itself solid.
+ */
 export function faceRole(placed, worldDir) {
   const part = getPart(placed.type);
   const local = applyOrientationInverse(placed.rot, worldDir).map(Math.round);
-  const isAttach = attachFaces(part).some((f) => sameVec(f, local));
-  if (isAttach) return part.articulated ? 'host' : 'rigid';
-  return part.solo ? 'none' : 'rigid';
+  if (attachFaces(part).some((f) => sameVec(f, local))) {
+    return part.articulated ? 'host' : 'rigid';
+  }
+  if (part.carry?.some((f) => sameVec(f, local))) return 'rigid';
+  return part.articulated ? 'none' : 'rigid';
 }
 
 export function findConnections(blueprint) {
