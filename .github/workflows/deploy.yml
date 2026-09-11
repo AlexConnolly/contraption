@@ -30,11 +30,10 @@ jobs:
       # site even though nobody is watching the deploy.
       - run: npm test
       - run: npm run build
-      # Turns Pages on for the repo on the first run, so there is no click to
-      # forget in the settings.
+      # Pages is switched on in the repo settings with its source set to
+      # GitHub Actions. Asking this step to enable it instead fails on a repo
+      # that has never had Pages, which is exactly the case it claims to cover.
       - uses: actions/configure-pages@v5
-        with:
-          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
