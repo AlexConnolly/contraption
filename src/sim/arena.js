@@ -106,6 +106,7 @@ export class Arena {
       }
     }
     for (const hoop of level.hoops ?? []) this.addHoop(hoop);
+    this.shuffleStarts();
     for (const prop of level.props ?? []) this.addProp(prop);
     for (const mover of level.movers ?? []) this.addMover(mover);
     for (const zone of level.zones ?? []) this.addZone(zone);
@@ -182,11 +183,43 @@ export class Arena {
     this.objects.push({ body, mesh }, { mesh: net });
   }
 
+  /**
+   * Deals the starting places of a set of props out among themselves.
+   *
+   * What moves is where a crate starts, never what it is: a crate keeps its
+   * label, so there is still something to sort it by, but knowing that the
+   * left-hand one was red last time tells you nothing. A program has to look.
+   */
+  shuffleStarts() {
+    this.starts = new Map();
+    for (const [index, group] of (this.level.shuffle ?? []).entries()) {
+      const rng = makeRng(this.seed + (index + 1) * 104729);
+      const places = group
+        .map((id) => (this.level.props ?? []).find((p) => p.id === id))
+        .filter(Boolean)
+        .map((prop) => [...prop.pos]);
+      // Fisher-Yates, so every arrangement is as likely as any other and each
+      // starting place is used exactly once.
+      for (let i = places.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(between(rng, 0, i + 1)) % (i + 1);
+        [places[i], places[j]] = [places[j], places[i]];
+      }
+      group.forEach((id, at) => {
+        if (places[at]) this.starts.set(id, places[at]);
+      });
+    }
+  }
+
+  startOf(prop) {
+    return this.starts?.get(prop.id) ?? prop.pos;
+  }
+
   addProp(prop) {
     const { RAPIER, world, scene } = this;
+    const start = this.startOf(prop);
     const body = world.createRigidBody(
       RAPIER.RigidBodyDesc.dynamic()
-        .setTranslation(prop.pos[0], prop.pos[1], prop.pos[2])
+        .setTranslation(start[0], start[1], start[2])
         .setLinearDamping(0.2)
         .setAngularDamping(0.4),
     );
@@ -384,8 +417,11 @@ export class Arena {
       mover.rate = motion.rate;
       mover.offset = motion.offset;
     }
+    // A fresh seed means a fresh deal, so a retry is a new arrangement.
+    this.shuffleStarts();
     for (const { spec, body } of this.props.values()) {
-      body.setTranslation({ x: spec.pos[0], y: spec.pos[1], z: spec.pos[2] }, true);
+      const start = this.startOf(spec);
+      body.setTranslation({ x: start[0], y: start[1], z: start[2] }, true);
       body.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
       body.setLinvel({ x: 0, y: 0, z: 0 }, true);
       body.setAngvel({ x: 0, y: 0, z: 0 }, true);

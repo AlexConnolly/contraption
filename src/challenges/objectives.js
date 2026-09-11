@@ -55,6 +55,12 @@ const CHECKS = {
     const zone = level.zones.find((z) => z.id === objective.zone);
     return inZone(ctx.corePosition(), zone);
   },
+  // Several things that all have to end up in the same place — a sorting bay
+  // wants one line in the panel per colour, not one per crate.
+  allPropsInZone(objective, level, ctx) {
+    const zone = level.zones.find((z) => z.id === objective.zone);
+    return objective.props.every((id) => inZone(ctx.propPosition(id), zone));
+  },
   propThroughHoop(objective, level, ctx) {
     const hoop = (level.hoops ?? []).find((h) => h.id === objective.hoop);
     return Boolean(hoop) && throughHoop(hoop, ctx.propPosition(objective.prop));
