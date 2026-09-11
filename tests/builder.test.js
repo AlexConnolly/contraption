@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { sanitiseLevel, toShareCode, fromShareCode } from '../src/challenges/format.js';
-import { TOOLS } from '../src/ui/builder.js';
+import { TOOLS, fogFrom } from '../src/ui/builder.js';
 
 function fakeStorage() {
   const data = new Map();
@@ -117,6 +117,20 @@ describe('a level assembled a piece at a time', () => {
     expect(clean.objectives).toHaveLength(0);
   });
 
+  it('keeps the hold time an objective was given', () => {
+    const { draft, place } = build();
+    const crate = place('crate', [0, 0, 0]);
+    const goal = place('zone', [0, 0, 6]);
+    draft.objectives.push({
+      type: 'propInZone', prop: crate.id, zone: goal.id, hold: 8, label: 'Park it',
+    });
+    expect(sanitiseLevel(draft).objectives[0].hold).toBe(8);
+
+    // And a hold nobody could sit out is pulled back rather than accepted.
+    draft.objectives[0].hold = 500;
+    expect(sanitiseLevel(draft).objectives[0].hold).toBeLessThanOrEqual(30);
+  });
+
   it('never leaves an objective pointing at something that is gone', () => {
     const { draft, place } = build();
     const crate = place('crate', [0, 0, 0]);
@@ -127,6 +141,37 @@ describe('a level assembled a piece at a time', () => {
     // Removed without tidying up after it — the format is the backstop.
     draft.props = [];
     expect(sanitiseLevel(draft).objectives).toHaveLength(0);
+  });
+});
+
+describe('the world numbers', () => {
+  // Fog is the one world setting with no off switch in the format: a level
+  // either carries a fog or does not. Zero visibility has to mean "none",
+  // because the alternative is a level nobody can see out of.
+  it('treats no distance as no fog at all', () => {
+    expect(fogFrom(null, { far: 0 })).toBe(null);
+    expect(fogFrom({ near: 5, far: 60 }, { far: 0 })).toBe(null);
+  });
+
+  it('keeps the near edge inside the far one', () => {
+    const fog = fogFrom({ near: 0, far: 0 }, { far: 20 });
+    expect(fog.far).toBe(20);
+    expect(fog.near).toBeLessThan(fog.far);
+
+    const pushed = fogFrom({ near: 90, far: 100 }, { far: 30 });
+    expect(pushed.near).toBeLessThan(30);
+  });
+
+  it('changes one edge without forgetting the other', () => {
+    const fog = fogFrom({ near: 4, far: 80, colour: 0x0b0f14 }, { near: 10 });
+    expect(fog.far).toBe(80);
+    expect(fog.colour).toBe(0x0b0f14);
+    expect(fog.near).toBe(10);
+  });
+
+  it('makes a fog the format keeps', () => {
+    const level = sanitiseLevel({ name: 'Murk', fog: fogFrom(null, { far: 40 }) });
+    expect(level.fog.far).toBe(40);
   });
 });
 

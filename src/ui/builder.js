@@ -21,6 +21,8 @@ import { blankLevel } from '../challenges/custom.js';
 
 const SNAP = 0.5;
 const GRID = 0.25;
+// The menu background, so fog reads as distance rather than as a grey wall.
+const FOG_COLOUR = 0x0b0f14;
 
 /** What you can put down, and what it starts out as. */
 export const TOOLS = [
@@ -96,6 +98,23 @@ function freshId(draft, kind, stem) {
     const id = `${stem}-${n}`;
     if (!taken.has(id)) return id;
   }
+}
+
+/**
+ * Fog is a distance you can see, so a zero is how you say there is none — the
+ * format carries either a fog or no fog and has no flag for off. The near edge
+ * is kept inside the far one, because fog that clears before it starts is an
+ * argument the renderer has to settle rather than a level.
+ */
+export function fogFrom(current, { near, far }) {
+  const now = current ?? { near: 0, far: 0, colour: FOG_COLOUR };
+  const next = {
+    ...now,
+    ...(near === undefined ? {} : { near }),
+    ...(far === undefined ? {} : { far }),
+  };
+  if (!(next.far > 0)) return null;
+  return { ...next, near: Math.max(0, Math.min(next.near, next.far - 1)) };
 }
 
 export class Builder {
@@ -484,6 +503,8 @@ export class Builder {
     this.number(rules, 'Mass cap', this.draft.massCap ?? 0, 0, 5000, (v) => {
       if (v <= 0) delete this.draft.massCap; else this.draft.massCap = v;
     });
+    this.number(rules, 'Fog from', this.draft.fog?.near ?? 0, 0, 400, (v) => this.setFog({ near: v }), 1);
+    this.number(rules, 'Fog out at', this.draft.fog?.far ?? 0, 0, 800, (v) => this.setFog({ far: v }), 1);
     this.props.append(rules);
 
     const bans = el('div', 'build-bans');
@@ -499,6 +520,12 @@ export class Builder {
       bans.append(button);
     }
     this.props.append(bans);
+  }
+
+  setFog(change) {
+    const next = fogFrom(this.draft.fog, change);
+    if (next) this.draft.fog = next;
+    else delete this.draft.fog;
   }
 
   objectiveList() {
@@ -533,13 +560,25 @@ export class Builder {
         this.refresh({ rebuildArena: false });
       });
 
+      const hold = document.createElement('input');
+      hold.type = 'number';
+      hold.className = 'build-hold';
+      hold.value = String(objective.hold ?? 0);
+      hold.min = '0';
+      hold.max = '30';
+      hold.title = 'Seconds it has to stay there';
+      hold.addEventListener('change', () => {
+        objective.hold = Number(hold.value);
+        this.refresh({ rebuildArena: false });
+      });
+
       const remove = el('button', 'build-mini danger', '×');
       remove.addEventListener('click', () => {
         this.draft.objectives.splice(index, 1);
         this.refresh({ rebuildArena: false });
       });
 
-      row.append(label, what, where, remove);
+      row.append(label, what, where, hold, remove);
       box.append(row);
     });
 

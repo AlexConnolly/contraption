@@ -1173,10 +1173,15 @@ input[type="range"] { accent-color: var(--amber); }
 }
 
 .build-objectives { display: grid; gap: 5px; margin-bottom: 10px; }
-.build-objective { display: grid; grid-template-columns: 1fr auto; gap: 4px; align-items: center; }
+.build-objective {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto auto;
+  gap: 4px;
+  align-items: center;
+}
 .build-objective input[type="text"] { grid-column: 1 / -1; }
 .build-objective select { font-size: 10.5px; min-width: 0; }
-.build-objective > select:nth-of-type(1) { grid-column: 1; }
+.build-hold { width: 44px; font-size: 10.5px; text-align: center; }
 .build-mini {
   font-family: var(--mono);
   font-size: 10px;

@@ -111,8 +111,9 @@ The right-hand rail is the level itself: name, brief, parts budget, par time,
 banned parts, and the world numbers — gravity, ground friction, fog, and the
 cap on how heavy the machine may be. Under that is the list of what is in the
 course and the objectives, each of which picks a real crate and a real zone
-from what you have placed rather than a name typed in hope. Removing a crate
-an objective needed takes the objective with it, and says so.
+from what you have placed rather than a name typed in hope, and says how long
+it has to stay there. Removing a crate an objective needed takes the objective
+with it, and says so.
 
 The level's problems are listed live and in plain words — *no objectives*,
 *par is 0s*, *nothing to stand on* — from the same check the format runs, so a
