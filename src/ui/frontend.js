@@ -170,16 +170,23 @@ export class FrontEnd {
     sheet.append(el('div', 'fe-head', '<h2>Challenges</h2><p>Pick a problem. The parts budget and the rules are set by the brief.</p>'));
 
     const grid = el('div', 'fe-grid');
-    for (const level of LEVELS) grid.append(this.challengeCard(level));
+    // Numbered by where a challenge sits in the campaign rather than by a
+    // number baked into its name. The campaign sorts itself by difficulty and
+    // there are dozens of levels now, so a hand-written "4 —" stops meaning
+    // anything the moment a pack lands either side of it.
+    let at = 0;
+    for (const level of LEVELS) {
+      const number = level.objectives.length > 0 ? String(++at) : '';
+      grid.append(this.challengeCard(level, number));
+    }
     sheet.append(grid);
     this.body.append(sheet);
   }
 
-  challengeCard(level) {
+  challengeCard(level, number) {
     const result = store.result(level.id);
     const done = Boolean(result?.best);
-    const number = level.name.includes('—') ? level.name.split('—')[0].trim() : '';
-    const name = level.name.includes('—') ? level.name.split('—')[1].trim() : level.name;
+    const name = level.name;
 
     const card = el('button', `fe-card${done ? ' done' : ''}`);
     const shot = el('div', 'fe-shot');

@@ -51,6 +51,18 @@ describe('skill levels', () => {
     expect(tierOf({ demands, bans: ['flight', 'wheels'] })).toBe('hard');
   });
 
+  // A ban is only a step up when the banned thing was a way out. Taking rotors
+  // away from a level nobody could have flown does not make it harder.
+  it('does not count a ban that was never an answer anyway', () => {
+    const demands = { steps: 1, flies: false, bansBite: false };
+    expect(tierOf({ demands, bans: ['flight'] })).toBe('easy');
+    expect(tierOf({ demands: { ...demands, steps: 2 }, bans: ['flight'] })).toBe('medium');
+  });
+
+  it('still counts one by default, because usually it is a way out', () => {
+    expect(tierOf({ demands: { steps: 1, flies: false }, bans: ['flight'] })).toBe('medium');
+  });
+
   it('does not run off the end of the ramp', () => {
     const demands = { steps: 3, flies: true };
     expect(tierOf({ demands, bans: ['flight', 'wheels', 'grabber'] })).toBe('expert');

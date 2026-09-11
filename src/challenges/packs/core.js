@@ -32,7 +32,7 @@ export const CORE = [
   {
     id: 'first-haul',
     demands: { steps: 1, flies: false },
-    name: '1 — First Haul',
+    name: 'First Haul',
     brief: 'Move the crate into the marked square and keep it there for 3 seconds.',
     hint: 'A core, a few blocks and four wheels will do it. Bind the left and right wheels to different keys so you can steer.',
     spawn: [0, 1.2, -8],
@@ -54,7 +54,7 @@ export const CORE = [
   {
     id: 'rough-ground',
     demands: { steps: 1, flies: false },
-    name: '2 — Rough Ground',
+    name: 'Rough Ground',
     brief: 'Same job, but the crate starts past a ramp and a scattering of kerbs.',
     hint: 'Weight low and wheels wide. Ballast under the chassis stops it tipping on the ramp.',
     spawn: [0, 1.2, -12],
@@ -82,7 +82,7 @@ export const CORE = [
   {
     id: 'pick-and-place',
     demands: { steps: 2, flies: false },
-    name: '3 — Pick and Place',
+    name: 'Pick and Place',
     brief: 'Lift the payload off its pedestal and set it on the far one. Pushing will not work.',
     hint: 'A grabber on a servo hinge. Toggle G to latch, toggle again to let go.',
     spawn: [0, 1.2, -7],
@@ -108,7 +108,7 @@ export const CORE = [
   {
     id: 'ledge-runner',
     demands: { steps: 2, flies: false },
-    name: '4 — Ledge Runner',
+    name: 'Ledge Runner',
     brief: 'Park the machine itself on the pad at the end of the gantry, and hold it there for 4 seconds.',
     hint: 'There is nothing past the pad. A distance sensor pointed forward, bound to your drive, will stop you on the mark.',
     spawn: [0, 4.2, -14],
@@ -134,7 +134,7 @@ export const CORE = [
   {
     id: 'sorting',
     demands: { steps: 3, flies: false },
-    name: '5 — Sorting Bay',
+    name: 'Sorting Bay',
     brief: 'Nine crates in the bin, three colours, one belt each. Read what each one is and put it on the matching belt.',
     hint: 'A distance sensor says what it is looking at as well as how far away: red reads 1, green 2, blue 3. Which crate is where is dealt again every run, so the answer has to come from looking rather than from remembering.',
     spawn: [0, 1, -7],
@@ -184,7 +184,7 @@ export const CORE = [
   {
     id: 'hoops',
     demands: { steps: 2, flies: false },
-    name: '6 — Hoops',
+    name: 'Hoops',
     brief: 'Put both balls through the ring. The ground under it is off limits, so you cannot simply carry them up and post them.',
     hint: 'You cannot reach it, so something has to throw. A turntable with a boom on it will fling a ball a long way — wind the torque up until it can actually swing the arm, and remember a boom needs a wide base or the machine just spins underneath it.',
     spawn: [0, 1, -12],
@@ -223,7 +223,7 @@ export const CORE = [
   {
     id: 'airlift',
     demands: { steps: 2, flies: true },
-    name: '7 — Airlift',
+    name: 'Airlift',
     brief: 'Get the payload onto the high platform. It is too tall to drive up.',
     hint: 'Wire the rotors to a Flight Controller and it will hold height by itself: WASD to fly, Space and Shift to climb and drop. Hang a grabber underneath to pick the payload up.',
     spawn: [0, 1.2, -8],
@@ -248,7 +248,7 @@ export const CORE = [
   {
     id: 'hands-off',
     demands: { steps: 1, flies: true, autonomous: true },
-    name: '8 — Hands Off',
+    name: 'Hands Off',
     brief: 'No controls at all on this one. Draw the program, press Test, and watch it fly itself to the pad.',
     hint: 'A Computer, a GPS and a Flight Controller. Climb, turn toward the waypoint, run in, then hold. Start from the Auto drone preset if you want a worked example to pull apart.',
     handsOff: true,
@@ -272,7 +272,7 @@ export const CORE = [
   {
     id: 'traffic',
     demands: { steps: 2, flies: true, autonomous: true },
-    name: '9 — Traffic',
+    name: 'Traffic',
     brief: 'Straight down the corridor to the pad — except every blocker covers the middle, so straight never works. Touch anything at all and the run is over.',
     hint: 'They run at a different speed and start somewhere else every time, so there is no timetable to learn. Point a sensor forwards and aim one out to each side, and go where the readings say there is room. The Dodger preset does exactly that.',
     handsOff: true,

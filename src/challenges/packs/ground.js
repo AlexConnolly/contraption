@@ -15,7 +15,7 @@ import { GREY, DARK } from '../palette.js';
 export const GROUND = [
   {
     id: 'shunt',
-    demands: { steps: 1, flies: false },
+    demands: { steps: 1, flies: false, bansBite: false },
     bans: ['flight'],
     name: 'Shunt',
     brief: 'Put the ball in the marked square. It is bigger than you are and it weighs a great deal more.',
@@ -106,7 +106,7 @@ export const GROUND = [
 
   {
     id: 'deadweight',
-    demands: { steps: 1, flies: false },
+    demands: { steps: 1, flies: false, bansBite: false },
     bans: ['flight'],
     name: 'Deadweight',
     brief: 'One crate, one square, flat ground the whole way. The crate weighs four times what you are used to.',
