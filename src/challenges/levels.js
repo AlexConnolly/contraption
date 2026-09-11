@@ -45,7 +45,12 @@ export function tierOf(level) {
   if (many && demands.flies) at = 2;
   else if (many || demands.flies) at = 1;
 
-  at += (level.bans ?? []).length;
+  // Only when the banned thing was a way out of this particular problem.
+  // Flying past an obstacle is a way out and taking it away is a real step up;
+  // flying a forty-kilo ball into a goal was never on, so banning rotors there
+  // takes nothing away and the level is as easy as it looks. Levels say so
+  // with `bansBite: false`, and the default is that a ban does bite.
+  if (demands.bansBite !== false) at += (level.bans ?? []).length;
   return TIERS[Math.min(at, TIERS.length - 1)].id;
 }
 
