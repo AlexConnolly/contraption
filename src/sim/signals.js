@@ -1,4 +1,4 @@
-import { applyOrientation } from '../core/orientation.js';
+import { driveSide } from '../core/orientation.js';
 
 // Turns key state and sensor readings into a signal in [-1, 1] per actuator.
 
@@ -120,17 +120,4 @@ export function keyLabel(code) {
   return code.replace('Left', ' L').replace('Right', ' R');
 }
 
-/**
- * Which way round a wheel is bolted on: +1 when its axle points along a
- * positive world axis, -1 when it points the other way. Two wheels facing each
- * other across a chassis have opposite axle directions, so one of them has to
- * be driven in reverse to roll the same way as the other.
- *
- * With forward at +Z and up at +Y, the machine's right is forward x up = -X,
- * so a wheel returning +1 sits on the machine's LEFT.
- */
-export function driveSide(rot) {
-  const axle = applyOrientation(rot, [1, 0, 0]);
-  const dominant = axle.find((n) => n !== 0) ?? 1;
-  return dominant < 0 ? -1 : 1;
-}
+export { driveSide };

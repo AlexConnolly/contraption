@@ -21,7 +21,7 @@
 | `tiers` | Skill level follows from what a challenge demands, not from a label: one thing on the ground is easy, several steps or flying is medium, both is hard, and anything that has to run itself is expert whatever else it involves. Every challenge in the game has a tier, only the sandbox has none, and the campaign never gets easier as it goes on. |
 | `survey` | The course tour starts where the machine starts, shows what has to move and where it has to end up, never stops twice on the same thing, takes the moving obstacles in as one picture only where there are some, looks along the course rather than down at it, and has somewhere to look on every challenge. |
 | `audio` | The mix is silent with nothing running; the motor note follows shaft speed rather than throttle and is the same backwards as forwards; a rotor is pitched by blade passes; a thruster opens up rather than changing note; nothing runs away at any speed; and many sources of one kind get louder without ever pinning the output. |
-| `hints` | Every part that has to be aimed reports which way it faces — the grabber at the face it grabs on, a thruster the way it pushes, a sensor down its beam, a wheel the way it will drive you rather than round its own axle — and plain structure reports none. |
+| `hints` | Every part that has to be aimed reports which way it faces — the grabber at the face it grabs on, a thruster the way it pushes, a sensor down its beam, a wheel the way it will drive you rather than round its own axle, on both sides of a rover alike since the motor is handed — and plain structure reports none. |
 | `progress` | Designs are kept apart per challenge; a slower later run cannot overwrite a best time; the best cost is the cost of the run that set the best time; machines saved in the same millisecond get different ids; renaming a machine that is not there is a no-op; storage that throws leaves the game running. |
 | `flight/loops` | Hover throttle matches weight over available lift; sinking adds throttle and rising removes it; a banked machine asks for more; the climb key drags the held altitude with it; the controller leans against drift and **away** from sideways drift; zero lift authority asks for nothing; every mixed throttle stays in range. |
 
@@ -59,5 +59,6 @@
 30. Parts that have to be aimed show an arrow in the studio, the hinge shows its swing plane, and none of them appear during a run.
 31. A wheel can be bolted under the build plate, and dropping the camera below it fades the plate out of the way.
 32. A wheel shows an arrow for the way it drives; the Select panel turns and tips a part that is already placed, keeps its bindings, and refuses with a message when there is no room.
-33. A servo hinge turned onto a face that will not attach shows a red ghost and a message naming it, and clicking does nothing; upright on the same cell it is green.
-34. Buttons click, placing and deleting parts sound different from each other, motors rise in pitch as they spin up, and the Sound setting silences all of it.
+33. Every wheel on a rover points the same way, whichever side of the chassis it is on.
+34. A servo hinge turned onto a face that will not attach shows a red ghost and a message naming it, and clicking does nothing; upright on the same cell it is green.
+35. Buttons click, placing and deleting parts sound different from each other, motors rise in pitch as they spin up, and the Sound setting silences all of it.

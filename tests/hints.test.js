@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { allParts, getPart, workingAxis } from '../src/parts/registry.js';
+import { IDENTITY_ORIENTATION, yawStep, applyOrientation } from '../src/core/orientation.js';
 
 describe('direction markers', () => {
   it('points the grabber at the face it actually grabs on', () => {
@@ -37,6 +38,32 @@ describe('direction markers', () => {
 
   it('marks an unpowered roller the same way', () => {
     expect(workingAxis(getPart('castor')).axis).toEqual([0, 0, 1]);
+  });
+
+  // A wheel's motor is handed: the machine flips the command on one side so
+  // both sides drive it the same way for the same key. An arrow that ignores
+  // that points the left wheels forward and the right ones backward, which is
+  // a picture of the joint convention rather than of what the wheel does.
+  it('points both sides of a rover the same way in the world', () => {
+    const wheel = getPart('wheel');
+    const left = IDENTITY_ORIENTATION;
+    const right = yawStep(yawStep(IDENTITY_ORIENTATION));
+    const world = (rot) => applyOrientation(rot, workingAxis(wheel, rot).axis).map(Math.round);
+    expect(world(left)).toEqual([0, 0, 1]);
+    expect(world(right)).toEqual([0, 0, 1]);
+  });
+
+  it('does the same for an unpowered roller, which rolls the same way', () => {
+    const castor = getPart('castor');
+    const world = (rot) => applyOrientation(rot, workingAxis(castor, rot).axis).map(Math.round);
+    expect(world(IDENTITY_ORIENTATION)).toEqual(world(yawStep(yawStep(IDENTITY_ORIENTATION))));
+  });
+
+  it('leaves a part with no handedness alone whatever it is turned to', () => {
+    const jet = getPart('thruster');
+    for (const rot of [IDENTITY_ORIENTATION, yawStep(IDENTITY_ORIENTATION)]) {
+      expect(workingAxis(jet, rot).axis).toEqual(jet.thruster.axis);
+    }
   });
 
   it('leaves plain structure unmarked', () => {

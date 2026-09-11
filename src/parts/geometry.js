@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { CELL, workingAxis } from './registry.js';
+import { IDENTITY_ORIENTATION } from '../core/orientation.js';
 
 // Where the rod leaves the barrel, and how long it is fully retracted, which
 // is whatever puts the foot flush with the bottom of the part's own cell.
@@ -289,7 +290,7 @@ export function createPartMesh(part, options = {}) {
     // Which way this part faces, for every part where that matters — the
     // controller's arrow is the machine's flight frame, so it shows which way
     // the whole thing thinks forward is.
-    const hint = workingAxis(part);
+    const hint = workingAxis(part, options.rot ?? IDENTITY_ORIENTATION);
     if (hint) object.add(directionArrow(hint.axis, HINT_COLOUR[hint.kind]));
     // A hinge has no direction, it has a plane, so it gets the plane instead.
     // Wheels are revolute too but got the arrow above: a ring round a wheel
@@ -299,8 +300,8 @@ export function createPartMesh(part, options = {}) {
   return object;
 }
 
-export function makeGhost(part) {
-  const object = createPartMesh(part, { hints: true });
+export function makeGhost(part, rot = IDENTITY_ORIENTATION) {
+  const object = createPartMesh(part, { hints: true, rot });
   object.traverse((child) => {
     if (!child.isMesh && !child.isLineSegments) return;
     child.castShadow = false;

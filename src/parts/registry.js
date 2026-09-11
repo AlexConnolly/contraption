@@ -1,3 +1,5 @@
+import { IDENTITY_ORIENTATION, driveSide } from '../core/orientation.js';
+
 // Every buildable part. `size` is the footprint in grid cells before rotation.
 // `attach` lists the local face normals that accept a connection; a part with
 // no entry accepts all six faces.
@@ -27,14 +29,24 @@ function cross(a, b) {
   ];
 }
 
-export function workingAxis(part) {
+export function workingAxis(part, rot = IDENTITY_ORIENTATION) {
   if (part.thruster) return { axis: part.thruster.axis, kind: 'act' };
   // A wheel rolls in the plane across its axle. Drawing the axle tells you
   // nothing a round part does not already tell you; what you cannot see is
   // which way it will drive you, which is the axle crossed with its own up.
+  //
+  // It has to take the rotation, because a wheel's motor is handed: wheels
+  // facing each other across a chassis mount with opposite axles, and the
+  // machine flips the command on one side so both drive it the same way. An
+  // arrow that ignored that would point the left wheels forward and the right
+  // ones backward, which is a picture of the joint convention rather than of
+  // what the wheel actually does.
   if (part.radius && part.joint === 'revolute') {
     const roll = cross(part.axis, [0, 1, 0]);
-    return { axis: roll.some(Boolean) ? roll : cross(part.axis, [0, 0, 1]), kind: 'act' };
+    const along = roll.some(Boolean) ? roll : cross(part.axis, [0, 0, 1]);
+    const side = driveSide(rot);
+    // `|| 0` so flipping a zero component gives 0 rather than -0.
+    return { axis: along.map((n) => (n * side) || 0), kind: 'act' };
   }
   if (part.sensor) return { axis: part.sensor.axis, kind: 'read' };
   if (part.flight) return { axis: [0, 0, 1], kind: 'read' };

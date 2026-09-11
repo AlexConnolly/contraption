@@ -126,3 +126,18 @@ export function applyOrientationInverse(index, v) {
     m[6] * v[0] + m[7] * v[1] + m[8] * v[2],
   ];
 }
+
+/**
+ * Which side of the machine a part bolted at this rotation sits on: +1 for
+ * one side, -1 for the other. Opposite sides mount with opposite axle
+ * directions, so a motor command has to be flipped on one of them for both to
+ * drive the machine the same way.
+ *
+ * With forward at +Z and up at +Y, the machine's right is forward x up = -X,
+ * so a part returning +1 sits on the machine's LEFT.
+ */
+export function driveSide(rot) {
+  const axle = applyOrientation(rot, [1, 0, 0]);
+  const dominant = axle.find((n) => n !== 0) ?? 1;
+  return dominant < 0 ? -1 : 1;
+}

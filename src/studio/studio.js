@@ -100,7 +100,7 @@ export class Studio {
       disposeTree(this.ghost);
     }
     const part = getPart(this.partType);
-    this.ghost = makeGhost(part);
+    this.ghost = makeGhost(part, this.rotation);
     this.ghostHolder.add(this.ghost);
     this.ghostBox = new THREE.LineSegments(
       new THREE.EdgesGeometry(
@@ -124,12 +124,17 @@ export class Studio {
     this.ghostHolder.visible = tool === 'place';
   }
 
+  // The ghost is rebuilt on a turn as well as on a change of part: a wheel's
+  // arrow depends on which side of the machine the rotation puts it, so it is
+  // not the same drawing at every rotation.
   rotateYaw() {
     this.rotation = yawStep(this.rotation);
+    this.refreshGhost();
   }
 
   rotatePitch() {
     this.rotation = pitchStep(this.rotation);
+    this.refreshGhost();
   }
 
   setPointer(x, y) {
@@ -409,7 +414,7 @@ export class Studio {
 
     for (const placed of this.blueprint.list()) {
       const part = getPart(placed.type);
-      const mesh = createPartMesh(part, { hints: true });
+      const mesh = createPartMesh(part, { hints: true, rot: placed.rot });
       mesh.position.set(
         placed.cell[0] * CELL, placed.cell[1] * CELL, placed.cell[2] * CELL,
       );
