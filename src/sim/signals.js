@@ -12,6 +12,34 @@ export const BINDING_MODES = [
   { id: 'always', name: 'Always on', keys: [] },
 ];
 
+/**
+ * How much throttle a wheel keeps while you are also asking it to turn.
+ *
+ * Adding steer to a full throttle and clamping does not steer: the outside
+ * wheel saturates and the inside one is commanded to a standstill rather than
+ * into reverse. At walking pace that is a wide turn; at top speed it is
+ * nothing at all, because a stopped wheel on a machine already doing 4.5 m/s
+ * is just a wheel being dragged. Measured on the starter rover, a stab of the
+ * steer key at speed moved it one degree in four seconds.
+ *
+ * Backing the throttle off first leaves room for a real difference between
+ * the two sides, so the inside wheel actually reverses and the machine comes
+ * round. It also means you slow down through a turn, which is what every
+ * vehicle does.
+ *
+ * 0.4 was measured rather than guessed. On the starter rover it doubles the
+ * turn rate — 20 to 40 deg/s from a standstill, 37 to 67 at speed — while
+ * still carrying 1.3 m/s through the corner. Higher values turn faster and
+ * keep dropping the speed: by 0.8 it is down to 0.4 m/s, which reads as
+ * pivoting on the spot rather than driving round something. Holding the steer
+ * key on its own still pivots, so both behaviours are available.
+ */
+export const STEER_BIAS = 0.4;
+
+export function driveMix(throttle, steer) {
+  return throttle * (1 - Math.abs(steer) * STEER_BIAS);
+}
+
 export function defaultBinding(part) {
   return part.actuator?.defaultBinding
     ? { ...part.actuator.defaultBinding }
@@ -63,7 +91,7 @@ export class SignalBus {
         // is still left from where the driver is sitting. Turning on the spot
         // has no direction of travel to reverse, so it keeps the forward sense.
         const sense = throttle < 0 ? -1 : 1;
-        return Math.max(-1, Math.min(1, throttle + side * steer * sense));
+        return Math.max(-1, Math.min(1, driveMix(throttle, steer) + side * steer * sense));
       }
       case 'axis':
         return (down(binding.pos) ? 1 : 0) - (down(binding.neg) ? 1 : 0);

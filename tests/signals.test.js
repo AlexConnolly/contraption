@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SignalBus, bindingLabel, keyLabel, driveSide } from '../src/sim/signals.js';
+import { SignalBus, bindingLabel, keyLabel, driveSide, driveMix, STEER_BIAS } from '../src/sim/signals.js';
 import { IDENTITY_ORIENTATION, yawStep } from '../src/core/orientation.js';
 
 function fakeInput() {
@@ -117,13 +117,39 @@ describe('drive bindings', () => {
     expect(bus.resolve('r', RIGHT)).toBe(1);
   });
 
-  it('clamps throttle and steer together to the motor range', () => {
+  // Adding steer to a full throttle and clamping does not steer: the outside
+  // wheel saturates and the inside one is only brought to a stop, which on a
+  // machine already moving is a wheel being dragged. The throttle is backed
+  // off first so the inside wheel can actually reverse.
+  it('reverses the inside wheel rather than merely stopping it', () => {
     const input = fakeInput();
     const bus = new SignalBus(input);
     input.down.add('KeyW');
     input.down.add('KeyA');
-    expect(bus.resolve('l', LEFT)).toBe(0);
+    expect(bus.resolve('l', LEFT)).toBeLessThan(0);
     expect(bus.resolve('r', RIGHT)).toBe(1);
+  });
+
+  it('keeps both wheels inside the motor range', () => {
+    const input = fakeInput();
+    const bus = new SignalBus(input);
+    input.down.add('KeyW');
+    input.down.add('KeyA');
+    for (const binding of [LEFT, RIGHT]) {
+      const value = bus.resolve('x', binding);
+      expect(value).toBeGreaterThanOrEqual(-1);
+      expect(value).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('still carries some throttle through a turn rather than pivoting', () => {
+    const input = fakeInput();
+    const bus = new SignalBus(input);
+    input.down.add('KeyW');
+    input.down.add('KeyA');
+    // Both wheels reversed would be a spin; one forward and one back, with the
+    // pair summing forward, is a machine driving round a corner.
+    expect(bus.resolve('l', LEFT) + bus.resolve('r', RIGHT)).toBeGreaterThan(0);
   });
 
   // Reversing swaps which way the machine swings for the same key, the way a
@@ -136,7 +162,7 @@ describe('drive bindings', () => {
     input.down.add('KeyA');
     // Forward and left drives the left wheels back and the right wheels on.
     // Backward and left has to do the opposite of that.
-    expect(bus.resolve('l', LEFT)).toBe(0);
+    expect(bus.resolve('l', LEFT)).toBeGreaterThan(0);
     expect(bus.resolve('r', RIGHT)).toBe(-1);
   });
 
@@ -145,7 +171,7 @@ describe('drive bindings', () => {
     const bus = new SignalBus(input);
     input.down.add('KeyW');
     input.down.add('KeyA');
-    expect(bus.resolve('l', LEFT)).toBe(0);
+    expect(bus.resolve('l', LEFT)).toBeLessThan(0);
     expect(bus.resolve('r', RIGHT)).toBe(1);
   });
 
@@ -155,6 +181,22 @@ describe('drive bindings', () => {
     input.down.add('KeyA');
     expect(bus.resolve('l', LEFT)).toBe(-1);
     expect(bus.resolve('r', RIGHT)).toBe(1);
+  });
+
+  it('leaves a straight line alone', () => {
+    const input = fakeInput();
+    const bus = new SignalBus(input);
+    input.down.add('KeyW');
+    expect(driveMix(1, 0)).toBe(1);
+    expect(bus.resolve('l', LEFT)).toBe(1);
+    expect(bus.resolve('r', RIGHT)).toBe(1);
+  });
+
+  it('backs the throttle off in proportion to the steer asked for', () => {
+    expect(driveMix(1, 1)).toBeCloseTo(1 - STEER_BIAS, 6);
+    expect(driveMix(1, -1)).toBeCloseTo(1 - STEER_BIAS, 6);
+    expect(driveMix(-1, 1)).toBeCloseTo(-(1 - STEER_BIAS), 6);
+    expect(driveMix(0, 1)).toBe(0);
   });
 
   it('reads the axle direction a wheel is bolted on with', () => {

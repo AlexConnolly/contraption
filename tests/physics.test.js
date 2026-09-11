@@ -189,6 +189,53 @@ describe('steering direction', () => {
     expect(after.dot(right)).toBeLessThan(-0.25);
   });
 
+  /**
+   * Turning while driving used to be barely there: the outside wheel
+   * saturated and the inside one was only stopped, so the starter rover came
+   * round at 20 deg/s from a standstill and at little more than one degree a
+   * second once it was up to speed. These pin the fix, in the terms a driver
+   * would notice — how fast it comes round, and whether it is still driving
+   * while it does.
+   */
+  function corner({ windUp = 0 } = {}) {
+    const { machine, bus } = build(starterRover(), keyboard());
+    run(machine, bus, 1.2);
+    bus.input.down.add('KeyW');
+    if (windUp) run(machine, bus, windUp);
+    bus.input.down.add('KeyD');
+
+    const heading = () => { const f = machine.coreForward(); return Math.atan2(f.x, f.z); };
+    let last = heading();
+    let turned = 0;
+    const seconds = 3;
+    for (let i = 0; i < Math.round(seconds / STEP); i += 1) {
+      machine.update(STEP, bus);
+      machine.world.step();
+      let d = heading() - last;
+      while (d > Math.PI) d -= 2 * Math.PI;
+      while (d < -Math.PI) d += 2 * Math.PI;
+      turned += d;
+      last = heading();
+    }
+    const v = machine.bodies[0].linvel();
+    return {
+      rate: Math.abs((turned * 180) / Math.PI) / seconds,
+      speed: Math.hypot(v.x, v.z),
+    };
+  }
+
+  it('comes round briskly when told to turn while driving', () => {
+    expect(corner().rate).toBeGreaterThan(30);
+  });
+
+  it('can still steer once it is up to speed', () => {
+    expect(corner({ windUp: 2.5 }).rate).toBeGreaterThan(30);
+  });
+
+  it('drives round the corner rather than stopping to pivot', () => {
+    expect(corner().speed).toBeGreaterThan(0.8);
+  });
+
   // Backing up on the same key has to swing the machine the other way, which
   // is what it looks like from behind the wheel.
   it('swings the other way on the same key while reversing', () => {

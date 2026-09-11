@@ -9,7 +9,7 @@ Three.js for rendering, Rapier for physics, Vite for the build.
 ```bash
 npm install
 npm run dev      # http://localhost:5173
-npm test         # 258 tests, including headless physics
+npm test         # 265 tests, including headless physics
 npm run build
 npm run preview  # serve the production build
 ```
@@ -100,6 +100,14 @@ rotor or grabber can be bound to whatever keys you like, in one of six modes:
 
 Drive mode swaps the steering round while you are reversing, so left is still
 left from where the driver is sitting.
+
+It also **backs the throttle off while you steer**, rather than adding steer
+to a full throttle and clamping. Clamping does not steer: the outside wheel
+saturates and the inside one is only brought to a standstill, which on a
+machine already moving is a wheel being dragged. Leaving room for a real
+difference lets the inside wheel reverse, which doubles the turn rate and
+costs some speed through the corner — which is what every vehicle does.
+Holding the steer key on its own still pivots on the spot.
 
 A piston's **reach** is set on the piston, anywhere from 0.4 m to 2.4 m, so a
 short jab and a long lift can sit on the same machine.
@@ -342,7 +350,7 @@ src/ui/          design tokens, front end (title, challenges, garage,
 
 ## Tests
 
-`npm test` runs 258 tests. The pure logic (orientations, grid placement, body
+`npm test` runs 265 tests. The pure logic (orientations, grid placement, body
 grouping, key bindings, objectives) is covered directly. On top of that,
 `tests/physics.test.js` builds real machines in a real Rapier world and asserts
 they behave — a rover drives, reverses and steers the correct way; an
