@@ -301,26 +301,39 @@ export class Hud {
     body.append(row);
   }
 
-  renderObjectives(report, level) {
+  // Built once per run; the per-frame update only touches the dot and the bar.
+  buildObjectives(report) {
     const list = this.dom.objectiveList;
     list.innerHTML = '';
+    this.objectiveRows = [];
     if (report.objectives.length === 0) {
       list.append(el('li', null, 'Sandbox — no objectives. Go and break something.'));
+      return;
     }
     for (const objective of report.objectives) {
       const item = el('li');
       const row = el('div', 'obj-row');
       const dot = el('span', 'obj-dot');
-      dot.classList.toggle('done', objective.done);
       row.append(dot, el('span', null, objective.label));
-      item.append(row);
       const bar = el('div', 'obj-bar');
       const fill = el('div');
-      fill.style.width = `${Math.round(objective.progress * 100)}%`;
       bar.append(fill);
-      item.append(bar);
+      item.append(row, bar);
       list.append(item);
+      this.objectiveRows.push({ dot, fill });
     }
+  }
+
+  renderObjectives(report, level) {
+    if (!this.objectiveRows || this.objectiveRows.length !== report.objectives.length) {
+      this.buildObjectives(report);
+    }
+    report.objectives.forEach((objective, index) => {
+      const row = this.objectiveRows[index];
+      if (!row) return;
+      row.dot.classList.toggle('done', objective.done);
+      row.fill.style.width = `${Math.round(objective.progress * 100)}%`;
+    });
     const par = level.par ? ` · par ${level.par}s` : '';
     this.dom.clock.innerHTML = `Run time <strong>${report.elapsed.toFixed(1)}s</strong>${par}`;
   }

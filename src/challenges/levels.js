@@ -19,9 +19,9 @@ export const LEVELS = [
       { pos: [-6, 0.75, -10], size: [10, 1.5, 1], rotY: 0.4, colour: DARK },
     ],
     props: [
-      { id: 'crate-a', pos: [3, 0.5, 2], size: [1, 1, 1], density: 0.6, colour: 0xc98b4b },
-      { id: 'crate-b', pos: [-3, 0.5, 2], size: [1.4, 0.7, 1.4], density: 0.5, colour: 0xb37a3f },
-      { id: 'ball', pos: [0, 0.6, 6], radius: 0.6, density: 0.4, colour: 0xd0574f },
+      { id: 'crate-a', pos: [3, 0.5, 2], size: [1, 1, 1], mass: 6, colour: 0xc98b4b },
+      { id: 'crate-b', pos: [-3, 0.5, 2], size: [1.4, 0.7, 1.4], mass: 7, colour: 0xb37a3f },
+      { id: 'ball', pos: [0, 0.6, 6], radius: 0.6, mass: 4, colour: 0xd0574f },
     ],
     zones: [],
     objectives: [],
@@ -37,7 +37,7 @@ export const LEVELS = [
     budget: { cost: 60 },
     pieces: [],
     props: [
-      { id: 'crate', pos: [0, 0.55, 2], size: [1.1, 1.1, 1.1], density: 0.45, colour: 0xc98b4b },
+      { id: 'crate', pos: [0, 0.55, 2], size: [1.1, 1.1, 1.1], mass: 8, colour: 0xc98b4b },
     ],
     zones: [
       { id: 'goal', pos: [0, 0.6, 12], size: [4, 2.4, 4], colour: 0x4ade80 },
@@ -64,7 +64,7 @@ export const LEVELS = [
       { pos: [0, 1.35, 9.5], size: [3, 0.5, 0.5], colour: DARK },
     ],
     props: [
-      { id: 'crate', pos: [0, 1.8, 6], size: [1.1, 1.1, 1.1], density: 0.5, colour: 0xc98b4b },
+      { id: 'crate', pos: [0, 1.8, 6], size: [1.1, 1.1, 1.1], mass: 8, colour: 0xc98b4b },
     ],
     zones: [
       { id: 'goal', pos: [0, 1.8, -10], size: [4, 3, 4], colour: 0x4ade80 },
@@ -89,7 +89,7 @@ export const LEVELS = [
       { pos: [0, 0.9, 3], size: [1, 1.8, 1], colour: DARK },
     ],
     props: [
-      { id: 'payload', pos: [-4, 1.45, 3], size: [0.9, 0.7, 0.9], density: 0.35, colour: 0x7cc4ff },
+      { id: 'payload', pos: [-4, 1.45, 3], size: [0.9, 0.7, 0.9], mass: 4, colour: 0x7cc4ff },
     ],
     zones: [
       { id: 'pad', pos: [4, 1.7, 3], size: [2.2, 1.6, 2.2], colour: 0x4ade80 },
@@ -113,7 +113,7 @@ export const LEVELS = [
       { pos: [0, 1.5, 8], size: [1.4, 3, 1.4], colour: DARK },
     ],
     props: [
-      { id: 'payload', pos: [0, 0.45, 0], size: [0.8, 0.8, 0.8], density: 0.3, colour: 0x7cc4ff },
+      { id: 'payload', pos: [0, 0.45, 0], size: [0.8, 0.8, 0.8], mass: 3, colour: 0x7cc4ff },
     ],
     zones: [
       { id: 'roof', pos: [0, 4.1, 8], size: [6, 2.2, 6], colour: 0x4ade80 },

@@ -89,8 +89,8 @@ const PARTS = [
     actuator: {
       kind: 'motor',
       signal: 'axis',
-      maxSpeed: 14,
-      maxForce: 14,
+      maxSpeed: 11,
+      maxForce: 22,
       defaultBinding: { mode: 'drive', pos: 'KeyW', neg: 'KeyS', left: 'KeyA', right: 'KeyD' },
     },
     blurb: 'Drives on its axle. Bind two sets to opposite keys to steer.',

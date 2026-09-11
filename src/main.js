@@ -31,11 +31,11 @@ const canvas = document.getElementById('view');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x151a20);
-scene.fog = new THREE.Fog(0x151a20, 45, 130);
+scene.fog = new THREE.Fog(0x151a20, 32, 88);
 
 const camera = new THREE.PerspectiveCamera(52, 1, 0.1, 500);
 camera.position.set(7, 6, 9);
@@ -142,6 +142,7 @@ function buildRun() {
     RAPIER, world, scene, blueprint: state.blueprint, spawn,
   });
   state.tracker = new ObjectiveTracker(state.level);
+  hud.buildObjectives(state.tracker.report());
   bus.reset();
   state.won = false;
   hud.hideWin();

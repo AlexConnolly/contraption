@@ -1,6 +1,13 @@
 import * as THREE from 'three';
 import { GROUP_WORLD } from './machine.js';
 
+// Props are authored with a mass in kilograms; Rapier wants a density.
+function propVolume(prop) {
+  return prop.radius
+    ? (4 / 3) * Math.PI * prop.radius ** 3
+    : prop.size[0] * prop.size[1] * prop.size[2];
+}
+
 function fixedBox(RAPIER, world, scene, { pos, size, rotX = 0, rotY = 0, colour }) {
   const quaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(rotX, rotY, 0));
   const body = world.createRigidBody(
@@ -90,8 +97,8 @@ export class Arena {
       ? RAPIER.ColliderDesc.ball(prop.radius)
       : RAPIER.ColliderDesc.cuboid(prop.size[0] / 2, prop.size[1] / 2, prop.size[2] / 2);
     world.createCollider(
-      desc.setDensity(prop.density ?? 0.5)
-        .setFriction(0.8)
+      desc.setDensity(prop.mass / propVolume(prop))
+        .setFriction(prop.friction ?? 0.85)
         .setRestitution(0.05)
         .setCollisionGroups(GROUP_WORLD),
       body,
