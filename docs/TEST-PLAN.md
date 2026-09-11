@@ -42,7 +42,7 @@
 13. Challenge 7 completes hands-off several times running, with visibly different obstacle timing and finishing times each run, and the objectives panel shows the no-contact rule.
 14. Blinding the sensors on challenge 7 ends the run with the failure card rather than a win.
 15. Save, reload the page, and load the design back unchanged.
-16. The game opens on the title screen with the machine turning behind it and the build UI hidden; `Esc` in game returns to it.
+16. The game opens on the title screen with the machine turning behind it and the build UI hidden; `Esc` in game returns to it. Nothing is on screen but the logo, the menu, the solved count and the machine — no build arrows, no plate, no key legend.
 17. Every challenge card shows a picture of its own course, its budget and par, and the `No input` / `No collisions` rules where they apply; clicking one starts that challenge.
 18. Winning a challenge puts a tick and a best time on its card, and the best time only improves.
 19. A machine saved to the garage appears with its own picture, opens into the current challenge, renames and deletes.

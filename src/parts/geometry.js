@@ -235,6 +235,9 @@ function overlaySkin(colour) {
 }
 
 function onTop(group) {
+  // Named so the studio can take every marker off at once when the machine is
+  // being shown rather than built.
+  group.name = 'hint';
   group.renderOrder = 999;
   group.traverse((child) => { child.renderOrder = 999; });
   return group;

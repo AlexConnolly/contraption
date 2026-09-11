@@ -47,8 +47,7 @@ export class FrontEnd {
 
     this.top = el('header', 'fe-top');
     this.body = el('div', 'fe-body');
-    this.foot = el('footer', 'fe-foot');
-    this.root.append(this.top, this.body, this.foot);
+    this.root.append(this.top, this.body);
     document.body.append(this.scan, this.root);
 
     addEventListener('keydown', (event) => {
@@ -86,7 +85,6 @@ export class FrontEnd {
     this.root.classList.toggle('solid', screen !== 'title');
     this.top.innerHTML = '';
     this.body.innerHTML = '';
-    this.foot.innerHTML = '';
 
     if (screen === 'title') this.renderTitle();
     if (screen === 'challenges') this.renderChallenges();
@@ -101,13 +99,6 @@ export class FrontEnd {
     this.top.append(back, title, el('span', 'fe-spacer'));
   }
 
-  keys(pairs) {
-    for (const [key, what] of pairs) {
-      this.foot.append(el('span', 'fe-key', `<kbd>${key}</kbd> ${what}`));
-    }
-    this.foot.append(el('span', 'fe-spacer'), el('span', 'build', 'Three.js · Rapier · WebGL 2'));
-  }
-
   // ------------------------------------------------------------------ title
 
   renderTitle() {
@@ -116,8 +107,6 @@ export class FrontEnd {
     const next = campaign.find((l) => !store.solved(l.id)) ?? campaign[campaign.length - 1];
 
     this.top.append(
-      el('div', 'fe-pill', '<span class="fe-dot"></span><b>PHYSICS 60 HZ</b><span class="fe-sep"></span>RAPIER · THREE.JS'),
-      el('div', 'fe-pill hide-sm', 'EARLY ACCESS<span class="fe-sep"></span><b>v0.9</b>'),
       el('span', 'fe-spacer'),
       el('div', 'fe-pill', `SOLVED <b>${solved} / ${campaign.length}</b>`),
     );
@@ -165,7 +154,6 @@ export class FrontEnd {
 
     hero.append(menu);
     this.body.append(hero);
-    this.keys([['ENTER', 'Select'], ['↑ ↓', 'Navigate'], ['ESC', 'Back']]);
     menu.querySelector('.fe-item')?.focus();
   }
 
@@ -184,7 +172,6 @@ export class FrontEnd {
     for (const level of LEVELS) grid.append(this.challengeCard(level));
     sheet.append(grid);
     this.body.append(sheet);
-    this.keys([['ESC', 'Back to menu']]);
   }
 
   challengeCard(level) {
@@ -264,7 +251,6 @@ export class FrontEnd {
       sheet.append(el('p', 'fe-empty', 'Nothing saved yet. Build something and save it here.'));
     }
     this.body.append(sheet);
-    this.keys([['ESC', 'Back to menu']]);
   }
 
   machineCard(machine) {
@@ -370,6 +356,5 @@ export class FrontEnd {
 
     sheet.append(list);
     this.body.append(sheet);
-    this.keys([['ESC', 'Back to menu']]);
   }
 }

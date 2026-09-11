@@ -436,6 +436,7 @@ export class Studio {
       }
     }
     this.grouping = grouping;
+    this.applyHints();
   }
 
   /**
@@ -457,12 +458,27 @@ export class Studio {
     };
   }
 
-  // The title screen turns the machine on an empty stage: no grid, and nothing
-  // to point at, so the placement ghost goes with the plate.
+  /**
+   * The title screen turns the machine on an empty stage: no grid, and nothing
+   * to point at, so the placement ghost goes with the plate. The direction
+   * arrows go too — they are there to help you aim a part, not to be looked
+   * at.
+   */
   setShowPlate(show) {
     this.plate.visible = show;
     if (this.grid) this.grid.visible = show;
     if (!show) this.clearPointer();
+    this.showHints = show;
+    this.applyHints();
+  }
+
+  applyHints() {
+    const show = this.showHints !== false;
+    for (const mesh of this.partMeshes.values()) {
+      mesh.traverse((child) => {
+        if (child.name === 'hint') child.visible = show;
+      });
+    }
   }
 
   setVisible(visible) {

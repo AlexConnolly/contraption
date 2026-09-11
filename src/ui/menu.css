@@ -12,7 +12,7 @@
   font-family: var(--ui);
   color: var(--text);
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr);
   padding: clamp(16px, 2.4vw, 34px);
   gap: clamp(14px, 2vw, 28px);
 }
@@ -74,12 +74,6 @@
   white-space: nowrap;
 }
 .fe-pill b { color: var(--text); font-weight: 500; }
-.fe-dot {
-  width: 7px; height: 7px; border-radius: 50%;
-  background: var(--green);
-  box-shadow: 0 0 8px var(--green);
-}
-.fe-sep { width: 1px; height: 14px; background: var(--edge); }
 .fe-spacer { flex: 1 1 auto; }
 
 .fe-back {
@@ -446,31 +440,6 @@
 .fe-choice button:hover { color: var(--text); }
 .fe-choice button[aria-pressed="true"] { background: var(--amber); color: #10131a; font-weight: 700; }
 
-/* ------------------------------------------------------------------- footer */
-
-.fe-foot {
-  display: flex;
-  align-items: center;
-  gap: 10px 22px;
-  flex-wrap: wrap;
-  padding-top: 13px;
-  border-top: 1px solid var(--edge);
-  font-family: var(--mono);
-  font-size: 11px;
-  color: var(--dim);
-}
-.fe-key { display: inline-flex; align-items: center; gap: 7px; }
-.fe-key kbd {
-  font: inherit;
-  font-weight: 700;
-  color: var(--amber);
-  background: var(--raised);
-  border: 1px solid var(--edge);
-  border-bottom-width: 2px;
-  padding: 2px 7px;
-}
-.fe-foot .build { color: var(--faint); }
-
 .fe-empty {
   padding: 46px 10px;
   text-align: center;
@@ -481,7 +450,6 @@
 @media (max-width: 760px) {
   .fe-hero { gap: 24px; }
   .fe-menu { width: 100%; }
-  .fe-top .hide-sm { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
