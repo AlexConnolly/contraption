@@ -162,6 +162,25 @@ underneath; drop the camera below the plate and it fades out of your way.
 
 Designs autosave per challenge and survive a reload.
 
+## The world itself
+
+A level can change `gravity`, the `friction` of the ground or of one surface,
+put `wind` volumes across the course, and close the view down with `fog`.
+
+These are the cheapest variety in the game — no new parts, no new objectives,
+nothing added to a machine — and between them they re-ask every question the
+player has already answered. A rover that works perfectly is useless on ice; a
+drone that hovers beautifully is a liability in a crosswind. They apply just as
+well to courses that already shipped.
+
+Wind is an **impulse**, not a force, and that is not a detail: a machine clears
+its own forces at the top of every update, so a force added by the arena would
+be wiped before it did anything. An impulse goes into the velocity and
+survives. It still scales with mass, which is the whole point — measured on the
+starter rover at 19 kg and the quadcopter at 10.3 kg, a 20 N crosswind drifts
+the rover half a metre in three seconds and the drone two and a half. Much past
+60 N and everything simply slides away.
+
 ## Sound
 
 Every audio file is **CC0** — Kenney's [Interface Sounds](https://kenney.nl/assets/interface-sounds)

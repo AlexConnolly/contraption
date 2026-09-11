@@ -8,6 +8,7 @@ import { Studio } from './studio/studio.js';
 import { starterRover, quadcopter } from './studio/presets.js';
 import { Machine } from './sim/machine.js';
 import { Arena } from './sim/arena.js';
+import { gravityOf } from './sim/world.js';
 import { SignalBus } from './sim/signals.js';
 import { controllerOf, firstController } from './sim/flight.js';
 import { getPart } from './parts/registry.js';
@@ -216,6 +217,9 @@ function applyBans() {
 
 function buildRun() {
   const spawn = new THREE.Vector3(...state.level.spawn);
+  // The world outlives any one run, so the level's gravity is set each time
+  // rather than baked in when it was created.
+  world.gravity = gravityOf(state.level);
   state.arena = new Arena({ RAPIER, world, scene, level: state.level });
   state.machine = new Machine({
     RAPIER, world, scene, blueprint: state.blueprint, spawn, level: state.level,

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Arena } from '../sim/arena.js';
+import { gravityOf } from '../sim/world.js';
 import { getPart, CELL } from '../parts/registry.js';
 import { orientationQuaternion } from '../core/orientation.js';
 import { createPartMesh } from '../parts/geometry.js';
@@ -88,7 +89,7 @@ export function renderLevel(RAPIER, level) {
   scene.fog = new THREE.Fog(SKY, 34, 120);
   lightUp(scene);
 
-  const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
+  const world = new RAPIER.World(gravityOf(level));
   world.timestep = 1 / 60;
   const arena = new Arena({ RAPIER, world, scene, level, seed: 7 });
   arena.step(1.4);

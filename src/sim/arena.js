@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GROUP_WORLD } from './machine.js';
 import { makeRng, randomSeed, between } from './rng.js';
 import { setTag, clearTag } from './tags.js';
+import { gustAt } from './world.js';
 
 // Props are authored with a mass in kilograms; Rapier wants a density.
 function propVolume(prop) {
@@ -11,7 +12,7 @@ function propVolume(prop) {
 }
 
 function fixedBox(RAPIER, world, scene, piece) {
-  const { pos, size, rotX = 0, rotY = 0, colour, belt } = piece;
+  const { pos, size, rotX = 0, rotY = 0, colour, belt, friction } = piece;
   const quaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(rotX, rotY, 0));
   const body = world.createRigidBody(
     RAPIER.RigidBodyDesc.fixed()
@@ -20,7 +21,10 @@ function fixedBox(RAPIER, world, scene, piece) {
   );
   const collider = world.createCollider(
     RAPIER.ColliderDesc.cuboid(size[0] / 2, size[1] / 2, size[2] / 2)
-      .setFriction(belt ? 1.4 : 0.95)
+      // A surface can be as slippery as the level wants. Near zero is ice,
+      // and ice is a whole level on its own: steering stops working and you
+      // plan a line instead of correcting your way along one.
+      .setFriction(friction ?? (belt ? 1.4 : 0.95))
       .setCollisionGroups(GROUP_WORLD),
     body,
   );
@@ -65,6 +69,18 @@ export class Arena {
 
   build() {
     const { RAPIER, world, scene, level } = this;
+
+    // Fog is the level closing the view down, so it belongs to the level and
+    // is put back the way it was found when the course is torn down.
+    this.fogBefore = scene.fog;
+    if (level.fog) {
+      scene.fog = new THREE.Fog(
+        level.fog.colour ?? 0x0b0f14,
+        level.fog.near ?? 1,
+        level.fog.far ?? 14,
+      );
+    }
+
     const groundY = level.groundY ?? 0;
     const half = (level.groundSize ?? 120) / 2;
 
@@ -73,7 +89,7 @@ export class Arena {
     );
     world.createCollider(
       RAPIER.ColliderDesc.cuboid(half, 1, half)
-        .setFriction(1)
+        .setFriction(level.friction ?? 1)
         .setCollisionGroups(GROUP_WORLD),
       groundBody,
     );
@@ -383,6 +399,47 @@ export class Arena {
     }
   }
 
+  /**
+   * How hard a wind volume is blowing right now. Exposed so a test can watch
+   * it breathe rather than having to infer it from where a crate ended up.
+   */
+  windAt(elapsed, wind) {
+    return gustAt(elapsed, wind);
+  }
+
+  /**
+   * Blows everything inside a wind volume along.
+   *
+   * An impulse rather than a force, and that is not a detail: a machine
+   * clears its own forces at the top of every update, so a force added here
+   * would be wiped before it did anything at all. An impulse goes straight
+   * into the velocity and survives.
+   *
+   * It is still scaled by mass, which is the entire point of the mechanic —
+   * a light drone gets blown about and a heavy rover barely notices, so the
+   * machine that has solved everything so far is the wrong answer here.
+   */
+  driveWind(dt) {
+    const winds = this.level.wind ?? [];
+    if (winds.length === 0) return;
+    for (const wind of winds) {
+      const strength = gustAt(this.elapsed, wind);
+      if (!strength) continue;
+      const [dx, dy, dz] = wind.dir ?? [1, 0, 0];
+      const length = Math.hypot(dx, dy, dz) || 1;
+      const [hx, hy, hz] = wind.size.map((n) => n / 2);
+      this.world.forEachRigidBody((body) => {
+        if (!body.isDynamic()) return;
+        const t = body.translation();
+        if (Math.abs(t.x - wind.pos[0]) > hx) return;
+        if (Math.abs(t.y - wind.pos[1]) > hy) return;
+        if (Math.abs(t.z - wind.pos[2]) > hz) return;
+        const push = (strength * dt) / length;
+        body.applyImpulse({ x: dx * push, y: dy * push, z: dz * push }, true);
+      });
+    }
+  }
+
   opponentPosition(id) {
     const rival = this.opponents.get(id);
     if (!rival) return null;
@@ -486,6 +543,7 @@ export class Arena {
     this.elapsed += dt;
     this.driveBelts();
     this.driveOpponents();
+    this.driveWind(dt);
     for (const mover of this.movers) {
       const travel = Math.sin(this.elapsed * mover.rate + mover.offset) * mover.span;
       const at = [...mover.spec.pos];
@@ -592,6 +650,7 @@ export class Arena {
   }
 
   dispose() {
+    this.scene.fog = this.fogBefore ?? null;
     for (const entry of this.objects) {
       if (entry.mesh) {
         this.scene.remove(entry.mesh);
