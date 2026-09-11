@@ -42,6 +42,24 @@ describe('skill levels', () => {
     }
   });
 
+  // Flight is the answer to almost everything, so taking it away is the single
+  // biggest thing a level can do to itself.
+  it('moves a level up a tier for every ban on it', () => {
+    const demands = { steps: 1, flies: false };
+    expect(tierOf({ demands })).toBe('easy');
+    expect(tierOf({ demands, bans: ['flight'] })).toBe('medium');
+    expect(tierOf({ demands, bans: ['flight', 'wheels'] })).toBe('hard');
+  });
+
+  it('does not run off the end of the ramp', () => {
+    const demands = { steps: 3, flies: true };
+    expect(tierOf({ demands, bans: ['flight', 'wheels', 'grabber'] })).toBe('expert');
+  });
+
+  it('still calls anything autonomous expert, bans or not', () => {
+    expect(tierOf({ demands: { steps: 1, autonomous: true }, bans: ['flight'] })).toBe('expert');
+  });
+
   it('names each tier for the UI', () => {
     expect(tier('expert').name).toBe('Expert');
     expect(tier('nope')).toBe(null);
