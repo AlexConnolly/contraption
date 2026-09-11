@@ -8,7 +8,7 @@ import { Studio } from './studio/studio.js';
 import { starterRover, quadcopter } from './studio/presets.js';
 import { Machine } from './sim/machine.js';
 import { Arena } from './sim/arena.js';
-import { gravityOf } from './sim/world.js';
+import { createWorld, gravityOf } from './sim/world.js';
 import { SignalBus } from './sim/signals.js';
 import { controllerOf, firstController } from './sim/flight.js';
 import { getPart } from './parts/registry.js';
@@ -691,7 +691,7 @@ function frame(now) {
 // ------------------------------------------------------------------------ boot
 
 async function boot() {
-  world = createWorld(RAPIER, { x: 0, y: -9.81, z: 0 });
+  world = createWorld(RAPIER, gravityOf(state.level));
 
   state.level = getLevel(store.lastLevel() ?? 'first-haul');
   const stored = loadDesign(state.level.id);

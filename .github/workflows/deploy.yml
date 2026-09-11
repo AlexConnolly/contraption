@@ -26,6 +26,10 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # A missing import is not a syntax error and not a test failure: the
+      # bundle builds, the tests pass because nothing loads the entry point,
+      # and the site is broken. That shipped once. It is checked first now.
+      - run: npm run lint
       # The physics is covered headlessly, so a broken build never reaches the
       # site even though nobody is watching the deploy.
       - run: npm test

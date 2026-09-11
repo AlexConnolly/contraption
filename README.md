@@ -437,7 +437,12 @@ it on the platform. Both assert the objective actually completes.
 
 Every physics world, in the game and in the tests, is made by `createWorld` in
 `sim/world.js`, so a solver setting the game uses is always a setting the tests
-are checking. That file carries the measurements behind the one setting that is
+are checking.
+
+`npm run lint` exists for one rule, `no-undef`. A missing import is not a
+syntax error and not a test failure: the bundle builds happily around a name
+that is not there, the suite passes because nothing loads the entry point, and
+the first thing to find out is somebody opening the site. That shipped once. That file carries the measurements behind the one setting that is
 not a Rapier default.
 
 Four conventions are worth stating because getting them wrong cost real bugs.
