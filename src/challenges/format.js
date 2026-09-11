@@ -1,0 +1,306 @@
+/**
+ * The portable form of a level.
+ *
+ * This is the one file in the project that has to be got right the first time.
+ * The moment somebody shares a level with somebody else, the format is public:
+ * changing its meaning breaks levels that are already out there, and there is
+ * no going back and editing them. So it is versioned, it is validated on the
+ * way in, and it is deliberately small — a level is data, never behaviour.
+ *
+ * A shared level is untrusted input. Everything that comes in is checked
+ * against the shape below, every number is clamped to something the engine can
+ * survive, every list is capped, and anything not named here is dropped rather
+ * than passed through. A level someone mailed you cannot carry a field we did
+ * not ask for, cannot reference a part that does not exist, and cannot be a
+ * hundred megabytes of geometry.
+ */
+
+export const LEVEL_FORMAT = 1;
+
+/** Caps, so a shared level can never be a denial of service. */
+export const LIMITS = {
+  name: 60,
+  brief: 300,
+  hint: 300,
+  pieces: 250,
+  props: 60,
+  zones: 12,
+  keepout: 12,
+  objectives: 8,
+  stacks: 6,
+  stackCount: 80,
+  movers: 16,
+  wind: 4,
+  chars: 64 * 1024,
+  bytes: 512 * 1024,
+};
+
+const BANS = ['flight', 'wheels', 'grabber'];
+const OBJECTIVE_TYPES = ['propInZone', 'coreInZone', 'propsInZone', 'propThroughHoop'];
+
+// The world is a box. Nothing a level describes may sit outside it, however
+// enthusiastic the person who built it was.
+const REACH = 200;
+const HIGH = 120;
+
+function clamp(value, low, high, fallback = 0) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(high, Math.max(low, n));
+}
+
+function text(value, max) {
+  if (typeof value !== 'string') return '';
+  // Control characters out: a level name is one line of plain text.
+  return [...value].filter((ch) => { const code = ch.codePointAt(0); return code > 31 && code !== 127; }).join('').trim().slice(0, max);
+}
+
+function slug(value) {
+  const s = typeof value === 'string' ? value : '';
+  return s.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 32);
+}
+
+function vec(value, fallback = [0, 0, 0]) {
+  if (!Array.isArray(value) || value.length !== 3) return [...fallback];
+  return [
+    clamp(value[0], -REACH, REACH),
+    clamp(value[1], -HIGH, HIGH),
+    clamp(value[2], -REACH, REACH),
+  ];
+}
+
+function size(value, fallback = [1, 1, 1]) {
+  if (!Array.isArray(value) || value.length !== 3) return [...fallback];
+  return [
+    clamp(value[0], 0.1, REACH, fallback[0]),
+    clamp(value[1], 0.1, HIGH, fallback[1]),
+    clamp(value[2], 0.1, REACH, fallback[2]),
+  ];
+}
+
+function colour(value, fallback) {
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 0 || n > 0xffffff) return fallback;
+  return n;
+}
+
+function list(value, max) {
+  return Array.isArray(value) ? value.slice(0, max) : [];
+}
+
+/**
+ * Cleans a level into exactly the shape the engine accepts, dropping anything
+ * unrecognised. Always returns something playable, which is the point: a
+ * mangled share code should give you an odd level, not a broken game.
+ */
+export function sanitiseLevel(input, { id } = {}) {
+  const raw = input && typeof input === 'object' ? input : {};
+
+  const props = list(raw.props, LIMITS.props).map((p, i) => {
+    const out = {
+      id: slug(p?.id) || `prop-${i}`,
+      pos: vec(p?.pos, [0, 1, 0]),
+      mass: clamp(p?.mass, 0.1, 5000, 5),
+      colour: colour(p?.colour, 0xc98b4b),
+    };
+    if (Number.isFinite(Number(p?.radius))) out.radius = clamp(p.radius, 0.1, 20, 0.5);
+    else out.size = size(p?.size, [1, 1, 1]);
+    if (p?.ccd) out.ccd = true;
+    if (Number.isFinite(Number(p?.friction))) out.friction = clamp(p.friction, 0, 4, 0.85);
+    if (Number.isInteger(Number(p?.tag))) out.tag = clamp(p.tag, 0, 9, 0);
+    return out;
+  });
+
+  const zones = list(raw.zones, LIMITS.zones).map((z, i) => ({
+    id: slug(z?.id) || `zone-${i}`,
+    pos: vec(z?.pos, [0, 1, 0]),
+    size: size(z?.size, [3, 2, 3]),
+    colour: colour(z?.colour, 0x4ade80),
+  }));
+
+  const known = new Set([...props.map((p) => p.id), ...zones.map((z) => z.id)]);
+
+  // An objective that points at nothing is worse than no objective: the level
+  // simply cannot be completed and there is no way for the player to tell.
+  const objectives = list(raw.objectives, LIMITS.objectives)
+    .filter((o) => OBJECTIVE_TYPES.includes(o?.type))
+    .filter((o) => (o.prop ? known.has(slug(o.prop)) : true))
+    .filter((o) => (o.zone ? known.has(slug(o.zone)) : true))
+    .map((o) => {
+      const out = {
+        type: o.type,
+        label: text(o.label, 80) || 'Finish the job',
+        hold: clamp(o.hold, 0, 30, 0),
+      };
+      if (o.prop) out.prop = slug(o.prop);
+      if (o.zone) out.zone = slug(o.zone);
+      if (o.stack) out.stack = slug(o.stack);
+      if (o.hoop) out.hoop = slug(o.hoop);
+      return out;
+    });
+
+  const level = {
+    id: id ?? (slug(raw.id) || 'custom'),
+    name: text(raw.name, LIMITS.name) || 'Untitled problem',
+    brief: text(raw.brief, LIMITS.brief) || 'No brief.',
+    custom: true,
+    spawn: vec(raw.spawn, [0, 1, -8]),
+    groundSize: clamp(raw.groundSize, 20, 400, 120),
+    groundY: clamp(raw.groundY, -HIGH, HIGH, 0),
+    pieces: list(raw.pieces, LIMITS.pieces).map((piece) => {
+      const out = {
+        pos: vec(piece?.pos, [0, 0, 0]),
+        size: size(piece?.size, [2, 1, 2]),
+        colour: colour(piece?.colour, 0x6b7480),
+      };
+      if (Number.isFinite(Number(piece?.friction))) out.friction = clamp(piece.friction, 0, 4, 0.95);
+      return out;
+    }),
+    props,
+    zones,
+    keepout: list(raw.keepout, LIMITS.keepout).map((k, i) => ({
+      id: slug(k?.id) || `keepout-${i}`,
+      pos: vec(k?.pos, [0, 4, 0]),
+      size: size(k?.size, [6, 8, 6]),
+    })),
+    objectives,
+    demands: {
+      steps: clamp(raw.demands?.steps, 1, 6, 1),
+      flies: Boolean(raw.demands?.flies),
+      autonomous: Boolean(raw.handsOff),
+      ...(raw.demands?.bansBite === false ? { bansBite: false } : {}),
+    },
+    bans: [...new Set(list(raw.bans, BANS.length).filter((b) => BANS.includes(b)))],
+    budget: { cost: clamp(raw.budget?.cost, 1, 2000, 120) },
+    par: clamp(raw.par, 5, 3600, 120),
+  };
+
+  if (raw.hint) level.hint = text(raw.hint, LIMITS.hint);
+  if (raw.handsOff) level.handsOff = true;
+  if (raw.noContact) level.noContact = true;
+  if (raw.noRespawn) level.noRespawn = true;
+  if (Number.isFinite(Number(raw.massCap))) level.massCap = clamp(raw.massCap, 1, 5000, 50);
+  if (Number.isFinite(Number(raw.gravity))) level.gravity = clamp(raw.gravity, -40, 0, -9.81);
+  if (Number.isFinite(Number(raw.friction))) level.friction = clamp(raw.friction, 0, 4, 1);
+  if (raw.fog) {
+    level.fog = {
+      near: clamp(raw.fog.near, 0, 400, 1),
+      far: clamp(raw.fog.far, 1, 800, 40),
+      colour: colour(raw.fog.colour, 0x0b0f14),
+    };
+  }
+
+  return level;
+}
+
+/** What a level is missing before it is worth playing. */
+export function levelProblems(level) {
+  const problems = [];
+  if (level.objectives.length === 0) problems.push('No objective — there is nothing to finish');
+  if (level.zones.length === 0 && level.objectives.some((o) => o.zone)) {
+    problems.push('An objective needs a zone and there are none');
+  }
+  const inGround = level.spawn[1] < level.groundY;
+  if (inGround) problems.push('The spawn point is under the ground');
+  for (const objective of level.objectives) {
+    if (objective.type === 'propInZone' && !objective.prop) {
+      problems.push(`"${objective.label}" does not say which prop`);
+    }
+  }
+  return problems;
+}
+
+// ---------------------------------------------------------------- share code
+
+const PREFIX = 'CTP1';
+
+function toBase64Url(bytes) {
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  const base64 = typeof btoa === 'function'
+    ? btoa(binary)
+    : Buffer.from(bytes).toString('base64');
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function fromBase64Url(text) {
+  const base64 = text.replace(/-/g, '+').replace(/_/g, '/');
+  if (typeof atob === 'function') {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  }
+  return new Uint8Array(Buffer.from(base64, 'base64'));
+}
+
+async function squeeze(bytes, mode) {
+  const Stream = mode === 'deflate' ? CompressionStream : DecompressionStream;
+  if (typeof Stream !== 'function') return null;
+  const stream = new Blob([bytes]).stream().pipeThrough(new Stream('deflate-raw'));
+  const chunks = [];
+  let total = 0;
+  const reader = stream.getReader();
+  for (;;) {
+    // eslint-disable-next-line no-await-in-loop
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.length;
+    // A small code must not be able to expand into something enormous.
+    if (total > LIMITS.bytes) throw new Error('Level is too big');
+    chunks.push(value);
+  }
+  const out = new Uint8Array(total);
+  let at = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, at);
+    at += chunk.length;
+  }
+  return out;
+}
+
+/**
+ * A level as one line of text somebody can paste to a friend.
+ *
+ * Compressed where the browser will do it, and plainly readable where it will
+ * not — the flag says which, so a code made on one machine always opens on
+ * another. That matters more than the few bytes saved.
+ */
+export async function toShareCode(level) {
+  const clean = sanitiseLevel(level);
+  const json = JSON.stringify({ v: LEVEL_FORMAT, level: clean });
+  const bytes = new TextEncoder().encode(json);
+  const packed = await squeeze(bytes, 'deflate').catch(() => null);
+  return packed && packed.length < bytes.length
+    ? `${PREFIX}z${toBase64Url(packed)}`
+    : `${PREFIX}j${toBase64Url(bytes)}`;
+}
+
+/** The other direction, and it never throws on rubbish — it explains. */
+export async function fromShareCode(code) {
+  const trimmed = typeof code === 'string' ? code.trim().replace(/\s+/g, '') : '';
+  if (!trimmed.startsWith(PREFIX)) {
+    return { ok: false, reason: 'That does not look like a level code' };
+  }
+  if (trimmed.length > LIMITS.chars) {
+    return { ok: false, reason: 'That code is too long to be a level' };
+  }
+  const flag = trimmed[PREFIX.length];
+  const body = trimmed.slice(PREFIX.length + 1);
+  if (flag !== 'z' && flag !== 'j') {
+    return { ok: false, reason: 'That code was made by a newer version of the game' };
+  }
+  try {
+    const bytes = fromBase64Url(body);
+    const json = flag === 'z'
+      ? new TextDecoder().decode(await squeeze(bytes, 'inflate'))
+      : new TextDecoder().decode(bytes);
+    const parsed = JSON.parse(json);
+    if (parsed?.v !== LEVEL_FORMAT) {
+      return { ok: false, reason: 'That level was made by a different version of the game' };
+    }
+    return { ok: true, level: sanitiseLevel(parsed.level) };
+  } catch {
+    return { ok: false, reason: 'That code is damaged' };
+  }
+}
