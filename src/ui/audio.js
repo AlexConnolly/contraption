@@ -54,7 +54,9 @@ function makeContext() {
 }
 
 export class GameAudio {
-  constructor({ volume = 'full', base = 'audio/' } = {}) {
+  // Through the bundler's base, so the clips are still found when the game is
+  // served from a subpath rather than from a domain root.
+  constructor({ volume = 'full', base = `${import.meta.env?.BASE_URL ?? '/'}audio/` } = {}) {
     this.volume = volume;
     this.base = base;
     this.ctx = null;

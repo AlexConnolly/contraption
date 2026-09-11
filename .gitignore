@@ -2,3 +2,6 @@ node_modules
 dist
 .DS_Store
 *.local
+
+# scratch scripts from agent runs
+tmp

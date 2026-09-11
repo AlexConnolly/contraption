@@ -1,6 +1,13 @@
 import { defineConfig } from 'vite';
 
+// A project page is served from /<repo>/, not from the root, so every asset URL
+// has to carry that prefix. GitHub Actions puts "owner/repo" in the
+// environment, which is the one place the name is known for certain — hard-
+// coding it means renaming the repo silently breaks the site.
+const repo = process.env.GITHUB_REPOSITORY?.split('/')[1];
+
 export default defineConfig({
+  base: repo ? `/${repo}/` : '/',
   server: {
     // Off deliberately. Editing a file mid-session otherwise reloads the page
     // and throws away whatever run or build was in progress, which makes the
