@@ -56,6 +56,7 @@ export class Arena {
     this.seed = seed ?? randomSeed();
     this.objects = [];
     this.props = new Map();
+    this.opponents = new Map();
     this.movers = [];
     this.belts = [];
     this.elapsed = 0;
@@ -108,7 +109,9 @@ export class Arena {
     for (const hoop of level.hoops ?? []) this.addHoop(hoop);
     this.shuffleStarts();
     for (const prop of level.props ?? []) this.addProp(prop);
+    for (const stack of level.stacks ?? []) this.addStack(stack);
     for (const mover of level.movers ?? []) this.addMover(mover);
+    for (const rival of level.opponents ?? []) this.addOpponent(rival);
     for (const zone of level.zones ?? []) this.addZone(zone);
     for (const zone of level.keepout ?? []) this.addKeepOut(zone);
   }
@@ -220,8 +223,12 @@ export class Arena {
     const body = world.createRigidBody(
       RAPIER.RigidBodyDesc.dynamic()
         .setTranslation(start[0], start[1], start[2])
-        .setLinearDamping(0.2)
-        .setAngularDamping(0.4),
+        .setLinearDamping(prop.damping ?? 0.2)
+        .setAngularDamping(prop.angularDamping ?? 0.4)
+        // A big heavy prop can cover more ground between steps than the floor
+        // is thick, and go straight through it. Continuous collision costs
+        // something, so it is asked for rather than assumed.
+        .setCcdEnabled(prop.ccd ?? false),
     );
     const desc = prop.radius
       ? RAPIER.ColliderDesc.ball(prop.radius)
@@ -248,6 +255,139 @@ export class Arena {
     scene.add(mesh);
     this.props.set(prop.id, { spec: prop, body, mesh });
     this.objects.push({ body, mesh, collider });
+  }
+
+  /**
+   * A heap of loose blocks from one line of level data.
+   *
+   * A rockfall across a road, a jenga bridge, a yard of scrap are all the same
+   * thing with different numbers, and writing forty props by hand for each of
+   * them would be unreadable. Where each block lands is drawn from the run
+   * seed, so a heap is repeatable when a test wants it and different when a
+   * player is looking at it: you cannot learn one arrangement and replay it.
+   */
+  addStack(stack) {
+    const rng = makeRng(
+      this.seed + [...String(stack.id)].reduce((a, c) => a + c.charCodeAt(0), 0) * 15485863,
+    );
+    const [sx, sy, sz] = stack.spread ?? [2, 1, 2];
+    for (let i = 0; i < (stack.count ?? 1); i += 1) {
+      this.addProp({
+        id: `${stack.id}-${i}`,
+        pos: [
+          stack.pos[0] + between(rng, -sx / 2, sx / 2),
+          stack.pos[1] + between(rng, 0, sy),
+          stack.pos[2] + between(rng, -sz / 2, sz / 2),
+        ],
+        size: stack.size ?? [0.6, 0.6, 0.6],
+        mass: stack.mass ?? 2,
+        colour: stack.colour ?? 0x9a8b72,
+        friction: stack.friction,
+        tag: stack.tag,
+        stack: stack.id,
+      });
+    }
+  }
+
+  /**
+   * A machine that is not yours, driving a route of its own.
+   *
+   * Dynamic rather than kinematic, which is the whole point: a scripted body
+   * that cannot be moved is scenery, and half of what these are for is being
+   * shoved. It steers by pulling its own velocity towards where it wants to
+   * go, so a heavy enough machine can hold it up, knock it off line or push it
+   * out of a ring, and it will keep trying to get back on route.
+   */
+  addOpponent(spec) {
+    const { RAPIER, world, scene } = this;
+    const size = spec.size ?? [2, 1.2, 3];
+    const body = world.createRigidBody(
+      RAPIER.RigidBodyDesc.dynamic()
+        .setTranslation(spec.pos[0], spec.pos[1], spec.pos[2])
+        .setLinearDamping(0.2)
+        .setAngularDamping(1.2),
+    );
+    const collider = world.createCollider(
+      RAPIER.ColliderDesc.cuboid(size[0] / 2, size[1] / 2, size[2] / 2)
+        .setDensity((spec.mass ?? 120) / (size[0] * size[1] * size[2]))
+        // Low, because it is meant to be driving on wheels rather than
+        // dragging a crate along the floor. High friction here fights the
+        // steering hard enough that it never reaches the speed it was given.
+        .setFriction(spec.friction ?? 0.3)
+        .setRestitution(0.02)
+        .setCollisionGroups(GROUP_WORLD),
+      body,
+    );
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(size[0], size[1], size[2]),
+      new THREE.MeshStandardMaterial({
+        color: spec.colour ?? 0xd6544a,
+        roughness: 0.55,
+        metalness: 0.2,
+        emissive: 0x2a0b08,
+      }),
+    );
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    scene.add(mesh);
+
+    const rival = {
+      spec,
+      body,
+      mesh,
+      route: (spec.route ?? [spec.pos]).map((at) => [...at]),
+      at: Math.min(1, (spec.route ?? [spec.pos]).length - 1),
+      way: 1,
+      speed: spec.speed ?? 3,
+    };
+    this.opponents.set(spec.id, rival);
+    this.objects.push({ body, mesh, collider });
+  }
+
+  /**
+   * Steers every opponent towards its next waypoint. Pulling the velocity
+   * rather than setting it, the same way a belt does, so being leaned on by
+   * something heavy actually slows it down instead of being ignored.
+   */
+  driveOpponents() {
+    const REACHED = 1.4;
+    // Firm enough to hold its speed against the ground, soft enough that
+    // leaning on it with something heavy actually tells.
+    const GRIP = 0.25;
+    for (const rival of this.opponents.values()) {
+      if (rival.route.length < 2) continue;
+      const t = rival.body.translation();
+      const target = rival.route[rival.at];
+      const dx = target[0] - t.x;
+      const dz = target[2] - t.z;
+      const away = Math.hypot(dx, dz);
+      if (away < REACHED) {
+        // Walk the route and turn round at the end rather than snapping back
+        // to the start, so a patrol looks like a patrol.
+        const next = rival.at + rival.way;
+        if (next >= rival.route.length || next < 0) {
+          rival.way *= -1;
+          rival.at += rival.way;
+        } else {
+          rival.at = next;
+        }
+        continue;
+      }
+      const v = rival.body.linvel();
+      const wantX = (dx / away) * rival.speed;
+      const wantZ = (dz / away) * rival.speed;
+      rival.body.setLinvel(
+        { x: v.x + (wantX - v.x) * GRIP, y: v.y, z: v.z + (wantZ - v.z) * GRIP },
+        true,
+      );
+    }
+  }
+
+  opponentPosition(id) {
+    const rival = this.opponents.get(id);
+    if (!rival) return null;
+    const t = rival.body.translation();
+    return new THREE.Vector3(t.x, t.y, t.z);
   }
 
   /**
@@ -345,6 +485,7 @@ export class Arena {
   step(dt) {
     this.elapsed += dt;
     this.driveBelts();
+    this.driveOpponents();
     for (const mover of this.movers) {
       const travel = Math.sin(this.elapsed * mover.rate + mover.offset) * mover.span;
       const at = [...mover.spec.pos];
@@ -426,6 +567,15 @@ export class Arena {
       body.setLinvel({ x: 0, y: 0, z: 0 }, true);
       body.setAngvel({ x: 0, y: 0, z: 0 }, true);
     }
+    for (const rival of this.opponents.values()) {
+      const { pos } = rival.spec;
+      rival.body.setTranslation({ x: pos[0], y: pos[1], z: pos[2] }, true);
+      rival.body.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
+      rival.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      rival.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      rival.at = Math.min(1, rival.route.length - 1);
+      rival.way = 1;
+    }
   }
 
   sync() {
@@ -433,7 +583,7 @@ export class Arena {
       const t = mover.body.translation();
       mover.mesh.position.set(t.x, t.y, t.z);
     }
-    for (const { body, mesh } of this.props.values()) {
+    for (const { body, mesh } of [...this.props.values(), ...this.opponents.values()]) {
       const t = body.translation();
       const r = body.rotation();
       mesh.position.set(t.x, t.y, t.z);
@@ -453,6 +603,7 @@ export class Arena {
     }
     this.objects = [];
     this.props.clear();
+    this.opponents.clear();
     this.movers = [];
     this.belts = [];
   }
