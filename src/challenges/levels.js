@@ -10,6 +10,7 @@ import { WORLDS } from './packs/worlds.js';
 import { JOBS } from './packs/jobs.js';
 import { QUESTIONS } from './packs/questions.js';
 import { GROUND } from './packs/ground.js';
+import { EXPERT } from './packs/expert.js';
 
 /**
  * What a challenge asks of you, and the skill level that follows from it.
@@ -64,6 +65,7 @@ const PACKS = [
   ...JOBS,
   ...QUESTIONS,
   ...WORLDS,
+  ...EXPERT,
 ];
 
 /**
