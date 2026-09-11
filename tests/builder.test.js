@@ -175,6 +175,35 @@ describe('the world numbers', () => {
   });
 });
 
+describe('the rules a run is played under', () => {
+  it('carries the three switches, and only when they are on', () => {
+    const off = sanitiseLevel({ name: 'Plain' });
+    expect(off.handsOff).toBeUndefined();
+    expect(off.noContact).toBeUndefined();
+    expect(off.noRespawn).toBeUndefined();
+
+    const on = sanitiseLevel({
+      name: 'Strict', handsOff: true, noContact: true, noRespawn: true,
+    });
+    expect(on.handsOff).toBe(true);
+    expect(on.noContact).toBe(true);
+    expect(on.noRespawn).toBe(true);
+  });
+
+  it('makes a hands-off level demand autonomy, which is what sets its skill level', async () => {
+    const { tierOf } = await import('../src/challenges/levels.js');
+    const level = sanitiseLevel({
+      name: 'On its own',
+      handsOff: true,
+      props: [{ id: 'crate', pos: [0, 1, 0] }],
+      zones: [{ id: 'goal', pos: [0, 1, 6] }],
+      objectives: [{ type: 'propInZone', prop: 'crate', zone: 'goal', label: 'Do it' }],
+    });
+    expect(level.demands.autonomous).toBe(true);
+    expect(tierOf(level)).toBe('expert');
+  });
+});
+
 describe('getting a level to somebody else', () => {
   it('survives the trip through a share code', async () => {
     const built = sanitiseLevel({

@@ -84,7 +84,8 @@
 40. The problems list names what is wrong while it is wrong — no objectives, par of 0, nothing to stand on — and clears as each is fixed.
 41. Changing gravity, friction or fog in the builder changes the course you are looking at, not just a number in a box; a fog distance of 0 is no fog rather than no visibility.
 42. An objective's hold time is kept, and a run has to sit out the whole of it before the objective ticks.
-43. Test play enters the studio on your own level with its bans and budget applied; Back says it returns to the builder, and does, with the draft as it was.
-44. Save puts the level on the Build screen and under `Made by you` on Challenges, marked `Yours`, unnumbered, and the campaign's solved count does not move when it is solved.
-45. Copy share code produces a `CTP1` string; pasting it into Open a level code on another browser profile opens the same level.
-46. A share code that has been truncated or edited by hand is refused with a message rather than a broken level.
+43. A level set to No input is marked Expert on its card, and one that bans flight greys the rotor and the thruster out of the rack when it is played.
+44. Test play enters the studio on your own level with its bans and budget applied; Back says it returns to the builder, and does, with the draft as it was.
+45. Save puts the level on the Build screen and under `Made by you` on Challenges, marked `Yours`, unnumbered, and the campaign's solved count does not move when it is solved.
+46. Copy share code produces a `CTP1` string; pasting it into Open a level code on another browser profile opens the same level.
+47. A share code that has been truncated or edited by hand is refused with a message rather than a broken level.

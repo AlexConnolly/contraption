@@ -108,8 +108,10 @@ looking at is what will be played. What the editor draws on top is a wireframe
 box round each thing you can pick, and nothing else.
 
 The right-hand rail is the level itself: name, brief, parts budget, par time,
-banned parts, and the world numbers — gravity, ground friction, fog, and the
-cap on how heavy the machine may be. Under that is the list of what is in the
+the world numbers — gravity, ground friction, fog, and the cap on how heavy
+the machine may be — and the switches that say what kind of run this is: the
+three part bans, *No input* for a level the machine has to solve on its own,
+*No touching*, and *One go*. Under that is the list of what is in the
 course and the objectives, each of which picks a real crate and a real zone
 from what you have placed rather than a name typed in hope, and says how long
 it has to stay there. Removing a crate an objective needed takes the objective

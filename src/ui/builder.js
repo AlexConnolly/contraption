@@ -519,6 +519,23 @@ export class Builder {
       });
       bans.append(button);
     }
+    // The three switches that change what a run is rather than what is in it.
+    // Hands-off is the one that moves the level's skill level, because a
+    // problem the machine has to solve on its own is a different problem.
+    for (const [flag, label] of [
+      ['handsOff', 'No input'],
+      ['noContact', 'No touching'],
+      ['noRespawn', 'One go'],
+    ]) {
+      const on = Boolean(this.draft[flag]);
+      const button = el('button', `build-ban${on ? ' on' : ''}`, label);
+      button.addEventListener('click', () => {
+        if (on) delete this.draft[flag];
+        else this.draft[flag] = true;
+        this.refresh({ rebuildArena: false });
+      });
+      bans.append(button);
+    }
     this.props.append(bans);
   }
 
