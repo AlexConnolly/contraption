@@ -6,7 +6,7 @@ import { Blueprint } from '../src/core/blueprint.js';
 import { Machine } from '../src/sim/machine.js';
 import { Arena } from '../src/sim/arena.js';
 import { SignalBus } from '../src/sim/signals.js';
-import { breached, throughHoop } from '../src/challenges/objectives.js';
+import { breached, breachedBy, throughHoop } from '../src/challenges/objectives.js';
 
 const STEP = 1 / 60;
 const keyboard = () => ({ down: new Set(), isDown: () => false, wasPressed: () => false });
@@ -97,5 +97,47 @@ describe('a hoop in the world', () => {
   it('lets one through the middle', () => {
     const at = fire([0, 2, -4], [0, 0, 7]);
     expect(at.z).toBeGreaterThan(2);
+  });
+});
+
+/**
+ * A keep-out that only looks at the core is not a keep-out. Park just outside
+ * the line, reach in with a long arm, and every "get it up there" problem
+ * falls over to the answer the zone exists to prevent — which is exactly what
+ * a player will try first.
+ */
+describe('a keep-out covers the whole machine', () => {
+  function reachingMachine(coreCell, armCells) {
+    const bp = new Blueprint();
+    bp.place('core', coreCell);
+    for (const cell of armCells) bp.place('beam', cell);
+    const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
+    world.timestep = STEP;
+    const machine = new Machine({
+      RAPIER,
+      world,
+      scene: new THREE.Scene(),
+      blueprint: bp,
+      spawn: new THREE.Vector3(0, 1, -7),
+      level: { keepout: [KEEPOUT] },
+    });
+    return machine;
+  }
+
+  it('is clear when the whole machine is outside', () => {
+    const machine = reachingMachine([0, 0, 0], [[0, 0, -2], [0, 0, -4]]);
+    expect(breachedBy({ keepout: [KEEPOUT] }, machine)).toBe(null);
+  });
+
+  it('catches an arm reaching in while the core stays legal', () => {
+    // Core back outside the line, a boom running forward into the zone.
+    const machine = reachingMachine([0, 0, 0], [[0, 0, 4], [0, 0, 8], [0, 0, 12], [0, 0, 16], [0, 0, 20]]);
+    expect(breached({ keepout: [KEEPOUT] }, machine.corePosition())).toBe(null);
+    expect(breachedBy({ keepout: [KEEPOUT] }, machine)).toBe(KEEPOUT);
+  });
+
+  it('says nothing on a level with no zones', () => {
+    const machine = reachingMachine([0, 0, 0], [[0, 0, 4]]);
+    expect(breachedBy({}, machine)).toBe(null);
   });
 });

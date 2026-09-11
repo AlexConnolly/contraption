@@ -11,7 +11,7 @@ import { Arena } from './sim/arena.js';
 import { SignalBus } from './sim/signals.js';
 import { controllerOf, firstController } from './sim/flight.js';
 import { getPart } from './parts/registry.js';
-import { ObjectiveTracker, withinBudget, breached } from './challenges/objectives.js';
+import { ObjectiveTracker, withinBudget, breachedBy } from './challenges/objectives.js';
 import { getLevel, LEVELS, nextLevel } from './challenges/levels.js';
 import { Hud } from './ui/hud.js';
 import { GraphEditor } from './ui/graph-editor.js';
@@ -525,7 +525,7 @@ function simulateStep() {
   // A keep-out covers the airspace above it as well as the ground, which is
   // what stops "put it on tall stilts and reach over" answering everything.
   if (!state.won && !state.crashed) {
-    const zone = breached(state.level, state.machine.corePosition());
+    const zone = breachedBy(state.level, state.machine);
     if (zone) {
       state.crashed = true;
       audio.crash();

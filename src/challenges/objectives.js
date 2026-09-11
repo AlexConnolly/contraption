@@ -25,6 +25,28 @@ export function breached(level, point) {
 }
 
 /**
+ * The same question asked of a whole machine rather than of one point.
+ *
+ * Checking the core alone is not a keep-out at all: park a step outside the
+ * line, reach in with a long boom, and the zone stops nothing — which is the
+ * first thing anybody tries. Every part is tested, so the arm counts as much
+ * as the body does.
+ *
+ * Part centres rather than part corners, which lets a part overhang the line
+ * by up to a quarter of a metre. That is deliberate: clipping the very edge of
+ * a zone should not end a run, and the tolerance is far smaller than anything
+ * you could exploit.
+ */
+export function breachedBy(level, machine) {
+  if (!machine || (level.keepout ?? []).length === 0) return null;
+  for (const placed of machine.blueprint.list()) {
+    const zone = breached(level, machine.partWorldPoint(placed));
+    if (zone) return zone;
+  }
+  return null;
+}
+
+/**
  * Whether something is in the middle of a hoop rather than resting against
  * it. Measured across the ring's own plane, so a hoop can face any direction:
  * near the plane, and comfortably inside the rim.

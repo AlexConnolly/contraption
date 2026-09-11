@@ -222,6 +222,11 @@ export const LEVELS = [
       { pos: [0, 3, 13], size: [10, 6, 1], colour: DARK },
       { pos: [-5.5, 5, 9], size: [1, 10, 9], colour: DARK },
       { pos: [5.5, 5, 9], size: [1, 10, 9], colour: DARK },
+      // A lid. Without it the court is a box open at the top, and hanging a
+      // ball in from above is an easier answer than throwing one. It also
+      // shows the limit rather than only enforcing it: you can see there is
+      // no way in over the top, which a keep-out volume alone never says.
+      { pos: [0, 10.4, 8.5], size: [12, 0.8, 10], colour: DARK },
     ],
     hoops: [
       { id: 'ring', pos: [0, 6.4, 12], radius: 1.5, axis: [0, 0, 1], colour: 0xf0a825 },

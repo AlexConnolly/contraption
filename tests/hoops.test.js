@@ -87,4 +87,20 @@ describe('the hoops level is actually winnable', () => {
     expect(breached(level, new THREE.Vector3(0, 6.4, 11))).not.toBe(null);
     expect(breached(level, new THREE.Vector3(0, 9.5, 8))).not.toBe(null);
   });
+
+  // The court has a roof on it, so there is no reaching in from overhead
+  // either — and the roof is high enough that the shot still clears.
+  it('is closed at the top', () => {
+    const lid = level.pieces.find((piece) => piece.size[1] < 1 && piece.pos[1] > 8);
+    expect(lid, 'the court needs a lid').toBeTruthy();
+    const underside = lid.pos[1] - lid.size[1] / 2;
+    const ceiling = level.keepout[0].pos[1] + level.keepout[0].size[1] / 2;
+    expect(underside).toBeLessThanOrEqual(ceiling + 0.1);
+    expect(lid.size[0]).toBeGreaterThanOrEqual(10);
+    expect(lid.size[2]).toBeGreaterThanOrEqual(9);
+  });
+
+  it('still lets the shot through under the roof', () => {
+    expect(fling(edge, shot(13.2, 42)).scored).toBe(true);
+  });
 });
