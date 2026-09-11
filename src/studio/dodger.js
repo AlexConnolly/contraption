@@ -101,8 +101,12 @@ function dodgeProgram(parts) {
    * Sees the whole frontal arc, not just the one ray down the nose. A single
    * beam lines up with a gap, reads clear, and the machine commits — and then
    * the gap slides shut in front of it. The narrow guards either side close
-   * that off. They are kept narrow on purpose: a wide beam picks up the
-   * corridor walls whenever the machine is near one and would stop it dead.
+   * that off.
+   *
+   * They have to be narrower than the gap the machine is trying to fly
+   * through, or they clip its edges from a stand-off away and the way ahead
+   * never reads clear at all. At twelve degrees they spread about a metre
+   * either side at the stand-off, inside a five-metre gap with room over.
    */
   const frontalArc = (g) => {
     const { add, wire } = g;
@@ -157,24 +161,45 @@ function dodgeProgram(parts) {
     return difference;
   };
 
-  // The way past, plus a shove off anything close on either beam.
-  const sideDemand = (g, wayPastGain, wallGain) => {
+  /**
+   * Which way to go, from the wide whiskers. Swept out to 50 degrees they
+   * sample a good six metres either side of the machine, which is what finds
+   * a gap that is not straight ahead; the narrow guards only ever see what is
+   * nearly in front and would miss it entirely. They also read the walls, so
+   * the one term keeps the machine off those as well.
+   */
+  const sideDemand = (g, gain, closeGain) => {
     const { add, wire } = g;
-    const wayPast = roomier(g, guardPort, guardStarboard, NOTICE);
-    const keenToPass = add('constant', { kind: 'number', value: wayPastGain });
+    const wayPast = roomier(g, portSide, starboard, NOTICE);
+    const keen = add('constant', { kind: 'number', value: gain });
     const passing = add('maths', { op: 'multiply' });
     wire(wayPast, 'r', passing, 'a');
-    wire(keenToPass, 'value', passing, 'b');
+    wire(keen, 'value', passing, 'b');
 
-    const walls = roomier(g, portSide, starboard, CLOSE);
-    const keenToClear = add('constant', { kind: 'number', value: wallGain });
-    const clearing = add('maths', { op: 'multiply' });
-    wire(walls, 'r', clearing, 'a');
-    wire(keenToClear, 'value', clearing, 'b');
+    // The wide pair finds the gap but cannot line the machine up on it: by the
+    // time it is close, both whiskers are looking at panel either side and
+    // read the same. The narrow guards do the last bit — dead level when the
+    // way through is square ahead, and leaning off it as soon as one of them
+    // starts clipping an edge.
+    const lining = roomier(g, guardPort, guardStarboard, NOTICE);
+    const fine = add('constant', { kind: 'number', value: 0.4 });
+    const aligning = add('maths', { op: 'multiply' });
+    wire(lining, 'r', aligning, 'a');
+    wire(fine, 'value', aligning, 'b');
 
+    // And a firmer shove from whatever has got close.
+    const near = roomier(g, portSide, starboard, CLOSE);
+    const urgent = add('constant', { kind: 'number', value: closeGain });
+    const shoving = add('maths', { op: 'multiply' });
+    wire(near, 'r', shoving, 'a');
+    wire(urgent, 'value', shoving, 'b');
+
+    const guided = add('maths', { op: 'add' });
     const total = add('maths', { op: 'add' });
-    wire(passing, 'r', total, 'a');
-    wire(clearing, 'r', total, 'b');
+    wire(passing, 'r', guided, 'a');
+    wire(aligning, 'r', guided, 'b');
+    wire(guided, 'r', total, 'a');
+    wire(shoving, 'r', total, 'b');
     return total;
   };
 
@@ -278,15 +303,57 @@ function dodgeProgram(parts) {
     // Across the corridor. A positive roll slides toward the machine's right,
     // which is -X, so both guidance terms come out negated.
     const across = add('maths', { op: 'subtract' });
-    const homing = add('constant', { kind: 'number', value: -0.12 });
-    const pull = add('maths', { op: 'multiply' });
-    const damping = add('constant', { kind: 'number', value: 0.75 });
-    const steady = add('maths', { op: 'multiply' });
-    const guided = add('maths', { op: 'add' });
+    const homing = add('constant', { kind: 'number', value: -0.14 });
+    const pulling = add('maths', { op: 'multiply' });
     wire(padParts, 'x', across, 'a');
     wire(hereParts, 'x', across, 'b');
-    wire(across, 'r', pull, 'a');
-    wire(homing, 'value', pull, 'b');
+    wire(across, 'r', pulling, 'a');
+    wire(homing, 'value', pulling, 'b');
+
+    // Only steer for the pad when there is nothing anywhere near. The way
+    // through a gate is rarely on the line to the pad, and a machine that
+    // keeps pulling back toward that line will find the gap, get dragged off
+    // it again and clip the edge on the way out.
+    //
+    // The beam ahead is the wrong thing to ask, because it reads clear exactly
+    // when the machine is lined up on the gap — the worst possible moment to
+    // start pulling it away again. The wide whiskers still have the panels
+    // either side in view, so they are what says whether this is open corridor
+    // or the middle of a gate.
+    const openLeft = add('read', { partId: portSide, port: 'distance' });
+    const openRight = add('read', { partId: starboard, port: 'distance' });
+    const openSides = add('maths', { op: 'min' });
+    const around = add('maths', { op: 'min' });
+    wire(openLeft, 'value', openSides, 'a');
+    wire(openRight, 'value', openSides, 'b');
+    wire(openSides, 'r', around, 'a');
+    wire(front, 'r', around, 'b');
+
+    const roomAround = add('constant', { kind: 'number', value: 7 });
+    const nothingNear = add('compare', { op: 'gt' });
+    wire(around, 'r', nothingNear, 'a');
+    wire(roomAround, 'value', nothingNear, 'b');
+
+    // Or once the pad itself is close. Leaving it to the whiskers alone parks
+    // the machine off to one side of the pad, near enough to a wall that they
+    // never quite say the coast is clear, and it sits there for good.
+    const nearly = add('constant', { kind: 'number', value: 10 });
+    const almostThere = add('compare', { op: 'lt' });
+    wire(range, 'flat', almostThere, 'a');
+    wire(nearly, 'value', almostThere, 'b');
+
+    const steerForIt = add('logic', { op: 'or' });
+    const nothing = add('constant', { kind: 'number', value: 0 });
+    const pull = add('select');
+    wire(nothingNear, 'r', steerForIt, 'a');
+    wire(almostThere, 'r', steerForIt, 'b');
+    wire(steerForIt, 'r', pull, 'when');
+    wire(pulling, 'r', pull, 'a');
+    wire(nothing, 'value', pull, 'b');
+
+    const damping = add('constant', { kind: 'number', value: 0.45 });
+    const steady = add('maths', { op: 'multiply' });
+    const guided = add('maths', { op: 'add' });
     wire(speed, 'x', steady, 'a');
     wire(damping, 'value', steady, 'b');
     wire(pull, 'r', guided, 'a');
@@ -370,7 +437,7 @@ function dodgeProgram(parts) {
     // something stops it.
     const velocity = add('read', { partId: gps, port: 'velocity' });
     const speed = add('split');
-    const damping = add('constant', { kind: 'number', value: 0.75 });
+    const damping = add('constant', { kind: 'number', value: 0.45 });
     const steady = add('maths', { op: 'multiply' });
     wire(velocity, 'value', speed, 'v');
     wire(speed, 'x', steady, 'a');
@@ -445,8 +512,8 @@ export function dodger() {
   const ahead = place('sensor', [0, 1, 1], facing([0, 0, 1]));
   const starboard = place('sensor', [-1, 1, 0], facing([0, 0, 1]), { yaw: -50 });
   const portSide = place('sensor', [1, 1, 0], facing([0, 0, 1]), { yaw: 50 });
-  const guardStarboard = place('sensor', [-1, 2, 0], facing([0, 0, 1]), { yaw: -20 });
-  const guardPort = place('sensor', [1, 2, 0], facing([0, 0, 1]), { yaw: 20 });
+  const guardStarboard = place('sensor', [-1, 2, 0], facing([0, 0, 1]), { yaw: -12 });
+  const guardPort = place('sensor', [1, 2, 0], facing([0, 0, 1]), { yaw: 12 });
   for (const cell of [[-1, 1, -1], [1, 1, -1], [-1, 1, 1], [1, 1, 1]]) {
     place('propeller', cell, IDENTITY_ORIENTATION, { binding: { mode: 'flight' } });
   }

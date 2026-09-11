@@ -9,7 +9,7 @@ Three.js for rendering, Rapier for physics, Vite for the build.
 ```bash
 npm install
 npm run dev      # http://localhost:5173
-npm test         # 175 tests, including headless physics
+npm test         # 177 tests, including headless physics
 npm run build
 npm run preview  # serve the production build
 ```
@@ -135,12 +135,15 @@ every run. There is no timetable to learn and no path worth memorising: a
 program has to look where it is going. The seed is recorded, so a run that
 went wrong can be set up again exactly.
 
-They are sized so two things hold at once. Each blocker **always covers the
-middle** of the corridor, so flying straight at the pad never works; and
-between them they sweep the **full width**, so no lane is safe for long either.
-Getting that balance wrong is easy: narrow blockers in a wide corridor leave
-the centre clear most of the time, and a machine sails through on luck rather
-than on looking.
+Each obstacle is a **gate**: two panels sliding together, holding a six-metre
+gap between them. Getting that shape right took a few goes. A single sliding
+blocker sounds simpler, but every gap it leaves is jammed against a wall, so
+the only way past is to hug one — which fails a no-contact run and looks
+terrible while it does it. Narrow blockers in a wide corridor have the opposite
+problem: the middle is clear most of the time and a machine sails through on
+luck rather than on looking. A gate puts the gap out in open corridor and sends
+it wandering, so the way through is somewhere new every run and never against a
+wall.
 
 The level also sets `noContact`, so **touching anything ends the run**. Parts of
 the same machine touching each other do not count, so a rover's wheels on the
@@ -153,7 +156,7 @@ in order to go round it. The flight controller also takes a **strafe** command,
 so a machine can slide sideways without turning and keep its whiskers pointed
 where it is going.
 
-The **Dodger** preset solves it — cleanly, on 149 of 150 different worlds — and
+The **Dodger** preset solves it — cleanly, on 148 of 150 different worlds — and
 its program is worth reading. Along the
 corridor and across it are each a proportional-derivative pair — lean on how
 far there is to go, lean back on how fast you are already moving — and only one
@@ -164,14 +167,29 @@ a pair of states takes over when the way ahead is shut, each having already
 picked which way it is going and not about to reconsider. That is the state
 machine earning its keep.
 
-The one that mattered most for flying clean is the stand-off. Leaning on how
-much room is left ahead, with no speed term in it, cannot brake — by the time
-the stand-off is reached the machine still has all its momentum and coasts into
-whatever it was standing off from. Room ahead has to set a speed it is allowed
-to do, and the gap between that and the speed it is doing sets the lean. Same
-shape as the drive term, and the same shape as the altitude loop; getting it
-wrong was the difference between never touching anything and touching
-something on every single run.
+Three things mattered for flying it clean.
+
+The **stand-off** has to be a speed, not a distance. Leaning on how much room
+is left ahead, with no speed term in it, cannot brake — by the time the
+stand-off is reached the machine still has all its momentum and coasts into
+whatever it was standing off from. Room ahead sets a speed it is allowed to do,
+and the gap between that and the speed it is doing sets the lean. Same shape as
+the drive term and the altitude loop.
+
+**Beams have to be narrower than the gap they are checking.** The guards either
+side of the nose say whether the way ahead is clear; swept too wide they clip
+the edges of a six-metre gap from a stand-off away and it never reads clear at
+all. The wide whiskers do the opposite job — they reach far enough out to the
+side to find a gap that is not ahead yet, which a narrow beam never sees.
+
+And **steering for the destination has to give way to what is in front**. The
+way through a gate is rarely on the line to the pad, so a machine that keeps
+pulling back toward that line will find the gap, get dragged off it again and
+clip an edge on the way out. Asking the nose beam whether it is clear is no
+good either: it reads clear exactly when the machine is lined up on the gap,
+which is the worst possible moment to start pulling away. The wide whiskers
+still have the panels in view, so they are what tells the difference between
+open corridor and the middle of a gate.
 
 ## How a machine is put together
 

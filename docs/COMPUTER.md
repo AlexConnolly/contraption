@@ -63,7 +63,9 @@ the machine has to fly itself on the program alone.
 ## Obstacles that move
 
 A level can carry `movers`: obstacles that slide back and forth across the
-course. Each one draws its speed, its starting point and its direction fresh
+course. Movers sharing a `group` slide off one set of numbers, which is how a
+pair of panels can hold a gap of fixed width between them while the gap itself
+wanders. Each one draws its speed, its starting point and its direction fresh
 at the start of every run, so there is no timetable to learn and no path worth
 memorising. A program has to look where it is going.
 

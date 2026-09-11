@@ -183,20 +183,26 @@ export const LEVELS = [
     groundSize: 180,
     budget: { cost: 170 },
     pieces: [
-      { pos: [-10.5, 6, 0.5], size: [1, 12, 51], colour: DARK },
-      { pos: [10.5, 6, 0.5], size: [1, 12, 51], colour: DARK },
-      { pos: [0, 11.6, 0.5], size: [22, 0.8, 51], colour: DARK },
+      { pos: [-14.5, 6, 0.5], size: [1, 12, 51], colour: DARK },
+      { pos: [14.5, 6, 0.5], size: [1, 12, 51], colour: DARK },
+      { pos: [0, 11.6, 0.5], size: [30, 0.8, 51], colour: DARK },
       { pos: [0, 2.5, 20], size: [7, 5, 7], colour: DARK },
       { pos: [0, 5.2, 20], size: [9, 0.6, 9], colour: GREY },
     ],
-    // Sized so that two things hold at once. Each blocker always covers the
-    // middle of the corridor, so flying straight at the pad never works, and
-    // between them they sweep the full width, so no lane is safe for long
-    // either. The only way through is to look and go round.
+    // Each gate is two panels holding a six-metre gap between them, and the
+    // whole gate slides. Because the gap is between the panels rather than
+    // beside a single blocker, it is always out in open corridor instead of
+    // jammed against a wall — which is what forces a machine to hug the wall
+    // to get past, and looks every bit as bad as it sounds. It ranges wide
+    // enough that it is usually nowhere near the middle, so flying straight at
+    // the pad does not work, and where it will be is different every run.
     movers: [
-      { pos: [0, 5.5, -10], size: [12, 9, 1.4], axis: 'x', span: 4, speed: [0.15, 0.3] },
-      { pos: [0, 5.5, -1], size: [12, 9, 1.4], axis: 'x', span: 4, speed: [0.17, 0.34] },
-      { pos: [0, 5.5, 8], size: [12, 9, 1.4], axis: 'x', span: 4, speed: [0.16, 0.32] },
+      { group: 'a', pos: [-15, 5.5, -10], size: [24, 9, 1.4], axis: 'x', span: 8, speed: [0.09, 0.18] },
+      { group: 'a', pos: [15, 5.5, -10], size: [24, 9, 1.4], axis: 'x', span: 8, speed: [0.09, 0.18] },
+      { group: 'b', pos: [-15, 5.5, -1], size: [24, 9, 1.4], axis: 'x', span: 8, speed: [0.1, 0.2] },
+      { group: 'b', pos: [15, 5.5, -1], size: [24, 9, 1.4], axis: 'x', span: 8, speed: [0.1, 0.2] },
+      { group: 'c', pos: [-15, 5.5, 8], size: [24, 9, 1.4], axis: 'x', span: 8, speed: [0.095, 0.19] },
+      { group: 'c', pos: [15, 5.5, 8], size: [24, 9, 1.4], axis: 'x', span: 8, speed: [0.095, 0.19] },
     ],
     props: [],
     zones: [

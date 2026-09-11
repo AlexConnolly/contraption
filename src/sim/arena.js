@@ -127,9 +127,27 @@ export class Arena {
    * starting point and direction are drawn fresh for every run, so a program
    * cannot be written against a timetable — it has to look where it is going.
    */
+  /**
+   * Movers sharing a `group` slide together off one set of numbers, so a pair
+   * of panels can hold a gap between them at a fixed width while the gap
+   * itself wanders.
+   */
+  motionFor(spec) {
+    const key = spec.group ?? `solo-${this.movers.length}`;
+    if (!this.motions) this.motions = new Map();
+    if (!this.motions.has(key)) {
+      const rng = makeRng(this.seed + [...key].reduce((a, c) => a + c.charCodeAt(0), 0) * 7919);
+      const [slow, fast] = spec.speed ?? [0.8, 1.9];
+      this.motions.set(key, {
+        rate: between(rng, slow, fast),
+        offset: between(rng, 0, Math.PI * 2),
+      });
+    }
+    return this.motions.get(key);
+  }
+
   addMover(spec) {
     const { RAPIER, world, scene } = this;
-    const rng = makeRng(this.seed + this.movers.length * 7919);
     const body = world.createRigidBody(
       RAPIER.RigidBodyDesc.kinematicPositionBased()
         .setTranslation(spec.pos[0], spec.pos[1], spec.pos[2]),
@@ -153,15 +171,15 @@ export class Arena {
     mesh.receiveShadow = true;
     scene.add(mesh);
 
-    const [slow, fast] = spec.speed ?? [0.8, 1.9];
+    const motion = this.motionFor(spec);
     this.movers.push({
       spec,
       body,
       mesh,
       axis: spec.axis ?? 'x',
       span: spec.span ?? 4,
-      rate: between(rng, slow, fast),
-      offset: between(rng, 0, Math.PI * 2),
+      rate: motion.rate,
+      offset: motion.offset,
     });
     this.objects.push({ body, mesh });
   }
@@ -209,11 +227,11 @@ export class Arena {
   reset() {
     this.elapsed = 0;
     this.seed = randomSeed();
+    this.motions = new Map();
     for (const mover of this.movers) {
-      const rng = makeRng(this.seed + this.movers.indexOf(mover) * 7919);
-      const [slow, fast] = mover.spec.speed ?? [0.8, 1.9];
-      mover.rate = between(rng, slow, fast);
-      mover.offset = between(rng, 0, Math.PI * 2);
+      const motion = this.motionFor(mover.spec);
+      mover.rate = motion.rate;
+      mover.offset = motion.offset;
     }
     for (const { spec, body } of this.props.values()) {
       body.setTranslation({ x: spec.pos[0], y: spec.pos[1], z: spec.pos[2] }, true);
