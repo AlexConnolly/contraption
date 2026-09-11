@@ -639,6 +639,31 @@ export class Hud {
    * the machine that set it. A run is only worth anything next to what it was
    * done with, so the card names every part you spent.
    */
+  /**
+   * A scored level ends with a number rather than a time, and bigger is
+   * better. Same card, because it is the same moment — you are being told how
+   * you did and offered the next thing.
+   */
+  showScore(level, report, cost, blueprint, next) {
+    const dom = this.dom;
+    dom.winKicker.textContent = 'Time up';
+    dom.winTitle.textContent = level.name;
+    dom.winClock.textContent = String(report.score ?? 0);
+    const best = store.result(level.id)?.bestScore;
+    const record = best === undefined || (report.score ?? 0) >= best;
+    dom.winClock.classList.toggle('beat', record);
+    dom.winStats.innerHTML = [
+      `<span>${report.scoreLabel ?? 'Score'}</span>`,
+      `<span>Cost <strong>${cost}</strong></span>`,
+      record ? '<span class="beat"><strong>Personal best</strong></span>'
+        : `<span>Best <strong>${best}</strong></span>`,
+    ].join('');
+    this.renderRig(blueprint);
+    dom.winNext.textContent = next ? 'Play next challenge' : 'Back to challenges';
+    dom.win.hidden = false;
+    dom.winNext.focus();
+  }
+
   showWin(level, report, cost, blueprint, next) {
     const dom = this.dom;
     dom.winTitle.textContent = level.name;

@@ -75,12 +75,15 @@ export const store = {
   },
 
   solved(levelId) {
-    return Boolean(read().results?.[levelId]?.best);
+    const result = read().results?.[levelId];
+    return Boolean(result?.best || result?.bestScore !== undefined);
   },
 
   solvedCount(levelIds) {
     const results = read().results ?? {};
-    return levelIds.filter((id) => results[id]?.best).length;
+    return levelIds.filter(
+      (id) => results[id]?.best || results[id]?.bestScore !== undefined,
+    ).length;
   },
 
   // Keeps the best time only, so a scrappy win is never overwritten by a
@@ -93,6 +96,26 @@ export const store = {
     data.results[levelId] = {
       best: better ? seconds : previous.best,
       bestCost: better ? cost : previous.bestCost,
+      runs: (previous?.runs ?? 0) + 1,
+      at: Date.now(),
+    };
+    write(data);
+    return better;
+  },
+
+  /**
+   * A scored level has no time to beat, only a number to beat, and bigger is
+   * better — which is the opposite of everything else recorded here, so it is
+   * kept under its own name rather than squeezed into `best`.
+   */
+  recordScore(levelId, score) {
+    const data = read();
+    data.results = data.results ?? {};
+    const previous = data.results[levelId];
+    const better = previous?.bestScore === undefined || score > previous.bestScore;
+    data.results[levelId] = {
+      ...previous,
+      bestScore: better ? score : previous.bestScore,
       runs: (previous?.runs ?? 0) + 1,
       at: Date.now(),
     };

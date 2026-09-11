@@ -129,3 +129,32 @@ describe('settings', () => {
     expect(store.design('first-haul')).toEqual({ parts: [] });
   });
 });
+
+describe('scored levels', () => {
+  it('keeps the best score, and bigger is better', () => {
+    store.recordScore('quarry', 12);
+    expect(store.recordScore('quarry', 8)).toBe(false);
+    expect(store.result('quarry').bestScore).toBe(12);
+    expect(store.recordScore('quarry', 20)).toBe(true);
+    expect(store.result('quarry').bestScore).toBe(20);
+  });
+
+  it('counts a score of nothing as having played it', () => {
+    store.recordScore('quarry', 0);
+    expect(store.result('quarry').bestScore).toBe(0);
+    expect(store.solved('quarry')).toBe(true);
+  });
+
+  it('counts towards the solved tally like any other challenge', () => {
+    store.recordWin('first-haul', 10, 20);
+    store.recordScore('quarry', 5);
+    expect(store.solvedCount(['first-haul', 'quarry', 'traffic'])).toBe(2);
+  });
+
+  it('leaves a timed result alone', () => {
+    store.recordWin('first-haul', 10, 20);
+    store.recordScore('first-haul', 3);
+    expect(store.result('first-haul').best).toBe(10);
+    expect(store.result('first-haul').bestScore).toBe(3);
+  });
+});

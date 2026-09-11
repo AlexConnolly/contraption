@@ -68,6 +68,59 @@ export function throughHoop(hoop, point) {
   return across <= hoop.radius * 0.75;
 }
 
+/**
+ * What a machine weighs, all of it. A rover's wheels are bodies of their own
+ * jointed to the chassis, so anything that only looked at the body the core
+ * sits on would report about half the truth.
+ */
+export function machineMass(machine) {
+  let total = 0;
+  for (const body of machine?.bodies ?? []) total += body.mass();
+  return total;
+}
+
+/**
+ * The other half of a parts budget. A budget limits what you spend, this
+ * limits what you weigh, and the two pull in different directions — a cheap
+ * machine can be a very heavy one. It is the rule that makes somebody take
+ * parts off rather than bolt more on.
+ */
+export function withinMassCap(machine, level) {
+  const cap = level?.massCap;
+  if (!cap) return { ok: true };
+  const mass = machineMass(machine);
+  return mass <= cap
+    ? { ok: true, mass, cap }
+    : {
+      ok: false,
+      mass,
+      cap,
+      reason: `Too heavy: ${mass.toFixed(0)} kg of ${cap} kg`,
+    };
+}
+
+/**
+ * The ids a stack was dealt out into. A level says "forty blocks" once, and
+ * the blocks are named after it, so an objective can talk about the heap
+ * without the level listing every one.
+ */
+function stackIds(level, id) {
+  const stack = (level.stacks ?? []).find((entry) => entry.id === id);
+  if (!stack) return [];
+  return Array.from({ length: stack.count ?? 1 }, (_, i) => `${id}-${i}`);
+}
+
+// Checks that answer with a number rather than with yes or no. A scored level
+// is built out of these: there is nothing to complete, only a tally.
+const COUNTS = {
+  propsInZone(objective, level, ctx) {
+    const zone = level.zones.find((z) => z.id === objective.zone);
+    const ids = objective.props ?? stackIds(level, objective.stack);
+    const inside = ids.filter((id) => inZone(ctx.propPosition(id), zone)).length;
+    return { count: inside, of: ids.length };
+  },
+};
+
 const CHECKS = {
   propInZone(objective, level, ctx) {
     const zone = level.zones.find((z) => z.id === objective.zone);
@@ -112,6 +165,8 @@ export class ObjectiveTracker {
       objective,
       held: 0,
       done: false,
+      count: COUNTS[objective.type] ? 0 : undefined,
+      of: COUNTS[objective.type] ? 0 : undefined,
     }));
     this.complete = false;
     this.elapsed = 0;
@@ -121,8 +176,16 @@ export class ObjectiveTracker {
     if (this.complete) return this.report();
     this.elapsed += dt;
     for (const entry of this.state) {
+      const counter = COUNTS[entry.objective.type];
+      if (counter) {
+        const { count, of } = counter(entry.objective, this.level, ctx);
+        entry.count = count;
+        entry.of = of;
+      }
       const check = CHECKS[entry.objective.type];
-      const satisfied = check ? check(entry.objective, this.level, ctx) : false;
+      const satisfied = counter
+        ? entry.count >= entry.of && entry.of > 0
+        : Boolean(check && check(entry.objective, this.level, ctx));
       const hold = entry.objective.hold ?? 0;
       if (satisfied) {
         entry.held = Math.min(hold, entry.held + dt);
@@ -132,22 +195,37 @@ export class ObjectiveTracker {
         entry.done = false;
       }
     }
-    this.complete = this.state.every((entry) => entry.done);
+    // A scored level has no win condition at all — only a number that goes up
+    // — so it must never decide it is finished.
+    this.complete = !this.level.scored && this.state.every((entry) => entry.done);
     return this.report();
   }
 
   report() {
+    const scored = Boolean(this.level.scored);
     return {
       complete: this.complete,
       elapsed: this.elapsed,
+      // Null rather than zero on an ordinary level, so nothing has to guess
+      // whether a score of nought means "none yet" or "not that kind".
+      score: scored ? this.tally() : null,
+      scoreLabel: scored ? this.level.scored.label : null,
       objectives: this.state.map((entry) => ({
         label: describeObjective(entry.objective),
         done: entry.done,
-        progress: entry.objective.hold
-          ? entry.held / entry.objective.hold
-          : Number(entry.done),
+        count: entry.count,
+        of: entry.of,
+        progress: entry.of
+          ? entry.count / entry.of
+          : (entry.objective.hold ? entry.held / entry.objective.hold : Number(entry.done)),
       })),
     };
+  }
+
+  tally() {
+    let total = 0;
+    for (const entry of this.state) total += entry.count ?? 0;
+    return total;
   }
 }
 

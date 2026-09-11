@@ -11,7 +11,9 @@ import { Arena } from './sim/arena.js';
 import { SignalBus } from './sim/signals.js';
 import { controllerOf, firstController } from './sim/flight.js';
 import { getPart } from './parts/registry.js';
-import { ObjectiveTracker, withinBudget, breachedBy } from './challenges/objectives.js';
+import {
+  ObjectiveTracker, withinBudget, withinMassCap, breachedBy,
+} from './challenges/objectives.js';
 import { bannedParts, banFor, firstBanned } from './challenges/bans.js';
 import { getLevel, LEVELS, nextLevel } from './challenges/levels.js';
 import { Hud } from './ui/hud.js';
@@ -172,6 +174,19 @@ function validateBuild() {
 }
 
 /**
+ * What a machine weighs can only be asked once it is built, so unlike the
+ * budget this is checked as the run starts rather than while building.
+ */
+function checkMass() {
+  const mass = withinMassCap(state.machine, state.level);
+  if (mass.ok) return true;
+  state.crashed = true;
+  audio.deny();
+  hud.showFailure(state.level, state.tracker.report(), mass.reason);
+  return false;
+}
+
+/**
  * A machine loaded from somewhere else, checked against what this level
  * allows. Refused by name, because "that will not work here" with no reason
  * is the most annoying message a game can give you.
@@ -212,6 +227,7 @@ function buildRun() {
   state.crashed = false;
   hud.hideWin();
   snapCamera();
+  checkMass();
 }
 
 function enterTest() {
@@ -328,6 +344,12 @@ function enterStudio() {
 
 function respawn() {
   if (state.mode !== 'test') return;
+  // One attempt. It costs a flag and it changes what people build, because
+  // reliability suddenly beats speed.
+  if (state.level.noRespawn) {
+    hud.toast('One attempt on this challenge — back to the studio to try again', true);
+    return;
+  }
   state.machine?.dispose();
   state.arena.reset();
   const spawn = new THREE.Vector3(...state.level.spawn);
@@ -568,6 +590,22 @@ function simulateStep() {
       hud.showFailure(state.level, report, 'You went where you should not');
       return;
     }
+  }
+  // A scored level is never complete — it runs its clock down and then tells
+  // you the number.
+  if (state.level.scored && !state.won && !state.crashed
+    && report.elapsed >= state.level.scored.seconds) {
+    state.won = true;
+    audio.win();
+    store.recordScore(state.level.id, report.score ?? 0);
+    hud.showScore(
+      state.level,
+      report,
+      state.blueprint.cost(),
+      state.blueprint,
+      nextLevel(state.level.id),
+    );
+    return;
   }
   if (report.complete && !state.won) {
     state.won = true;
