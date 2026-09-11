@@ -25,6 +25,22 @@ and the rules it is played under — *No input* where the machine has to run on
 its own program, *No collisions* where touching anything fails the run. A
 solved challenge shows a tick and the best time you have set on it.
 
+### Bans
+
+A level can put parts out of reach — `bans: ['flight']`, and also `'wheels'`
+and `'grabber'`. It is the cheapest content in the game: no new parts, no new
+physics, and it changes the shape of a level more than anything else does.
+Flying is the universal answer, so taking it away turns a gentle haul into a
+real problem.
+
+What a ban covers is read off the part registry rather than listed by id, so a
+rotor added next year is flight because of what it does. Enforcement is at
+build time, never at run time: the part is greyed out on the rack, refuses to
+place, and a machine loaded from the garage with a banned part on it is turned
+away by name. A ban is shown in red on the challenge card and said out loud at
+the first stop of the course tour — a constraint you cannot see before you
+build reads as unfairness rather than as a puzzle.
+
 Skill levels are worked out from what the challenge actually demands rather
 than typed in by hand, so one cannot end up marked easier than it plays:
 

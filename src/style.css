@@ -309,6 +309,15 @@ input[type="range"] { accent-color: var(--amber); }
   clip-path: polygon(0 0, calc(100% - var(--notch-sm)) 0, 100% var(--notch-sm), 100% 100%, var(--notch-sm) 100%, 0 calc(100% - var(--notch-sm)));
 }
 .part-btn:hover { border-color: var(--cyan); }
+
+/* Forbidden on this challenge. Still on the rack, because seeing that a part
+   exists and is off the table says more than a shorter list would. */
+.part-btn.banned {
+  opacity: 0.3;
+  cursor: not-allowed;
+  filter: grayscale(1);
+}
+.part-btn.banned:hover { border-color: var(--red); }
 .part-btn.active {
   border-color: var(--amber);
   background: var(--amber-dim);

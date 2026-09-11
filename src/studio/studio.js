@@ -276,7 +276,20 @@ export class Studio {
    * easy to miss while building and only shows up as a part falling off when
    * the run starts.
    */
+  /**
+   * What the level will not let you build with. Set when the level changes,
+   * so a banned part cannot be placed at all rather than failing the run
+   * later — nobody should find out about a ban after twenty minutes.
+   */
+  setBans(banned, describe) {
+    this.banned = banned ?? new Set();
+    this.describeBan = describe ?? (() => 'Not allowed on this challenge');
+  }
+
   checkPlacement(typeId, cell, rot, ignoreId = null) {
+    if (this.banned?.has(typeId)) {
+      return { ok: false, reason: this.describeBan(typeId) };
+    }
     const fits = this.blueprint.canPlace(typeId, cell, rot, ignoreId);
     if (!fits.ok) return fits;
     const held = wouldConnect(this.blueprint, typeId, cell, rot, ignoreId);

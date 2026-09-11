@@ -17,6 +17,17 @@ describe('the course tour', () => {
     expect(captions[2]).toBe(getLevel('first-haul').objectives[0].label);
   });
 
+  // The tour is the one place a ban is guaranteed to be seen before anybody
+  // starts building against it.
+  it('says what is banned as soon as it opens', () => {
+    const level = { ...getLevel('first-haul'), bans: ['flight'] };
+    expect(stopsFor(level)[0].caption).toMatch(/no flight/i);
+  });
+
+  it('says nothing extra when nothing is banned', () => {
+    expect(stopsFor(getLevel('first-haul'))[0].caption).toBe('You start here');
+  });
+
   it('does not stop twice on the same thing', () => {
     const level = {
       spawn: [0, 0, 0],

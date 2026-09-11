@@ -12,6 +12,7 @@ import { SignalBus } from './sim/signals.js';
 import { controllerOf, firstController } from './sim/flight.js';
 import { getPart } from './parts/registry.js';
 import { ObjectiveTracker, withinBudget, breachedBy } from './challenges/objectives.js';
+import { bannedParts, banFor, firstBanned } from './challenges/bans.js';
 import { getLevel, LEVELS, nextLevel } from './challenges/levels.js';
 import { Hud } from './ui/hud.js';
 import { GraphEditor } from './ui/graph-editor.js';
@@ -161,7 +162,41 @@ function validateBuild() {
   }
   const budget = withinBudget(state.blueprint, state.level);
   if (!budget.ok) return { ok: false, reason: budget.reason };
+  // The palette will not let you place one, but a machine can arrive from the
+  // garage or from a design saved before the level banned it.
+  const broken = firstBanned(state.level, state.blueprint);
+  if (broken) {
+    return { ok: false, reason: `${broken.ban.name}: take the ${broken.part.name} off` };
+  }
   return { ok: true };
+}
+
+/**
+ * A machine loaded from somewhere else, checked against what this level
+ * allows. Refused by name, because "that will not work here" with no reason
+ * is the most annoying message a game can give you.
+ */
+function loadMachine(blueprint, what) {
+  const broken = firstBanned(state.level, blueprint);
+  if (broken) {
+    audio.deny();
+    hud.toast(`${what} has a ${broken.part.name} on it — ${broken.ban.name} here`, true);
+    return false;
+  }
+  studio.replaceBlueprint(blueprint);
+  return true;
+}
+
+// Whatever this level forbids, told to the places that have to refuse it.
+function applyBans() {
+  hud.applyBans(state.level);
+  studio.setBans(
+    bannedParts(state.level),
+    (partId) => {
+      const ban = banFor(state.level, partId);
+      return ban ? `${ban.name} on this challenge` : 'Not allowed here';
+    },
+  );
 }
 
 function buildRun() {
@@ -313,6 +348,7 @@ function changeLevel(id) {
   const stored = loadDesign(state.level.id);
   studio.replaceBlueprint(stored ?? starterRover());
   hud.setLevel(state.level);
+  applyBans();
   if (state.mode === 'test') enterTest(); else refreshReadouts();
 }
 
@@ -729,16 +765,13 @@ async function boot() {
       const presets = { rover: starterRover, drone: quadcopter };
       const make = presets[id];
       if (!make) return;
-      studio.replaceBlueprint(make());
-      hud.toast(`Started from the ${id}`);
+      if (loadMachine(make(), `The ${id}`)) hud.toast(`Started from the ${id}`);
     },
     onLoadMachine: (id) => {
       const machine = store.machine(id);
       if (!machine) return;
-      studio.replaceBlueprint(
-        Blueprint.fromJSON(machine.blueprint, { bounds: state.blueprint.bounds }),
-      );
-      hud.toast(`Loaded ${machine.name}`);
+      const blueprint = Blueprint.fromJSON(machine.blueprint, { bounds: state.blueprint.bounds });
+      if (loadMachine(blueprint, machine.name)) hud.toast(`Loaded ${machine.name}`);
     },
     onCaptureKey: (handler) => input.capture((code) => {
       handler(code);
@@ -756,6 +789,7 @@ async function boot() {
   });
 
   hud.setLevel(state.level);
+  applyBans();
   hud.setMode('studio');
   hud.setActivePart(studio.partType);
   hud.setActiveTool('place');
@@ -785,11 +819,9 @@ async function boot() {
       onLoadMachine: (id) => {
         const machine = store.machine(id);
         if (!machine) return;
-        studio.replaceBlueprint(
-          Blueprint.fromJSON(machine.blueprint, { bounds: state.blueprint.bounds }),
-        );
+        const blueprint = Blueprint.fromJSON(machine.blueprint, { bounds: state.blueprint.bounds });
         leaveMenu();
-        hud.toast(`Loaded ${machine.name}`);
+        if (loadMachine(blueprint, machine.name)) hud.toast(`Loaded ${machine.name}`);
       },
       getSettings: () => ({ ...settings }),
       onSetting: applySetting,

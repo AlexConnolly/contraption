@@ -6,6 +6,7 @@ import { BINDING_MODES, bindingLabel, keyLabel, defaultBinding } from '../sim/si
 import { estimateGains, firstController, controllerOf } from '../sim/flight.js';
 import { renderPart, renderMachine } from './thumbnails.js';
 import { store } from './progress.js';
+import { bannedParts, banFor } from '../challenges/bans.js';
 
 const HELP = {
   studio: [
@@ -237,7 +238,23 @@ export class Hud {
     }
   }
 
+  /**
+   * Greys out whatever this level forbids. The part stays on the rack so you
+   * can see it exists and see that it is off the table, which reads better
+   * than a shorter list of parts with no explanation.
+   */
+  applyBans(level) {
+    const forbidden = bannedParts(level);
+    for (const [partId, button] of this.partButtons ?? []) {
+      const ban = forbidden.has(partId) ? banFor(level, partId) : null;
+      button.classList.toggle('banned', Boolean(ban));
+      button.disabled = Boolean(ban);
+      button.title = ban ? `${ban.name} — ${ban.note}` : getPart(partId).blurb;
+    }
+  }
+
   setLevel(level) {
+    this.applyBans(level);
     this.dom.viewGoal.textContent = level.brief;
     this.dom.briefTitle.textContent = level.name;
     this.dom.briefText.textContent = level.brief;

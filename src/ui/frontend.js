@@ -1,5 +1,6 @@
 import './menu.css';
 import { LEVELS, tierOf, tier } from '../challenges/levels.js';
+import { bansOn } from '../challenges/bans.js';
 import { store } from './progress.js';
 import { levelThumb, renderMachine } from './thumbnails.js';
 import { Blueprint } from '../core/blueprint.js';
@@ -207,6 +208,14 @@ export class FrontEnd {
     const rules = el('div', 'rules');
     if (level.handsOff) rules.append(el('span', 'fe-tag rule', 'No input'));
     if (level.noContact) rules.append(el('span', 'fe-tag rule', 'No collisions'));
+    // In red, because a ban takes something away rather than asking for
+    // something extra — and because it is the thing that decides what you
+    // build, so it has to be legible from the card.
+    for (const ban of bansOn(level)) {
+      const tag = el('span', 'fe-tag ban', ban.name);
+      tag.title = ban.note;
+      rules.append(tag);
+    }
     if (!level.objectives.length) rules.append(el('span', 'fe-tag free', 'Free play'));
     shot.append(rules);
 

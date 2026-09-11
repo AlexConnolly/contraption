@@ -335,6 +335,8 @@
   background: rgba(7, 10, 15, .8);
 }
 .fe-tag.rule { color: var(--cyan); border-color: rgba(53, 208, 224, .45); }
+/* A ban takes something away, so it reads in the same red as a failure. */
+.fe-tag.ban { color: var(--red); border-color: rgba(240, 106, 93, .5); }
 .fe-tag.free { color: var(--dim); border-color: var(--edge); }
 
 .fe-meat { padding: 13px 15px 15px; display: grid; gap: 10px; align-content: start; }

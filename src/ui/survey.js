@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { bansOn } from '../challenges/bans.js';
 
 /**
  * A look round the course before you build for it. The first question any of
@@ -26,10 +27,15 @@ export function stopsFor(level) {
   const stops = [];
   const seen = new Set();
 
+  // A constraint the player cannot see before they build reads as unfairness
+  // rather than as a puzzle, so the tour opens by saying what is off the table.
+  const bans = bansOn(level).map((ban) => ban.name.toLowerCase());
   stops.push({
     at: point(level.spawn),
     reach: 9,
-    caption: 'You start here',
+    caption: bans.length > 0
+      ? `You start here — ${bans.join(', ')}`
+      : 'You start here',
   });
 
   for (const objective of level.objectives ?? []) {
