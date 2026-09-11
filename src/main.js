@@ -5,8 +5,7 @@ import RAPIER from './sim/rapier.js';
 import { Blueprint } from './core/blueprint.js';
 import { Input } from './core/input.js';
 import { Studio } from './studio/studio.js';
-import { starterRover, quadcopter, autoDrone } from './studio/presets.js';
-import { dodger } from './studio/dodger.js';
+import { starterRover, quadcopter } from './studio/presets.js';
 import { Machine } from './sim/machine.js';
 import { Arena } from './sim/arena.js';
 import { SignalBus } from './sim/signals.js';
@@ -187,7 +186,6 @@ function enterTest() {
     hud.toast(check.reason, true);
     return;
   }
-  audio.runStart();
   const orphans = studio.grouping?.disconnected ?? [];
   const seized = studio.grouping?.seized ?? [];
   if (orphans.length > 0) {
@@ -703,12 +701,33 @@ async function boot() {
       hud.toast(`Linked ${linked} thruster${linked === 1 ? '' : 's'} to the controller`);
     },
     onReselect: refreshInspector,
+    // Two to start from, deliberately. The rest of what anybody wants is in
+    // their own garage, which the picker lists underneath these.
+    presets: () => [
+      { id: 'rover', name: 'Rover', blueprint: starterRover() },
+      { id: 'drone', name: 'Drone', blueprint: quadcopter() },
+    ],
+    blueprintOf: (machine) => {
+      try {
+        return Blueprint.fromJSON(machine.blueprint, { bounds: state.blueprint.bounds });
+      } catch {
+        return null;
+      }
+    },
     onPreset: (id) => {
-      const presets = {
-        rover: starterRover, quadcopter, auto: autoDrone, dodger, empty: () => new Blueprint(),
-      };
-      studio.replaceBlueprint(presets[id]());
-      hud.toast(`Loaded the ${id} to start from`);
+      const presets = { rover: starterRover, drone: quadcopter };
+      const make = presets[id];
+      if (!make) return;
+      studio.replaceBlueprint(make());
+      hud.toast(`Started from the ${id}`);
+    },
+    onLoadMachine: (id) => {
+      const machine = store.machine(id);
+      if (!machine) return;
+      studio.replaceBlueprint(
+        Blueprint.fromJSON(machine.blueprint, { bounds: state.blueprint.bounds }),
+      );
+      hud.toast(`Loaded ${machine.name}`);
     },
     onCaptureKey: (handler) => input.capture((code) => {
       handler(code);

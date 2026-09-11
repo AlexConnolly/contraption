@@ -13,32 +13,19 @@
 
     <header id="topbar">
       <div class="brand">Contrap<i>tion</i></div>
-      <button id="btn-challenges" class="crumb">
-        <span class="crumb-back">Challenges</span>
-        <span id="crumb-level" class="crumb-level"></span>
-      </button>
+      <button id="btn-challenges" class="back">Back</button>
       <div class="mode-switch">
         <button id="mode-studio" class="mode active" data-mode="studio">Studio</button>
         <button id="mode-view" class="mode" data-mode="view">View</button>
-        <button id="mode-test" class="mode" data-mode="test">Test</button>
       </div>
+      <button id="mode-test" class="play" data-mode="test">Play</button>
       <div class="spacer"></div>
       <div id="budget" class="readout"></div>
-      <label class="field">
-        <span>Start from</span>
-        <select id="preset-select">
-          <option value="">…</option>
-          <option value="rover">Rover</option>
-          <option value="quadcopter">Quadcopter</option>
-          <option value="auto">Auto drone</option>
-          <option value="dodger">Dodger</option>
-          <option value="empty">Empty</option>
-        </select>
-      </label>
       <div class="actions">
-        <button id="btn-save" class="ghost">Save</button>
-        <button id="btn-load" class="ghost">Load</button>
-        <button id="btn-clear" class="ghost danger">Clear</button>
+        <button id="btn-preset">Start from…</button>
+        <button id="btn-save">Save</button>
+        <button id="btn-load">Load</button>
+        <button id="btn-clear" class="danger">Clear</button>
       </div>
     </header>
 
@@ -52,16 +39,18 @@
       </div>
     </aside>
 
-    <aside id="inspector">
-      <div class="panel-title">Inspector</div>
-      <div id="inspector-body" class="empty">Select a part with the Select tool to set its controls.</div>
-    </aside>
+    <div id="rail">
+      <section id="brief">
+        <h2 id="brief-title"></h2>
+        <p id="brief-text"></p>
+        <p id="brief-hint" class="hint"></p>
+      </section>
 
-    <section id="brief">
-      <h2 id="brief-title"></h2>
-      <p id="brief-text"></p>
-      <p id="brief-hint" class="hint"></p>
-    </section>
+      <aside id="inspector">
+        <div class="panel-title">Inspector</div>
+        <div id="inspector-body" class="empty">Select a part with the Select tool to set its controls.</div>
+      </aside>
+    </div>
 
     <section id="objectives" hidden>
       <div class="panel-title">Objectives</div>
@@ -91,6 +80,17 @@
 
     <footer id="help"></footer>
     <div id="toast"></div>
+
+    <div id="picker" hidden>
+      <div class="picker-card">
+        <h2>Start from</h2>
+        <p>Load a machine onto the plate. Whatever is there now is replaced.</p>
+        <div id="picker-grid" class="picker-grid"></div>
+        <div class="picker-actions">
+          <button id="picker-cancel">Cancel</button>
+        </div>
+      </div>
+    </div>
 
     <div id="modal" hidden>
       <div class="modal-card">

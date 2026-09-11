@@ -4,7 +4,7 @@ import {
 } from '../parts/registry.js';
 import { BINDING_MODES, bindingLabel, keyLabel, defaultBinding } from '../sim/signals.js';
 import { estimateGains, firstController, controllerOf } from '../sim/flight.js';
-import { renderPart } from './thumbnails.js';
+import { renderPart, renderMachine } from './thumbnails.js';
 import { store } from './progress.js';
 
 const HELP = {
@@ -44,13 +44,14 @@ export class Hud {
   constructor(handlers) {
     this.h = handlers;
     this.dom = {
-      crumbLevel: document.getElementById('crumb-level'),
+      rail: document.getElementById('rail'),
+      picker: document.getElementById('picker'),
+      pickerGrid: document.getElementById('picker-grid'),
       modal: document.getElementById('modal'),
       modalTitle: document.getElementById('modal-title'),
       modalBody: document.getElementById('modal-body'),
       modalOk: document.getElementById('modal-ok'),
       modalCancel: document.getElementById('modal-cancel'),
-      presetSelect: document.getElementById('preset-select'),
       modeStudio: document.getElementById('mode-studio'),
       modeView: document.getElementById('mode-view'),
       modeTest: document.getElementById('mode-test'),
@@ -99,14 +100,14 @@ export class Hud {
       });
       if (leave) h.onLeaveChallenge();
     });
-    dom.presetSelect.addEventListener('change', (e) => {
-      if (!e.target.value) return;
-      h.onPreset(e.target.value);
-      e.target.value = '';
+    document.getElementById('btn-preset').addEventListener('click', () => this.openPicker());
+    document.getElementById('picker-cancel').addEventListener('click', () => this.closePicker());
+    dom.picker.addEventListener('mousedown', (event) => {
+      if (event.target === dom.picker) this.closePicker();
     });
     dom.modeStudio.addEventListener('click', () => h.onModeChange('studio'));
     dom.modeView.addEventListener('click', () => h.onModeChange('view'));
-    dom.modeTest.addEventListener('click', () => h.onModeChange('test'));
+    dom.modeTest.addEventListener('click', () => h.onModeChange(this.mode === 'test' ? 'studio' : 'test'));
     document.getElementById('btn-save').addEventListener('click', () => h.onSave());
     document.getElementById('btn-load').addEventListener('click', () => h.onLoad());
     document.getElementById('btn-clear').addEventListener('click', () => h.onClear());
@@ -187,11 +188,12 @@ export class Hud {
   }
 
   setMode(mode, flightKeys = null) {
+    this.mode = mode;
     this.flightKeys = flightKeys;
+    const test = mode === 'test';
     for (const [name, node] of [
       ['studio', this.dom.modeStudio],
       ['view', this.dom.modeView],
-      ['test', this.dom.modeTest],
     ]) {
       node.classList.toggle('active', mode === name);
     }
@@ -201,9 +203,13 @@ export class Hud {
     this.dom.inspector.hidden = mode !== 'studio';
     this.dom.objectives.hidden = mode === 'studio';
     this.dom.viewbar.hidden = mode !== 'view';
+    this.dom.rail.hidden = mode === 'view';
     // In view there is no run, so no clock and nothing to respawn.
     this.dom.clock.hidden = mode !== 'test';
     this.dom.testControls.hidden = mode !== 'test';
+    // Play is the same button whichever mode you are in; in a run it stops.
+    this.dom.modeTest.classList.toggle('running', test);
+    this.dom.modeTest.textContent = test ? 'Stop' : 'Play';
     this.setHelp(mode);
   }
 
@@ -232,7 +238,6 @@ export class Hud {
   }
 
   setLevel(level) {
-    this.dom.crumbLevel.textContent = level.name;
     this.dom.viewGoal.textContent = level.brief;
     this.dom.briefTitle.textContent = level.name;
     this.dom.briefText.textContent = level.brief;
@@ -678,6 +683,76 @@ export class Hud {
 
   get winIsOpen() {
     return !this.dom.win.hidden;
+  }
+
+  // ------------------------------------------------------- machine picker
+
+  /**
+   * Two machines to start from and whatever you have saved, each shown as
+   * what it actually is. A dropdown of names told you nothing: the whole
+   * point of the garage is that you recognise your own machines by sight.
+   */
+  openPicker() {
+    const grid = this.dom.pickerGrid;
+    grid.innerHTML = '';
+
+    const add = (title) => grid.append(el('div', 'picker-head', title));
+    const card = (name, note, blueprint, go) => {
+      const button = el('button', 'pick');
+      const shot = el('div', 'pick-shot');
+      const image = document.createElement('img');
+      image.alt = '';
+      try {
+        image.src = renderMachine(blueprint);
+      } catch {
+        shot.style.background = 'linear-gradient(135deg,#141c27,#0b1018)';
+      }
+      shot.append(image);
+      const meat = el('div', 'pick-meat');
+      meat.append(el('b', null, name), el('span', null, note));
+      button.append(shot, meat);
+      button.addEventListener('click', () => {
+        this.closePicker();
+        go();
+      });
+      grid.append(button);
+    };
+
+    add('Start from');
+    for (const preset of this.h.presets()) {
+      card(
+        preset.name,
+        `${preset.blueprint.size} parts · cost ${preset.blueprint.cost()}`,
+        preset.blueprint,
+        () => this.h.onPreset(preset.id),
+      );
+    }
+
+    add('Your machines');
+    const saved = store.machines();
+    if (saved.length === 0) {
+      grid.append(el('div', 'picker-empty', 'Nothing saved yet. Save a machine from the garage and it will be here.'));
+    }
+    for (const machine of saved) {
+      const blueprint = this.h.blueprintOf(machine);
+      if (!blueprint) continue;
+      card(
+        machine.name,
+        `${blueprint.size} parts · cost ${blueprint.cost()}`,
+        blueprint,
+        () => this.h.onLoadMachine(machine.id),
+      );
+    }
+
+    this.dom.picker.hidden = false;
+  }
+
+  closePicker() {
+    this.dom.picker.hidden = true;
+  }
+
+  get pickerIsOpen() {
+    return !this.dom.picker.hidden;
   }
 
   // --------------------------------------------------------- course tour

@@ -10,29 +10,37 @@ function propVolume(prop) {
     : prop.size[0] * prop.size[1] * prop.size[2];
 }
 
-function fixedBox(RAPIER, world, scene, { pos, size, rotX = 0, rotY = 0, colour }) {
+function fixedBox(RAPIER, world, scene, piece) {
+  const { pos, size, rotX = 0, rotY = 0, colour, belt } = piece;
   const quaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(rotX, rotY, 0));
   const body = world.createRigidBody(
     RAPIER.RigidBodyDesc.fixed()
       .setTranslation(pos[0], pos[1], pos[2])
       .setRotation(quaternion),
   );
-  world.createCollider(
+  const collider = world.createCollider(
     RAPIER.ColliderDesc.cuboid(size[0] / 2, size[1] / 2, size[2] / 2)
-      .setFriction(0.95)
+      .setFriction(belt ? 1.4 : 0.95)
       .setCollisionGroups(GROUP_WORLD),
     body,
   );
+  // A belt reads as rubber rather than as more floor, and takes a little of
+  // its own colour so a sorting bay's lanes can be told apart at a glance.
   const mesh = new THREE.Mesh(
     new THREE.BoxGeometry(size[0], size[1], size[2]),
-    new THREE.MeshStandardMaterial({ color: colour, roughness: 0.85, metalness: 0.05 }),
+    new THREE.MeshStandardMaterial({
+      color: colour,
+      roughness: belt ? 0.98 : 0.85,
+      metalness: 0.05,
+      emissive: belt ? new THREE.Color(colour).multiplyScalar(0.22) : 0x000000,
+    }),
   );
   mesh.position.set(pos[0], pos[1], pos[2]);
   mesh.quaternion.copy(quaternion);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   scene.add(mesh);
-  return { body, mesh };
+  return { body, mesh, collider };
 }
 
 /**
@@ -49,6 +57,7 @@ export class Arena {
     this.objects = [];
     this.props = new Map();
     this.movers = [];
+    this.belts = [];
     this.elapsed = 0;
     this.build();
   }
@@ -84,11 +93,93 @@ export class Arena {
     this.objects.push({ mesh: grid });
 
     for (const piece of level.pieces ?? []) {
-      this.objects.push(fixedBox(RAPIER, world, scene, piece));
+      const built = fixedBox(RAPIER, world, scene, piece);
+      this.objects.push(built);
+      if (piece.belt) {
+        const [dx, dy, dz] = piece.belt.dir;
+        const length = Math.hypot(dx, dy, dz) || 1;
+        this.belts.push({
+          collider: built.collider,
+          dir: [dx / length, dy / length, dz / length],
+          speed: piece.belt.speed ?? 2,
+        });
+      }
     }
+    for (const hoop of level.hoops ?? []) this.addHoop(hoop);
     for (const prop of level.props ?? []) this.addProp(prop);
     for (const mover of level.movers ?? []) this.addMover(mover);
     for (const zone of level.zones ?? []) this.addZone(zone);
+    for (const zone of level.keepout ?? []) this.addKeepOut(zone);
+  }
+
+  /**
+   * A ring you have to put something through. Rapier has no torus, so the rim
+   * is a circle of small boxes — it has to be real geometry rather than a
+   * marker, or a payload can simply be shoved in through the side and the
+   * whole problem evaporates.
+   */
+  addHoop(hoop) {
+    const { RAPIER, world, scene } = this;
+    const radius = hoop.radius ?? 1.4;
+    const thickness = hoop.thickness ?? 0.16;
+    const segments = hoop.segments ?? 16;
+    const axis = new THREE.Vector3(...(hoop.axis ?? [0, 0, 1])).normalize();
+    const frame = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), axis);
+
+    const body = world.createRigidBody(
+      RAPIER.RigidBodyDesc.fixed().setTranslation(hoop.pos[0], hoop.pos[1], hoop.pos[2]),
+    );
+    const step = (Math.PI * 2) / segments;
+    // Each box spans one segment of the rim, tilted to sit along the circle.
+    const chord = radius * Math.tan(step / 2) * 1.05;
+    for (let i = 0; i < segments; i += 1) {
+      const angle = i * step;
+      const local = new THREE.Vector3(Math.cos(angle) * radius, Math.sin(angle) * radius, 0);
+      const spin = new THREE.Quaternion()
+        .setFromAxisAngle(new THREE.Vector3(0, 0, 1), angle + Math.PI / 2)
+        .premultiply(frame);
+      local.applyQuaternion(frame);
+      world.createCollider(
+        RAPIER.ColliderDesc.cuboid(thickness, chord, thickness)
+          .setTranslation(local.x, local.y, local.z)
+          .setRotation({ x: spin.x, y: spin.y, z: spin.z, w: spin.w })
+          .setFriction(0.5)
+          .setRestitution(0.2)
+          .setCollisionGroups(GROUP_WORLD),
+        body,
+      );
+    }
+
+    const mesh = new THREE.Mesh(
+      new THREE.TorusGeometry(radius, thickness, 10, 32),
+      new THREE.MeshStandardMaterial({
+        color: hoop.colour ?? 0xf0a825,
+        roughness: 0.5,
+        metalness: 0.35,
+        emissive: 0x3a2606,
+      }),
+    );
+    mesh.position.set(hoop.pos[0], hoop.pos[1], hoop.pos[2]);
+    mesh.quaternion.copy(frame);
+    mesh.castShadow = true;
+    scene.add(mesh);
+
+    // A faint disc across the opening, so the target reads from a distance.
+    const net = new THREE.Mesh(
+      new THREE.CircleGeometry(radius * 0.75, 28),
+      new THREE.MeshBasicMaterial({
+        color: hoop.colour ?? 0xf0a825,
+        transparent: true,
+        opacity: 0.12,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      }),
+    );
+    net.position.copy(mesh.position);
+    net.quaternion.copy(frame);
+    scene.add(net);
+
+    this.objects.push({ body, mesh }, { mesh: net });
   }
 
   addProp(prop) {
@@ -188,10 +279,39 @@ export class Arena {
     this.objects.push({ body, mesh });
   }
 
+  /**
+   * Rapier has no conveyor surface, so a belt is a plain fixed box that drags
+   * whatever is resting on it. Every step it looks at what it is touching and
+   * pulls that body's speed along the belt towards the belt's own.
+   *
+   * Pulling rather than setting: a crate keeps its own falling and sliding,
+   * and anything driving against the belt can still fight it. `GRIP` is how
+   * much of the difference is taken each step — high enough to get up to belt
+   * speed in a few frames, low enough that landing on one is not a smack.
+   */
+  driveBelts() {
+    const GRIP = 0.3;
+    for (const belt of this.belts) {
+      const [dx, dy, dz] = belt.dir;
+      this.world.contactPairsWith(belt.collider, (other) => {
+        const body = other.parent();
+        if (!body || !body.isDynamic()) return;
+        const v = body.linvel();
+        const along = v.x * dx + v.y * dy + v.z * dz;
+        const change = (belt.speed - along) * GRIP;
+        body.setLinvel(
+          { x: v.x + dx * change, y: v.y + dy * change, z: v.z + dz * change },
+          true,
+        );
+      });
+    }
+  }
+
   // Called once per physics step, before the world advances, so the obstacle
   // is where the sensors will see it.
   step(dt) {
     this.elapsed += dt;
+    this.driveBelts();
     for (const mover of this.movers) {
       const travel = Math.sin(this.elapsed * mover.rate + mover.offset) * mover.span;
       const at = [...mover.spec.pos];
@@ -199,6 +319,33 @@ export class Arena {
       at[index] += travel;
       mover.body.setNextKinematicTranslation({ x: at[0], y: at[1], z: at[2] });
     }
+  }
+
+  /**
+   * Somewhere the machine may not go, airspace included. Drawn as a red cage
+   * rather than a tinted box: it has to read as a wall from across the course,
+   * because flying into one ends the run.
+   */
+  addKeepOut(zone) {
+    const geometry = new THREE.BoxGeometry(zone.size[0], zone.size[1], zone.size[2]);
+    const mesh = new THREE.Mesh(
+      geometry,
+      new THREE.MeshBasicMaterial({
+        color: 0xf0463a,
+        transparent: true,
+        opacity: 0.1,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      }),
+    );
+    mesh.position.set(zone.pos[0], zone.pos[1], zone.pos[2]);
+    const frame = new THREE.LineSegments(
+      new THREE.EdgesGeometry(geometry),
+      new THREE.LineBasicMaterial({ color: 0xff5a4a }),
+    );
+    mesh.add(frame);
+    this.scene.add(mesh);
+    this.objects.push({ mesh });
   }
 
   addZone(zone) {
@@ -271,5 +418,6 @@ export class Arena {
     this.objects = [];
     this.props.clear();
     this.movers = [];
+    this.belts = [];
   }
 }

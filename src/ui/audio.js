@@ -23,7 +23,6 @@ const CLIPS = {
   deny: 'deny.ogg',
   confirm: 'confirm.ogg',
   latch: 'grab-latch.ogg',
-  runStart: 'run-start.ogg',
   crash: 'crash.ogg',
   win: 'win.ogg',
   fail: 'fail.ogg',
@@ -196,7 +195,6 @@ export class GameAudio {
   confirm() { this.play('confirm', { gain: 0.7 }); }
   latch() { this.play('latch', { gain: 0.6 }); }
   release() { this.play('latch', { gain: 0.45, rate: 0.8 }); }
-  runStart() { this.play('runStart', { gain: 0.5 }); }
   crash() { this.play('crash', { gain: 0.9 }); }
   win() { this.play('win', { gain: 0.8 }); }
   fail() { this.play('fail', { gain: 0.8 }); }
