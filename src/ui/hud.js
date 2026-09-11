@@ -1,6 +1,6 @@
 import {
   CATEGORIES, partsInCategory, getPart, pistonStroke, workingAxis,
-  turntableSpin, turntableTorque,
+  turntableSpin, turntableTorque, CELL, CELL_VOLUME,
 } from '../parts/registry.js';
 import { BINDING_MODES, bindingLabel, keyLabel, defaultBinding } from '../sim/signals.js';
 import { estimateGains, firstController, controllerOf } from '../sim/flight.js';
@@ -39,6 +39,29 @@ function el(tag, className, text) {
   if (className) node.className = className;
   if (text !== undefined) node.textContent = text;
   return node;
+}
+
+/**
+ * What a blueprint will weigh once it is built, worked out the same way the
+ * physics does it: part mass is given per grid cell and turned into a density,
+ * and each collider's own volume decides the rest. A wheel is a cylinder and a
+ * wedge is half a box, so neither weighs what its cell count suggests.
+ */
+export function blueprintMass(blueprint) {
+  let total = 0;
+  for (const placed of blueprint.list()) {
+    const part = getPart(placed.type);
+    const density = part.mass / CELL_VOLUME;
+    let volume;
+    if (part.radius) {
+      volume = Math.PI * part.radius * part.radius * part.width;
+    } else {
+      const box = part.size.reduce((a, n) => a * n * CELL, 1);
+      volume = part.shape === 'wedge' ? box / 2 : box;
+    }
+    total += density * volume;
+  }
+  return total;
 }
 
 export class Hud {
@@ -261,12 +284,29 @@ export class Hud {
     this.dom.briefHint.textContent = level.hint ?? '';
   }
 
-  setBudget(cost, budget, partCount) {
+  /**
+   * Parts, cost, and — where a level caps it — weight.
+   *
+   * The mass cap used to be invisible until the run started, which is the one
+   * place it is no use: by then you have finished building. It reads the same
+   * way the budget does, so being over is something you see while you can
+   * still do something about it.
+   */
+  setBudget(cost, budget, partCount, blueprint, massCap) {
     const over = budget && cost > budget;
     this.dom.budget.classList.toggle('over', Boolean(over));
-    this.dom.budget.innerHTML = budget
-      ? `${partCount} parts · cost <strong>${cost}</strong> / ${budget}`
-      : `${partCount} parts · cost <strong>${cost}</strong>`;
+
+    const parts = [`${partCount} parts`];
+    parts.push(budget
+      ? `cost <strong>${cost}</strong> / ${budget}`
+      : `cost <strong>${cost}</strong>`);
+
+    if (massCap && blueprint) {
+      const kg = blueprintMass(blueprint);
+      parts.push(`mass <strong>${kg.toFixed(0)}</strong> / ${massCap} kg`);
+      this.dom.budget.classList.toggle('over', Boolean(over) || kg > massCap);
+    }
+    this.dom.budget.innerHTML = parts.join(' · ');
   }
 
   clearInspector(message) {

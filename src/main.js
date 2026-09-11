@@ -495,7 +495,13 @@ function updateCamera(dt) {
 // ------------------------------------------------------------------- readouts
 
 function refreshReadouts() {
-  hud.setBudget(state.blueprint.cost(), state.level.budget?.cost, state.blueprint.size);
+  hud.setBudget(
+    state.blueprint.cost(),
+    state.level.budget?.cost,
+    state.blueprint.size,
+    state.blueprint,
+    state.level.massCap,
+  );
 }
 
 function refreshInspector() {

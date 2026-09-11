@@ -6,6 +6,10 @@
 // will tell you if a pack has been dropped in the wrong place.
 
 import { CORE } from './packs/core.js';
+import { WORLDS } from './packs/worlds.js';
+import { JOBS } from './packs/jobs.js';
+import { QUESTIONS } from './packs/questions.js';
+import { GROUND } from './packs/ground.js';
 
 /**
  * What a challenge asks of you, and the skill level that follows from it.
@@ -51,6 +55,10 @@ export function tier(id) {
 
 const PACKS = [
   ...CORE,
+  ...GROUND,
+  ...JOBS,
+  ...QUESTIONS,
+  ...WORLDS,
 ];
 
 /**
