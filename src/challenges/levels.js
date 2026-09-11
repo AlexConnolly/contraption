@@ -148,6 +148,29 @@ export const LEVELS = [
     ],
     par: 200,
   },
+
+  {
+    id: 'hands-off',
+    name: '6 — Hands Off',
+    brief: 'No controls at all on this one. Draw the program, press Test, and watch it fly itself to the pad.',
+    hint: 'A Computer, a GPS and a Flight Controller. Climb, turn toward the waypoint, run in, then hold. Start from the Auto drone preset if you want a worked example to pull apart.',
+    handsOff: true,
+    spawn: [0, 1.2, -16],
+    groundSize: 180,
+    budget: { cost: 150 },
+    pieces: [
+      { pos: [0, 2.5, 12], size: [6, 5, 6], colour: DARK },
+      { pos: [0, 5.2, 12], size: [8, 0.6, 8], colour: GREY },
+    ],
+    props: [],
+    zones: [
+      { id: 'pad', pos: [0, 7.4, 12], size: [6, 3.4, 6], colour: 0x4ade80 },
+    ],
+    objectives: [
+      { type: 'coreInZone', zone: 'pad', hold: 4, label: 'Machine holding station over the pad' },
+    ],
+    par: 60,
+  },
 ];
 
 export function getLevel(id) {

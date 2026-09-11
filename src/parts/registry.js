@@ -74,6 +74,10 @@ const PARTS = [
   },
   {
     id: 'wheel',
+    ports: {
+      in: [{ id: 'throttle', name: 'Throttle', kind: 'number', min: -1, max: 1 }],
+      out: [{ id: 'spin', name: 'Spin rate', kind: 'number' }],
+    },
     name: 'Powered Wheel',
     category: 'drive',
     size: [1, 1, 1],
@@ -89,6 +93,7 @@ const PARTS = [
     friction: 2.4,
     actuator: {
       kind: 'motor',
+      port: 'throttle',
       signal: 'axis',
       maxSpeed: 11,
       maxForce: 22,
@@ -115,6 +120,10 @@ const PARTS = [
   },
   {
     id: 'hinge',
+    ports: {
+      in: [{ id: 'target', name: 'Target angle', kind: 'number', min: -1, max: 1 }],
+      out: [{ id: 'angle', name: 'Angle', kind: 'number' }],
+    },
     name: 'Servo Hinge',
     category: 'manipulator',
     size: [1, 1, 1],
@@ -129,6 +138,7 @@ const PARTS = [
     limits: [-1.55, 1.55],
     actuator: {
       kind: 'servo',
+      port: 'target',
       signal: 'axis',
       range: 1.55,
       stiffness: 140,
@@ -139,6 +149,10 @@ const PARTS = [
   },
   {
     id: 'piston',
+    ports: {
+      in: [{ id: 'target', name: 'Target extension', kind: 'number', min: 0, max: 1 }],
+      out: [{ id: 'extension', name: 'Extension', kind: 'number' }],
+    },
     name: 'Piston',
     category: 'manipulator',
     size: [1, 1, 1],
@@ -153,6 +167,7 @@ const PARTS = [
     stroke: 1.2,
     actuator: {
       kind: 'linear',
+      port: 'target',
       signal: 'hold',
       stiffness: 500,
       damping: 70,
@@ -162,6 +177,10 @@ const PARTS = [
   },
   {
     id: 'grabber',
+    ports: {
+      in: [{ id: 'active', name: 'Grab', kind: 'bool' }],
+      out: [{ id: 'holding', name: 'Holding', kind: 'bool' }],
+    },
     name: 'Magnet Grabber',
     category: 'manipulator',
     size: [1, 1, 1],
@@ -171,6 +190,7 @@ const PARTS = [
     grabber: { reach: 0.85, strength: 900 },
     actuator: {
       kind: 'grab',
+      port: 'active',
       signal: 'toggle',
       defaultBinding: { mode: 'toggle', pos: 'KeyG' },
     },
@@ -178,6 +198,10 @@ const PARTS = [
   },
   {
     id: 'propeller',
+    ports: {
+      in: [{ id: 'throttle', name: 'Throttle', kind: 'number', min: 0, max: 1 }],
+      out: [],
+    },
     name: 'Lift Rotor',
     category: 'flight',
     size: [1, 1, 1],
@@ -187,6 +211,7 @@ const PARTS = [
     thruster: { axis: [0, 1, 0], maxThrust: 95, spin: 42, reaction: 9 },
     actuator: {
       kind: 'thrust',
+      port: 'throttle',
       signal: 'hold',
       defaultBinding: { mode: 'hold', pos: 'Space' },
     },
@@ -194,6 +219,10 @@ const PARTS = [
   },
   {
     id: 'thruster',
+    ports: {
+      in: [{ id: 'throttle', name: 'Throttle', kind: 'number', min: 0, max: 1 }],
+      out: [],
+    },
     name: 'Jet Thruster',
     category: 'flight',
     size: [1, 1, 1],
@@ -203,6 +232,7 @@ const PARTS = [
     thruster: { axis: [0, 1, 0], maxThrust: 55, spin: 0 },
     actuator: {
       kind: 'thrust',
+      port: 'throttle',
       signal: 'hold',
       defaultBinding: { mode: 'hold', pos: 'ShiftLeft' },
     },
@@ -210,6 +240,21 @@ const PARTS = [
   },
   {
     id: 'controller',
+    ports: {
+      in: [
+        { id: 'pitch', name: 'Pitch', kind: 'number', min: -1, max: 1 },
+        { id: 'yaw', name: 'Yaw', kind: 'number', min: -1, max: 1 },
+        { id: 'climb', name: 'Climb', kind: 'number', min: -1, max: 1 },
+        { id: 'targetAltitude', name: 'Hold altitude', kind: 'number' },
+      ],
+      out: [
+        { id: 'altitude', name: 'Altitude', kind: 'number' },
+        { id: 'verticalSpeed', name: 'Climb rate', kind: 'number' },
+        { id: 'forwardSpeed', name: 'Forward speed', kind: 'number' },
+        { id: 'rightSpeed', name: 'Right speed', kind: 'number' },
+        { id: 'levelness', name: 'Levelness', kind: 'number' },
+      ],
+    },
     name: 'Flight Controller',
     category: 'avionics',
     size: [1, 1, 1],
@@ -242,7 +287,46 @@ const PARTS = [
     blurb: 'Mixes every rotor and thruster linked to it, and holds altitude when you let go.',
   },
   {
+    id: 'gps',
+    name: 'GPS',
+    category: 'avionics',
+    size: [1, 1, 1],
+    mass: 0.4,
+    colour: 0x7ad4ff,
+    cost: 4,
+    ports: {
+      in: [],
+      out: [
+        { id: 'position', name: 'Position', kind: 'vec3' },
+        { id: 'velocity', name: 'Velocity', kind: 'vec3' },
+        { id: 'speed', name: 'Ground speed', kind: 'number' },
+        { id: 'altitude', name: 'Altitude', kind: 'number' },
+        { id: 'heading', name: 'Heading', kind: 'number' },
+      ],
+    },
+    blurb: 'Tells the computer where the machine is, how fast it is going and which way it faces.',
+  },
+  {
+    id: 'computer',
+    name: 'Computer',
+    category: 'avionics',
+    size: [1, 1, 1],
+    mass: 1,
+    colour: 0xffa3d1,
+    unique: true,
+    cost: 10,
+    computer: true,
+    blurb: 'Runs the program you draw. States, each with its own loop, wired to every module on the machine.',
+  },
+  {
     id: 'sensor',
+    ports: {
+      in: [],
+      out: [
+        { id: 'distance', name: 'Distance', kind: 'number' },
+        { id: 'tripped', name: 'Tripped', kind: 'bool' },
+      ],
+    },
     name: 'Distance Sensor',
     category: 'logic',
     size: [1, 1, 1],
@@ -282,4 +366,12 @@ export function attachFaces(part) {
 
 export function isActuator(part) {
   return Boolean(part.actuator);
+}
+
+export function portsOf(part, direction) {
+  return part.ports?.[direction] ?? [];
+}
+
+export function findPort(part, direction, id) {
+  return portsOf(part, direction).find((port) => port.id === id) ?? null;
 }

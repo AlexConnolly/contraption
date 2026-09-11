@@ -11,6 +11,8 @@
 | `signals` | Axis, hold and toggle bindings resolve to the right value; a sensor-driven binding follows its source; unbound actuators read zero. |
 | `challenge` | Objective evaluation completes only after the hold time elapses; a failed objective resets its timer; budgets reject oversized builds. |
 | `flight/mixer` | Each thruster's authority per channel follows from where it sits and which way it points: upward rotors all lift, front and rear oppose in pitch, diagonals oppose in yaw through reaction torque, a lone centred rotor has lift and yaw but nothing else, and a forward-facing jet counts as pitch rather than lift. |
+| `program/graph` | Nodes evaluate only after what feeds them; a cycle is reported rather than run; every node kind produces the right value; a state hands over on a `Go to` and its timer restarts; validation catches a kind mismatch, a missing part and a dangling transition. |
+| `computer` | Module reads come off the running machine; writes are clamped to the port's range; a program drives actuators directly, and drives the flight controller by naming a height. |
 | `flight/loops` | Hover throttle matches weight over available lift; sinking adds throttle and rising removes it; a banked machine asks for more; the climb key drags the held altitude with it; the controller leans against drift and **away** from sideways drift; zero lift authority asks for nothing; every mixed throttle stays in range. |
 
 ## Manual (browser)
@@ -25,4 +27,6 @@
 8. A distance sensor drives a motor without a key press.
 9. Challenge 1 completes and shows the win panel; the timer and part count are reported.
 10. A quadcopter wired to a flight controller lifts off, holds height hands-off, flies on WASD and climbs on Space/Shift; after a hard shove or a long turning run it comes back to level and stops.
-11. Save, reload the page, and load the design back unchanged.
+11. The node editor opens from a Computer, lays out with Tidy, and wires only between sockets of the same kind; a link into an occupied input replaces it.
+12. Challenge 6 completes with every key held down and ignored.
+13. Save, reload the page, and load the design back unchanged.

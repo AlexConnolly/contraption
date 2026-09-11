@@ -5,7 +5,7 @@ import RAPIER from './sim/rapier.js';
 import { Blueprint } from './core/blueprint.js';
 import { Input } from './core/input.js';
 import { Studio } from './studio/studio.js';
-import { starterRover, quadcopter } from './studio/presets.js';
+import { starterRover, quadcopter, autoDrone } from './studio/presets.js';
 import { Machine } from './sim/machine.js';
 import { Arena } from './sim/arena.js';
 import { SignalBus } from './sim/signals.js';
@@ -14,6 +14,8 @@ import { getPart } from './parts/registry.js';
 import { ObjectiveTracker, withinBudget } from './challenges/objectives.js';
 import { getLevel, LEVELS } from './challenges/levels.js';
 import { Hud } from './ui/hud.js';
+import { GraphEditor } from './ui/graph-editor.js';
+import { emptyProgram } from './sim/program.js';
 
 const STEP = 1 / 60;
 const STORAGE_KEY = 'contraption.v1';
@@ -75,6 +77,7 @@ const bus = new SignalBus(input);
 let studio;
 let hud;
 let world;
+let editor;
 
 // ---------------------------------------------------------------- persistence
 
@@ -141,7 +144,7 @@ function buildRun() {
   const spawn = new THREE.Vector3(...state.level.spawn);
   state.arena = new Arena({ RAPIER, world, scene, level: state.level });
   state.machine = new Machine({
-    RAPIER, world, scene, blueprint: state.blueprint, spawn,
+    RAPIER, world, scene, blueprint: state.blueprint, spawn, level: state.level,
   });
   state.tracker = new ObjectiveTracker(state.level);
   hud.buildObjectives(state.tracker.report());
@@ -169,6 +172,7 @@ function enterTest() {
   studio.setVisible(false);
   disposeRun();
   buildRun();
+  input.enabled = !state.level.handsOff;
   const controller = firstController(state.blueprint);
   hud.setMode('test', controller
     ? { ...getPart('controller').flight.defaultKeys, ...(controller.config.keys ?? {}) }
@@ -178,6 +182,7 @@ function enterTest() {
 
 function enterStudio() {
   state.mode = 'studio';
+  input.enabled = true;
   disposeRun();
   studio.setVisible(true);
   hud.setMode('studio');
@@ -194,7 +199,7 @@ function respawn() {
   state.arena.reset();
   const spawn = new THREE.Vector3(...state.level.spawn);
   state.machine = new Machine({
-    RAPIER, world, scene, blueprint: state.blueprint, spawn,
+    RAPIER, world, scene, blueprint: state.blueprint, spawn, level: state.level,
   });
   state.tracker.reset();
   bus.reset();
@@ -293,6 +298,7 @@ canvas.addEventListener('pointerleave', () => studio?.clearPointer());
 canvas.addEventListener('contextmenu', (event) => event.preventDefault());
 
 function handleShortcuts() {
+  if (editor?.isOpen) return;
   if (input.wasPressed('Tab')) {
     if (state.mode === 'studio') enterTest(); else enterStudio();
   }
@@ -446,6 +452,16 @@ async function boot() {
     },
     onConfigChange: (id, config) => state.blueprint.setConfig(id, config),
     onDeleteSelected: () => studio.deleteSelected(),
+    onOpenProgram: (computerId) => {
+      const placed = state.blueprint.get(computerId);
+      if (!placed) return;
+      editor.open({
+        program: placed.config.program ?? emptyProgram(),
+        blueprint: state.blueprint,
+        level: state.level,
+        name: `${state.level.name} — program`,
+      });
+    },
     onLinkThrusters: (controllerId) => {
       let linked = 0;
       for (const placed of state.blueprint.list()) {
@@ -462,7 +478,9 @@ async function boot() {
     },
     onReselect: refreshInspector,
     onPreset: (id) => {
-      const presets = { rover: starterRover, quadcopter, empty: () => new Blueprint() };
+      const presets = {
+        rover: starterRover, quadcopter, auto: autoDrone, empty: () => new Blueprint(),
+      };
       studio.replaceBlueprint(presets[id]());
       hud.toast(`Loaded the ${id} to start from`);
     },
@@ -470,6 +488,15 @@ async function boot() {
       handler(code);
       refreshInspector();
     }),
+  });
+
+  editor = new GraphEditor({
+    onChange: (program) => {
+      const computer = state.blueprint.list().find((p) => getPart(p.type).computer);
+      if (computer) state.blueprint.setConfig(computer.id, { program });
+      scheduleAutosave();
+    },
+    onClose: () => refreshInspector(),
   });
 
   hud.setLevel(state.level);
@@ -487,6 +514,7 @@ async function boot() {
       hud,
       input,
       bus,
+      editor,
       // Steps and redraws on demand. A browser tab in the background stops
       // calling requestAnimationFrame, so automated checks drive it from here.
       advance(seconds) {

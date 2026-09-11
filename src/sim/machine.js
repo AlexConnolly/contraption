@@ -8,6 +8,8 @@ import {
   readFlightKeys, controllerOf,
 } from './flight.js';
 import { createPartMesh } from '../parts/geometry.js';
+import { Computer } from './computer.js';
+import { emptyProgram } from './program.js';
 
 export const GROUP_WORLD = 0x00010003;
 export const GROUP_MACHINE = 0x00020001;
@@ -27,7 +29,8 @@ function vec(v) {
  * them, and drives the actuators from a signal bus each step.
  */
 export class Machine {
-  constructor({ RAPIER, world, scene, blueprint, spawn }) {
+  constructor({ RAPIER, world, scene, blueprint, spawn, level }) {
+    this.level = level ?? null;
     this.RAPIER = RAPIER;
     this.world = world;
     this.scene = scene;
@@ -39,6 +42,8 @@ export class Machine {
     this.actuators = [];
     this.sensors = [];
     this.controllers = [];
+    this.computers = [];
+    this.sensorReadings = new Map();
     this.grabs = new Map();
     this.partMeshes = new Map();
     this.grouping = groupBlueprint(blueprint);
@@ -79,6 +84,7 @@ export class Machine {
     this.buildJoints();
     this.collectActuators();
     this.buildControllers();
+    this.buildComputers();
     this.syncMeshes();
   }
 
@@ -234,7 +240,16 @@ export class Machine {
         v.y = 0;
         return v.lengthSq() > 1e-6 ? velocity.dot(v.normalize()) : 0;
       };
-      const command = readFlightKeys(bus.input, entry.keys);
+      // A program writing to the controller's ports takes the stick off the
+      // pilot; anything it leaves alone still answers to the keyboard.
+      const keys = readFlightKeys(bus.input, entry.keys);
+      const command = {
+        pitch: this.forced(entry.placed.id, 'pitch') ?? keys.pitch,
+        yaw: this.forced(entry.placed.id, 'yaw') ?? keys.yaw,
+        climb: this.forced(entry.placed.id, 'climb') ?? keys.climb,
+      };
+      const holdAt = this.forced(entry.placed.id, 'targetAltitude');
+      if (holdAt !== undefined) entry.runtime.holdAltitude(holdAt);
       entry.runtime.update(dt, command, {
         mass: body.mass(),
         gravity: -this.world.gravity.y,
@@ -249,7 +264,38 @@ export class Machine {
         bus.setChannel(id, throttle);
       }
       entry.command = command;
+      entry.forwardSpeed = flat(frameWorld.forward);
+      entry.rightSpeed = flat(frameWorld.right);
     }
+  }
+
+  sensorDistance(partId) {
+    return this.sensorReadings.get(partId)?.distance ?? 0;
+  }
+
+  sensorTripped(partId) {
+    return this.sensorReadings.get(partId)?.tripped ?? false;
+  }
+
+  buildComputers() {
+    for (const placed of this.blueprint.list()) {
+      if (!getPart(placed.type).computer) continue;
+      this.computers.push(new Computer({
+        machine: this,
+        placed,
+        program: placed.config.program ?? emptyProgram(),
+        level: this.level,
+      }));
+    }
+  }
+
+  // What the program set for a module port this tick, if it set anything.
+  forced(partId, port) {
+    for (const computer of this.computers) {
+      const value = computer.value(partId, port);
+      if (value !== undefined) return value;
+    }
+    return undefined;
   }
 
   bindingFor(placed, part) {
@@ -301,6 +347,10 @@ export class Machine {
       const proximity = hit ? Math.max(0, 1 - hit.timeOfImpact / part.sensor.range) : 0;
       const threshold = placed.config.threshold ?? part.config.threshold;
       const tripped = hit && proximity >= threshold ? 1 : 0;
+      this.sensorReadings.set(placed.id, {
+        distance: hit ? hit.timeOfImpact : part.sensor.range,
+        tripped: Boolean(tripped),
+      });
       bus.setSensor(placed.id, tripped);
       const mesh = this.partMeshes.get(placed.id);
       if (mesh?.userData.indicator) {
@@ -310,7 +360,6 @@ export class Machine {
   }
 
   update(dt, bus) {
-    this.updateControllers(dt, bus);
     // Rapier keeps applied forces until they are cleared, so thrust has to be
     // wiped and re-applied every step or it accumulates. Force and torque are
     // cleared separately, and addForceAtPoint sets both: an off-centre
@@ -319,10 +368,18 @@ export class Machine {
       body.resetForces(false);
       body.resetTorques(false);
     }
+    // Sensors first, so a program reads this step's world rather than the last
+    // one; then the programs; then the controllers and actuators they drive.
     this.readSensors(bus);
+    for (const computer of this.computers) computer.tick(dt);
+    this.updateControllers(dt, bus);
+
     for (const actuator of this.actuators) {
       const { placed, part, joint } = actuator;
-      const signal = bus.resolve(placed.id, this.bindingFor(placed, part));
+      const driven = this.forced(placed.id, part.actuator.port);
+      const signal = driven === undefined
+        ? bus.resolve(placed.id, this.bindingFor(placed, part))
+        : Number(driven);
       const power = placed.config.power ?? 1;
       actuator.signal = signal;
       switch (part.actuator.kind) {

@@ -201,6 +201,7 @@ export class Hud {
     head.append(swatch, el('h3', null, part.name));
     body.append(head, el('p', 'insp-blurb', part.blurb));
 
+    if (part.computer) this.renderComputer(body, placed);
     if (part.flight) this.renderController(body, placed, part, blueprint);
     if (part.actuator) this.renderBinding(body, placed, part, blueprint);
     if (part.sensor) this.renderSensor(body, placed, part);
@@ -345,6 +346,20 @@ export class Hud {
       });
       body.append(reset);
     }
+  }
+
+  renderComputer(body, placed) {
+    const program = placed.config.program;
+    const states = program?.states?.length ?? 0;
+    const nodes = program?.states?.reduce((sum, s) => sum + s.nodes.length, 0) ?? 0;
+    body.append(el('p', 'insp-blurb',
+      states ? `${states} state${states === 1 ? '' : 's'}, ${nodes} node${nodes === 1 ? '' : 's'}.`
+        : 'No program yet.'));
+    const open = el('button', 'primary', 'Open program');
+    open.style.width = '100%';
+    open.style.marginBottom = '10px';
+    open.addEventListener('click', () => this.h.onOpenProgram(placed.id));
+    body.append(open);
   }
 
   renderController(body, placed, part, blueprint) {

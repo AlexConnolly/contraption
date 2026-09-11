@@ -9,7 +9,7 @@ Three.js for rendering, Rapier for physics, Vite for the build.
 ```bash
 npm install
 npm run dev      # http://localhost:5173
-npm test         # 108 tests, including headless physics
+npm test         # 150 tests, including headless physics
 npm run build
 npm run preview  # serve the production build
 ```
@@ -94,6 +94,39 @@ single-rotor case, where reaction torque is welded to lift and fighting the
 spin can only drop the machine. That much trim is allowed only as far as the
 altitude loop has throttle left to win back.
 
+## The computer
+
+A machine can carry a **Computer**, and its program is a node graph. That graph
+*is* the behaviour — there is no autopilot hiding underneath it.
+
+Every module that can do something, or knows something, exposes typed ports.
+A GPS reports position, velocity, speed, altitude and heading. A wheel takes a
+throttle and reports its spin. A grabber takes an on-off and reports whether it
+is holding anything. The flight controller takes pitch, yaw, climb and a target
+altitude, and reports altitude, climb rate and how level it is. So one graph
+can set a rotor's throttle directly, or hand the flight controller a height and
+let it sort the throttles out itself.
+
+A program is a set of **states**, and each state owns its own graph. That graph
+runs every tick while the state is active — the state's loop. A `Go to` node
+whose condition holds hands over to another state, and the first to fire wins.
+
+Values are `number`, `bool` or `vec3`, and links are checked against the kind
+at both ends. The node vocabulary is deliberately small: read and write a
+module port, constants, level waypoints, build and split vectors, distance and
+bearing between two points, maths, comparisons, logic, select, a timer for how
+long the state has been running, and `Go to`. The graph is evaluated once per
+tick in dependency order, and a cycle is reported rather than quietly serving a
+stale value.
+
+Open it from the Computer's inspector. Drag nodes about, pull a link from an
+output socket to an input socket, and press **Tidy** to lay the current state
+out in columns. `docs/COMPUTER.md` lists every port.
+
+A level can be marked **hands-off**: the keyboard is ignored for the whole run,
+so the machine has to fly itself. Challenge 6 is one, and the **Auto drone**
+preset solves it — worth opening up and taking apart.
+
 ## How a machine is put together
 
 A blueprint is a list of parts on an integer grid, each with one of the 24
@@ -124,10 +157,11 @@ Machine parts do not collide with each other, only with the world.
 ```
 src/core/        orientation maths, the blueprint grid, keyboard input
 src/parts/       part registry (mass, cost, joints, actuators) and meshes
-src/sim/         connectivity, body grouping, signal bus, machine, arena
+src/sim/         connectivity, body grouping, signal bus, machine, arena,
+                 flight controller, program graph, computer runtime
 src/studio/      build mode: picking, ghost preview, undo, presets
 src/challenges/  levels and objective tracking
-src/ui/          palette, inspector, objectives, win card
+src/ui/          palette, inspector, objectives, win card, node editor
 ```
 
 ## Tests
@@ -145,6 +179,13 @@ flies real machines: a quadcopter that lifts off, holds height hands-off,
 climbs, flies, brakes itself to a stop, yaws both ways and recovers level after
 a hard knock; a single-rotor craft that holds height with no pitch or roll
 authority; and a platform flown on plain jets with no rotors at all.
+
+`tests/program.test.js` covers the graph on its own — ordering, cycle
+detection, every node kind, state transitions and the validation a player sees.
+`tests/autonomy.test.js` then runs programs on real machines with the keyboard
+provably untouched: the hands-off challenge flown by the preset program, a
+drone holding height on maths nodes alone with no flight controller anywhere,
+and a rover that drives itself and stops on a sensor.
 
 `tests/level.test.js` plays challenge 1 from start to finish with a scripted
 driver, and flies challenge 4 with a drone that picks the payload up and puts

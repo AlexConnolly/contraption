@@ -133,6 +133,14 @@ export class FlightController {
     this.altitudeIntegral = 0;
   }
 
+  // A program can name the height to sit at instead of the controller keeping
+  // whatever height the pilot last left it at.
+  holdAltitude(altitude) {
+    if (this.targetAltitude !== altitude) this.altitudeIntegral = 0;
+    this.targetAltitude = altitude;
+    this.commanded = true;
+  }
+
   update(dt, command, state) {
     const t = this.tuning;
     const { mass, gravity, liftAuthority, altitude, verticalSpeed } = state;
@@ -142,7 +150,7 @@ export class FlightController {
     // Altitude -> climb rate -> acceleration. Holding a key drives the rate
     // directly and drags the held altitude along with it.
     let targetRate;
-    if (Math.abs(command.climb) > EPSILON) {
+    if (Math.abs(command.climb) > EPSILON && !this.commanded) {
       targetRate = command.climb * t.maxClimbRate;
       this.targetAltitude = altitude;
       this.altitudeIntegral = 0;
@@ -202,6 +210,7 @@ export class FlightController {
     );
 
     this.channels = { climb, pitch, yaw, roll };
+    this.commanded = false;
     return this.channels;
   }
 
@@ -248,17 +257,34 @@ export class FlightController {
       for (const entry of entries) entry.trim /= spread;
     }
 
+    // Only ever slide the band down. Sliding it up to make room for a
+    // negative trim would hand the machine lift nobody asked for, and at low
+    // throttle that compounds into a climb it cannot be talked out of.
     let over = 0;
-    let under = 0;
     for (const entry of entries) {
       over = Math.max(over, entry.base + entry.trim - 1);
-      under = Math.max(under, -(entry.base + entry.trim));
     }
-    const shift = under > 0 ? under : -over;
 
     const out = new Map();
     for (const entry of entries) {
-      out.set(entry.id, clamp(entry.base + entry.trim + shift, 0, 1));
+      out.set(entry.id, clamp(entry.base + entry.trim - over, 0, 1));
+    }
+
+    // Clamping at zero can still leave more lift than the climb channel asked
+    // for, so take the difference back off every thruster evenly.
+    if (totalClimbGain > EPSILON) {
+      let demanded = 0;
+      let produced = 0;
+      for (const entry of entries) {
+        demanded += entry.base * entry.climbGain;
+        produced += out.get(entry.id) * entry.climbGain;
+      }
+      const excess = (produced - demanded) / totalClimbGain;
+      if (excess > EPSILON) {
+        for (const entry of entries) {
+          out.set(entry.id, clamp(out.get(entry.id) - excess, 0, 1));
+        }
+      }
     }
     return out;
   }

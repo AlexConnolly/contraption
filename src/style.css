@@ -297,3 +297,132 @@ select {
   #palette { width: 180px; }
   #inspector { width: 220px; }
 }
+
+/* ---------- node editor ---------- */
+
+.graph-root {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  grid-template-rows: 48px 1fr;
+  background: #0e1217;
+}
+.graph-root[hidden] { display: none !important; }
+
+.graph-bar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 14px;
+  background: var(--panel-solid);
+  border-bottom: 1px solid var(--line);
+}
+.graph-title { font-weight: 600; letter-spacing: 0.04em; }
+.graph-problems { font-size: 12px; color: var(--muted); max-width: 52ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.graph-problems.bad { color: var(--warn); }
+
+.graph-side {
+  background: var(--panel-solid);
+  border-right: 1px solid var(--line);
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.graph-states { display: flex; flex-direction: column; gap: 4px; margin-bottom: 16px; }
+.graph-state { display: flex; gap: 3px; align-items: stretch; }
+.graph-state-name {
+  flex: 1;
+  text-align: left;
+  padding: 6px 9px;
+  background: rgba(255,255,255,0.04);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.graph-state.active .graph-state-name { border-color: var(--accent); background: rgba(78,161,255,0.16); }
+.graph-state.start .graph-state-name::before { content: "▶ "; color: var(--good); }
+.graph-icon { padding: 6px 7px; font-size: 11px; color: var(--muted); }
+.graph-icon:hover { color: var(--text); }
+
+.graph-group {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 10px 0 4px;
+}
+.graph-palette { display: flex; flex-direction: column; gap: 3px; }
+.graph-add { text-align: left; padding: 6px 9px; font-size: 12px; background: rgba(255,255,255,0.04); }
+
+.graph-canvas {
+  position: relative;
+  overflow: hidden;
+  cursor: grab;
+  background:
+    radial-gradient(circle at 1px 1px, rgba(255,255,255,0.07) 1px, transparent 0) 0 0 / 26px 26px,
+    #0e1217;
+}
+.graph-canvas:active { cursor: grabbing; }
+.graph-content { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+.graph-links { position: absolute; top: 0; left: 0; overflow: visible; pointer-events: none; }
+.graph-link { pointer-events: stroke; cursor: pointer; }
+.graph-link:hover { stroke-width: 4; }
+.graph-nodes { position: absolute; top: 0; left: 0; }
+
+.graph-node {
+  position: absolute;
+  background: #1b222b;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+  font-size: 12px;
+  user-select: none;
+}
+.graph-node.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 6px 18px rgba(0,0,0,0.45); }
+.graph-node-head {
+  height: 26px;
+  display: flex;
+  align-items: center;
+  padding: 0 9px;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  background: rgba(255,255,255,0.06);
+  border-radius: 7px 7px 0 0;
+  cursor: move;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.graph-node-x {
+  position: absolute;
+  top: 4px; right: 4px;
+  padding: 0 4px;
+  font-size: 10px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+}
+.graph-node-x:hover { color: var(--bad); background: transparent; }
+
+.graph-rows { padding: 6px 0; }
+.graph-row { display: flex; align-items: center; gap: 6px; padding: 0 9px; }
+.graph-row.out { justify-content: flex-end; }
+.graph-port { color: #b8c3ce; font-size: 11px; }
+.graph-socket {
+  width: 11px; height: 11px;
+  border-radius: 50%;
+  flex: none;
+  cursor: crosshair;
+  box-shadow: 0 0 0 2px #1b222b;
+}
+.graph-row.in .graph-socket { margin-left: -14px; }
+.graph-row.out .graph-socket { margin-right: -14px; }
+
+.graph-config { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 9px 8px; }
+.graph-config select, .graph-config input { font-size: 11px; padding: 3px 5px; width: 100%; }
+.graph-config input.narrow { width: calc(33% - 3px); }
+.graph-config.note { color: var(--muted); font-size: 11px; }
