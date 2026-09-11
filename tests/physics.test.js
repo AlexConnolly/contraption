@@ -5,6 +5,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { Blueprint } from '../src/core/blueprint.js';
 import { IDENTITY_ORIENTATION, yawStep, pitchStep } from '../src/core/orientation.js';
 import { Machine, GROUP_WORLD } from '../src/sim/machine.js';
+import { getPart, CELL, pistonStroke } from '../src/parts/registry.js';
 import { SignalBus } from '../src/sim/signals.js';
 import { starterRover } from '../src/studio/presets.js';
 
@@ -143,6 +144,21 @@ describe('steering direction', () => {
     const { after, right } = turnTest('KeyA');
     expect(after.dot(right)).toBeLessThan(-0.25);
   });
+
+  // Backing up on the same key has to swing the machine the other way, which
+  // is what it looks like from behind the wheel.
+  it('swings the other way on the same key while reversing', () => {
+    const { machine, bus } = build(starterRover(), keyboard());
+    run(machine, bus, 1);
+    const before = machine.coreForward().clone();
+    const right = before.clone().cross(new THREE.Vector3(0, 1, 0)).normalize();
+
+    bus.input.down.add('KeyS');
+    bus.input.down.add('KeyA');
+    run(machine, bus, 1.5);
+
+    expect(machine.coreForward().dot(right)).toBeGreaterThan(0.2);
+  });
 });
 
 describe('thruster torque', () => {
@@ -247,6 +263,78 @@ describe('manipulators', () => {
     bus.input.down.delete('KeyE');
     run(machine, bus, 1.5);
     expect(machine.partWorldPoint(cap).y).toBeLessThan(high - 0.4);
+  });
+
+  // How far a piston pushes is set on the piston, not fixed for every piston
+  // in the game.
+  function pistonLift(stroke) {
+    const bp = new Blueprint({ name: 'lifter' });
+    bp.place('panel', [0, 0, 0]);
+    bp.place('core', [0, 1, 0]);
+    bp.place('piston', [0, 1, 1], IDENTITY_ORIENTATION, {
+      binding: { mode: 'hold', pos: 'KeyE' },
+      ...(stroke === undefined ? {} : { stroke }),
+    });
+    bp.place('block', [0, 2, 1]);
+    const { machine, bus } = build(bp, keyboard());
+    run(machine, bus, 1.5);
+    const cap = bp.list().find((p) => p.type === 'block');
+    const low = machine.partWorldPoint(cap).y;
+    bus.input.down.add('KeyE');
+    run(machine, bus, 2.5);
+    return { lift: machine.partWorldPoint(cap).y - low, machine, bp };
+  }
+
+  it('pushes as far as the piston is set to, not a fixed distance', () => {
+    const short = pistonLift(0.5).lift;
+    const long = pistonLift(2).lift;
+    expect(short).toBeGreaterThan(0.35);
+    expect(short).toBeLessThan(0.7);
+    expect(long).toBeGreaterThan(1.7);
+  });
+
+  it('will not push past the stroke it is set to', () => {
+    expect(pistonLift(0.5).lift).toBeLessThan(0.7);
+  });
+
+  it('refuses a stroke outside what the part can do', () => {
+    const [min, max] = getPart('piston').strokeRange;
+    expect(pistonStroke({ config: { stroke: 99 } })).toBe(max);
+    expect(pistonStroke({ config: { stroke: -4 } })).toBe(min);
+    expect(pistonStroke({ config: {} })).toBe(getPart('piston').stroke);
+    expect(pistonLift(99).lift).toBeLessThan(max + 0.3);
+  });
+
+  // The piston travels with its load, so the gap it opens is underneath it and
+  // the rod has to reach back down to the base. A piston with nothing in that
+  // gap looks broken however well it works.
+  it('keeps its foot planted on the base as it extends', () => {
+    const bp = new Blueprint({ name: 'lifter' });
+    bp.place('panel', [0, 0, 0]);
+    bp.place('core', [0, 1, 0]);
+    bp.place('piston', [0, 1, 1], IDENTITY_ORIENTATION, {
+      binding: { mode: 'hold', pos: 'KeyE' },
+      stroke: 1.6,
+    });
+    bp.place('block', [0, 2, 1]);
+    const { machine, bus } = build(bp, keyboard());
+    const piston = bp.list().find((p) => p.type === 'piston');
+
+    run(machine, bus, 1.5);
+    machine.syncMeshes();
+    const restFoot = machine.pistonFootPoint(piston.id);
+    const restBody = machine.partWorldPoint(piston).y;
+    expect(restFoot).not.toBe(null);
+
+    bus.input.down.add('KeyE');
+    run(machine, bus, 2.5);
+    machine.syncMeshes();
+    const outFoot = machine.pistonFootPoint(piston.id);
+    const outBody = machine.partWorldPoint(piston).y;
+
+    // The part itself rode up; the foot it is standing on did not.
+    expect(outBody - restBody).toBeGreaterThan(1.2);
+    expect(Math.abs(outFoot.y - restFoot.y)).toBeLessThan(0.1);
   });
 });
 

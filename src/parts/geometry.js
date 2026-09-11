@@ -1,6 +1,11 @@
 import * as THREE from 'three';
 import { CELL } from './registry.js';
 
+// Where the rod leaves the barrel, and how long it is fully retracted, which
+// is whatever puts the foot flush with the bottom of the part's own cell.
+export const PISTON_ROD_TOP = -CELL * 0.12;
+export const PISTON_REST = CELL * 0.4 + PISTON_ROD_TOP;
+
 const INSET = 0.03;
 
 function box(part, scale = 1) {
@@ -86,26 +91,40 @@ const BUILDERS = {
     return group;
   },
 
+  /**
+   * An articulated part travels with the load, not with the base it pushes
+   * off, so the gap a piston opens is underneath it. The barrel therefore
+   * rides up with the part and the rod reaches back down to the foot planted
+   * on the base. The rod's geometry is shifted so its origin is at its top
+   * and scaling Y grows it downwards; `machine.syncPistons` does that.
+   */
   piston(part) {
     const group = new THREE.Group();
-    const collar = new THREE.Mesh(
-      new THREE.CylinderGeometry(CELL * 0.34, CELL * 0.34, CELL * 0.34, 18),
+    const barrel = new THREE.Mesh(
+      new THREE.CylinderGeometry(CELL * 0.34, CELL * 0.34, CELL * 0.62, 18),
       material(part.colour),
     );
-    collar.position.y = -CELL * 0.28;
-    group.add(collar);
+    barrel.position.y = CELL * 0.19;
+    group.add(barrel);
+
+    const rodGeometry = new THREE.CylinderGeometry(CELL * 0.16, CELL * 0.16, 1, 14);
+    rodGeometry.translate(0, -0.5, 0);
     const rod = new THREE.Mesh(
-      new THREE.CylinderGeometry(CELL * 0.16, CELL * 0.16, CELL * 0.9, 14),
+      rodGeometry,
       material(0xdfe6ec, { metalness: 0.7, roughness: 0.2 }),
     );
-    rod.position.y = CELL * 0.16;
+    rod.name = 'rod';
+    rod.position.y = PISTON_ROD_TOP;
+    rod.scale.y = PISTON_REST;
     group.add(rod);
-    const cap = new THREE.Mesh(
+
+    const foot = new THREE.Mesh(
       new THREE.BoxGeometry(CELL - INSET, CELL * 0.2, CELL - INSET),
       material(part.colour),
     );
-    cap.position.y = CELL * 0.5;
-    group.add(cap);
+    foot.name = 'foot';
+    foot.position.y = PISTON_ROD_TOP - PISTON_REST;
+    group.add(foot);
     return group;
   },
 

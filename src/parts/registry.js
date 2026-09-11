@@ -10,6 +10,18 @@ export function partDensity(part) {
   return part.mass / CELL_VOLUME;
 }
 
+/**
+ * How far a piston is set to push, in metres. Each one carries its own, so a
+ * short jab and a long reach can sit on the same machine; anything outside
+ * what the part can do is pulled back to the nearest end of its range.
+ */
+export function pistonStroke(placed, part = getPart('piston')) {
+  const [min, max] = part.strokeRange;
+  const asked = placed?.config?.stroke;
+  if (typeof asked !== 'number' || Number.isNaN(asked)) return part.stroke;
+  return Math.min(max, Math.max(min, asked));
+}
+
 export const CATEGORIES = [
   { id: 'core', name: 'Core' },
   { id: 'structure', name: 'Structure' },
@@ -165,6 +177,7 @@ const PARTS = [
     attach: [[0, -1, 0]],
     carry: [[0, 1, 0]],
     stroke: 1.2,
+    strokeRange: [0.4, 2.4],
     actuator: {
       kind: 'linear',
       port: 'target',
@@ -173,7 +186,7 @@ const PARTS = [
       damping: 70,
       defaultBinding: { mode: 'hold', pos: 'KeyE' },
     },
-    blurb: 'Extends along its axis. Pushes hard.',
+    blurb: 'Extends along its axis. Pushes hard. Set how far it reaches.',
   },
   {
     id: 'grabber',

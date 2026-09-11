@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { getPart, partDensity, CELL } from '../parts/registry.js';
+import { getPart, partDensity, pistonStroke, CELL } from '../parts/registry.js';
+import { PISTON_ROD_TOP, PISTON_REST } from '../parts/geometry.js';
 import { orientationQuaternion, applyOrientation } from '../core/orientation.js';
 import { groupBlueprint } from './grouping.js';
 import { driveSide } from './signals.js';
@@ -28,6 +29,22 @@ function vec(v) {
  * Turns a blueprint into Rapier bodies plus the Three.js objects that track
  * them, and drives the actuators from a signal bus each step.
  */
+// A body's local point and local direction, in world space. Rapier hands back
+// plain objects, so these do the transform by hand.
+function worldPointOf(body, local) {
+  const t = body.translation();
+  const r = body.rotation();
+  return new THREE.Vector3(local.x, local.y, local.z)
+    .applyQuaternion(new THREE.Quaternion(r.x, r.y, r.z, r.w))
+    .add(new THREE.Vector3(t.x, t.y, t.z));
+}
+
+function worldDirectionOf(body, local) {
+  const r = body.rotation();
+  return new THREE.Vector3(local.x, local.y, local.z)
+    .applyQuaternion(new THREE.Quaternion(r.x, r.y, r.z, r.w));
+}
+
 export class Machine {
   constructor({ RAPIER, world, scene, blueprint, spawn, level }) {
     this.level = level ?? null;
@@ -138,7 +155,7 @@ export class Machine {
       if (spec.type === 'prismatic') {
         params = RAPIER.JointData.prismatic(anchor, anchor, axis);
         params.limitsEnabled = true;
-        params.limits = [0, part.stroke];
+        params.limits = [0, pistonStroke(placed, part)];
       } else {
         params = RAPIER.JointData.revolute(anchor, anchor, axis);
         if (part.limits) {
@@ -147,7 +164,9 @@ export class Machine {
         }
       }
       const joint = world.createImpulseJoint(params, host, child, true);
-      this.joints.push({ partId: placed.id, joint, part });
+      // The anchor and axis are kept so a piston can measure how far it has
+      // actually pushed, and draw its rod that long.
+      this.joints.push({ partId: placed.id, joint, part, host, child, anchor, axis });
     }
   }
 
@@ -440,7 +459,7 @@ export class Machine {
           break;
         case 'linear':
           joint?.configureMotorPosition(
-            Math.max(0, signal) * part.stroke,
+            Math.max(0, signal) * pistonStroke(placed, part),
             part.actuator.stiffness,
             part.actuator.damping,
           );
@@ -552,6 +571,46 @@ export class Machine {
       this.groups[i].position.set(t.x, t.y, t.z);
       this.groups[i].quaternion.set(r.x, r.y, r.z, r.w);
     }
+    this.syncPistons();
+  }
+
+  /**
+   * How far a piston has actually pushed, in metres, measured from the two
+   * bodies it joins rather than read off the motor — what the motor was asked
+   * for and where the load ended up are not the same thing under load.
+   *
+   * The joint anchors the same local point in both bodies, so at rest the two
+   * world points coincide; the gap between them along the axis is the travel.
+   */
+  pistonExtension(entry) {
+    const here = worldPointOf(entry.host, entry.anchor);
+    const there = worldPointOf(entry.child, entry.anchor);
+    const axis = worldDirectionOf(entry.host, entry.axis);
+    return there.sub(here).dot(axis);
+  }
+
+  // Stretches each piston's rod to span the gap it has opened. Without this
+  // the rod stays its built length and the part hangs over open air.
+  syncPistons() {
+    for (const entry of this.joints) {
+      if (entry.part.joint !== 'prismatic') continue;
+      const mesh = this.partMeshes.get(entry.partId);
+      const rod = mesh?.getObjectByName('rod');
+      const foot = mesh?.getObjectByName('foot');
+      if (!rod || !foot) continue;
+      const reach = PISTON_REST + Math.max(0, this.pistonExtension(entry));
+      rod.scale.y = reach;
+      foot.position.y = PISTON_ROD_TOP - reach;
+    }
+  }
+
+  /** Where a piston's foot has ended up, in world space. */
+  pistonFootPoint(partId) {
+    const mesh = this.partMeshes.get(partId);
+    const foot = mesh?.getObjectByName('foot');
+    if (!foot) return null;
+    foot.updateWorldMatrix(true, false);
+    return new THREE.Vector3().setFromMatrixPosition(foot.matrixWorld);
   }
 
   core() {
