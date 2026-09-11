@@ -11,13 +11,17 @@ Inputs are set by the graph, outputs are read by it:
 | Module | Reads | Writes |
 |---|---|---|
 | GPS | position, velocity, speed, altitude, heading | — |
-| Flight Controller | altitude, climb rate, forward/right speed, heading, levelness | pitch, yaw, climb, **target altitude** |
+| Flight Controller | altitude, climb rate, forward/right speed, levelness | pitch, yaw, **strafe**, climb, **target altitude** |
 | Powered Wheel | spin rate | throttle |
 | Servo Hinge | angle | target angle |
 | Piston | extension | target extension |
 | Magnet Grabber | holding | active |
 | Lift Rotor / Jet Thruster | — | throttle |
 | Distance Sensor | distance, tripped | — |
+
+A distance sensor can be aimed off its mounting, swept round the machine's up
+axis. A beam down the nose with a whisker angled out each side tells a program
+which way is clearer, which a single forward beam cannot.
 
 So the same graph can drive a rotor directly, or hand the flight controller a
 height and let it work the throttles out itself.
@@ -40,6 +44,7 @@ Values are `number`, `bool` or `vec3`, and links are type-checked.
 | Waypoint | the position of a marked zone in the level |
 | Vector / Split | build a vector, or take it apart |
 | Distance / Bearing | between two positions |
+| Closing speed | how fast a velocity is carrying the machine toward a point — signed, so it can tell approaching from leaving |
 | Maths | add, subtract, multiply, divide, min, max, abs, clamp |
 | Compare | `<`, `<=`, `>`, `>=`, `==`, `!=` |
 | Logic | and, or, not |
@@ -54,3 +59,12 @@ rather than silently producing a stale value.
 
 A level can be marked hands-off. The keyboard is ignored for the whole run, so
 the machine has to fly itself on the program alone.
+
+## Obstacles that move
+
+A level can carry `movers`: obstacles that slide back and forth across the
+course. Each one draws its speed, its starting point and its direction fresh
+at the start of every run, so there is no timetable to learn and no path worth
+memorising. A program has to look where it is going.
+
+The seed is recorded, so a run that went wrong can be set up again exactly.

@@ -192,7 +192,11 @@ export class FlightController {
     const targetLean = Math.abs(command.pitch) > EPSILON
       ? command.pitch * t.maxLean
       : lean(state.forwardSpeed);
-    const targetRoll = lean(state.rightSpeed);
+    // A program can ask for a lean sideways; with nothing asked the controller
+    // goes back to leaning against its own drift.
+    const targetRoll = Math.abs(command.roll ?? 0) > EPSILON
+      ? command.roll * t.maxLean
+      : lean(state.rightSpeed);
 
     const pitch = clamp(
       (targetLean - state.pitchDown) * t.attitudeGain

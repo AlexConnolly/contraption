@@ -244,6 +244,7 @@ const PARTS = [
       in: [
         { id: 'pitch', name: 'Pitch', kind: 'number', min: -1, max: 1 },
         { id: 'yaw', name: 'Yaw', kind: 'number', min: -1, max: 1 },
+        { id: 'roll', name: 'Strafe', kind: 'number', min: -1, max: 1 },
         { id: 'climb', name: 'Climb', kind: 'number', min: -1, max: 1 },
         { id: 'targetAltitude', name: 'Hold altitude', kind: 'number' },
       ],
@@ -333,7 +334,7 @@ const PARTS = [
     mass: 0.35,
     colour: 0xb06bff,
     cost: 3,
-    sensor: { range: 6, axis: [0, 0, 1] },
+    sensor: { range: 9, axis: [0, 0, 1] },
     emits: true,
     config: { threshold: 0.5, invert: false },
     blurb: 'Looks along its face. Bind a motor to it to drive itself.',

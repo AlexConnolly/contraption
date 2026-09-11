@@ -9,7 +9,7 @@ Three.js for rendering, Rapier for physics, Vite for the build.
 ```bash
 npm install
 npm run dev      # http://localhost:5173
-npm test         # 150 tests, including headless physics
+npm test         # 171 tests, including headless physics
 npm run build
 npm run preview  # serve the production build
 ```
@@ -127,6 +127,30 @@ A level can be marked **hands-off**: the keyboard is ignored for the whole run,
 so the machine has to fly itself. Challenge 6 is one, and the **Auto drone**
 preset solves it — worth opening up and taking apart.
 
+## Obstacles that move
+
+Challenge 7 is a corridor with three blockers sliding across it, and each one
+draws its speed, its starting point and its direction fresh at the start of
+every run. There is no timetable to learn and no path worth memorising: a
+program has to look where it is going. The seed is recorded, so a run that
+went wrong can be set up again exactly.
+
+Seeing is what a distance sensor is for, and it can be **aimed** off its
+mounting. One beam down the nose tells you something is there; a whisker angled
+out each side tells you which way is clearer, which is what you actually need
+in order to go round it. The flight controller also takes a **strafe** command,
+so a machine can slide sideways without turning and keep its whiskers pointed
+where it is going.
+
+The **Dodger** preset solves it, and its program is worth reading. Along the
+corridor and across it are each a proportional-derivative pair — lean on how
+far there is to go, lean back on how fast you are already moving — and only one
+term in the whole graph knows about obstacles: how much more crowded one
+whisker is than the other. Weighing both sides up balances out exactly in front
+of something wide and leaves the machine sitting there arguing with itself, so
+a second state takes over when the way ahead is shut and simply commits to one
+side. That is the state machine earning its keep.
+
 ## How a machine is put together
 
 A blueprint is a list of parts on an integer grid, each with one of the 24
@@ -187,11 +211,18 @@ provably untouched: the hands-off challenge flown by the preset program, a
 drone holding height on maths nodes alone with no flight controller anywhere,
 and a rover that drives itself and stops on a sensor.
 
+`tests/avoidance.test.js` solves challenge 7 hands-off across ten different
+seeds — ten different worlds, since a program that had memorised a path would
+only ever get through the one it was written for — and checks it goes round the
+blockers rather than down the middle, by a different path each time, with
+clearance to spare. It also checks the opposite: blind the forward sensor and
+the same machine never finishes.
+
 `tests/level.test.js` plays challenge 1 from start to finish with a scripted
 driver, and flies challenge 4 with a drone that picks the payload up and puts
 it on the platform. Both assert the objective actually completes.
 
-Three conventions are worth stating because getting them wrong cost real bugs.
+Four conventions are worth stating because getting them wrong cost real bugs.
 Forward is **+Z** and up is **+Y**, so the machine's right-hand side is
 `forward x up` = **-X** — steering felt inverted until that was fixed. And
 Rapier's `addForceAtPoint` records a force *and* the `r x F` torque, which are
@@ -200,7 +231,10 @@ accumulate, and a single off-centre thruster would wind a machine up until it
 threw itself off the floor. Lastly, leaning a machine accelerates it the way it
 leans, so braking sideways drift means rolling **away** from it; that sign
 inverted made the controller feed drift instead of killing it, and a drone that
-so much as turned would accelerate away and never stop.
+so much as turned would accelerate away and never stop. Lastly, ground speed is
+a magnitude: it cannot tell approaching from leaving, so a controller holding an
+approach on it will happily fly backwards at exactly the right speed. That is
+what the closing-speed node is for.
 
 Part masses are given in kilograms per cell and prop masses in kilograms, so
 the numbers in the registry and levels mean something when you tune them.

@@ -86,9 +86,11 @@ function deliveryProgram(parts) {
     wire(pad, 'position', bearing, 'b');
 
     const heading = add('read', { partId: gps, port: 'heading' });
+    // Heading minus bearing: a positive yaw command swings the nose toward the
+    // machine's right, which is -X, so it drives the heading down.
     const turn = add('maths', { op: 'angleDelta' });
-    wire(heading, 'value', turn, 'a');
-    wire(bearing, 'deg', turn, 'b');
+    wire(bearing, 'deg', turn, 'a');
+    wire(heading, 'value', turn, 'b');
 
     // Steer harder the further off the bearing we are, up to full deflection.
     const span = add('constant', { kind: 'number', value: 45 });

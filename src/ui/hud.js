@@ -407,6 +407,13 @@ export class Hud {
 
   renderSensor(body, placed, part) {
     this.renderSlider(
+      body, 'Aim', placed.config.yaw ?? 0, -90, 90, 5,
+      (value) => this.h.onConfigChange(placed.id, { yaw: value }),
+    );
+    body.append(el('p', 'insp-blurb',
+      'Degrees off its mounting, swept round the machine. Whiskers either side '
+      + 'of a forward beam tell you which way is clearer.'));
+    this.renderSlider(
       body, 'Trip point',
       placed.config.threshold ?? part.config.threshold,
       0.05, 0.95, 0.05,

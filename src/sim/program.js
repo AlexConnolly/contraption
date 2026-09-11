@@ -162,6 +162,25 @@ export const NODE_TYPES = {
     },
   },
 
+  closing: {
+    name: 'Closing speed',
+    group: 'maths',
+    inputs: () => [
+      { id: 'velocity', name: 'Velocity', kind: 'vec3' },
+      { id: 'from', name: 'From', kind: 'vec3' },
+      { id: 'to', name: 'To', kind: 'vec3' },
+    ],
+    outputs: () => [{ id: 'speed', name: 'Closing speed', kind: 'number' }],
+    // Signed: positive while getting nearer, negative while getting further
+    // away. Plain speed is a magnitude and cannot tell the difference, which
+    // makes it useless for holding an approach.
+    evaluate: (_node, inputs) => {
+      const direction = vec(inputs.to).clone().sub(vec(inputs.from));
+      if (direction.lengthSq() < 1e-9) return { speed: 0 };
+      return { speed: vec(inputs.velocity).dot(direction.normalize()) };
+    },
+  },
+
   bearing: {
     name: 'Bearing',
     group: 'maths',

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GROUP_WORLD } from './machine.js';
+import { makeRng, randomSeed, between } from './rng.js';
 
 // Props are authored with a mass in kilograms; Rapier wants a density.
 function propVolume(prop) {
@@ -38,13 +39,16 @@ function fixedBox(RAPIER, world, scene, { pos, size, rotX = 0, rotY = 0, colour 
  * objective tracks, and the translucent goal zones.
  */
 export class Arena {
-  constructor({ RAPIER, world, scene, level }) {
+  constructor({ RAPIER, world, scene, level, seed }) {
     this.RAPIER = RAPIER;
     this.world = world;
     this.scene = scene;
     this.level = level;
+    this.seed = seed ?? randomSeed();
     this.objects = [];
     this.props = new Map();
+    this.movers = [];
+    this.elapsed = 0;
     this.build();
   }
 
@@ -82,6 +86,7 @@ export class Arena {
       this.objects.push(fixedBox(RAPIER, world, scene, piece));
     }
     for (const prop of level.props ?? []) this.addProp(prop);
+    for (const mover of level.movers ?? []) this.addMover(mover);
     for (const zone of level.zones ?? []) this.addZone(zone);
   }
 
@@ -117,6 +122,63 @@ export class Arena {
     this.objects.push({ body, mesh });
   }
 
+  /**
+   * An obstacle that slides back and forth across the course. Its speed,
+   * starting point and direction are drawn fresh for every run, so a program
+   * cannot be written against a timetable — it has to look where it is going.
+   */
+  addMover(spec) {
+    const { RAPIER, world, scene } = this;
+    const rng = makeRng(this.seed + this.movers.length * 7919);
+    const body = world.createRigidBody(
+      RAPIER.RigidBodyDesc.kinematicPositionBased()
+        .setTranslation(spec.pos[0], spec.pos[1], spec.pos[2]),
+    );
+    world.createCollider(
+      RAPIER.ColliderDesc.cuboid(spec.size[0] / 2, spec.size[1] / 2, spec.size[2] / 2)
+        .setFriction(0.6)
+        .setCollisionGroups(GROUP_WORLD),
+      body,
+    );
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(spec.size[0], spec.size[1], spec.size[2]),
+      new THREE.MeshStandardMaterial({
+        color: spec.colour ?? 0xb4603f,
+        roughness: 0.6,
+        metalness: 0.15,
+        emissive: 0x2a0f08,
+      }),
+    );
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    scene.add(mesh);
+
+    const [slow, fast] = spec.speed ?? [0.8, 1.9];
+    this.movers.push({
+      spec,
+      body,
+      mesh,
+      axis: spec.axis ?? 'x',
+      span: spec.span ?? 4,
+      rate: between(rng, slow, fast),
+      offset: between(rng, 0, Math.PI * 2),
+    });
+    this.objects.push({ body, mesh });
+  }
+
+  // Called once per physics step, before the world advances, so the obstacle
+  // is where the sensors will see it.
+  step(dt) {
+    this.elapsed += dt;
+    for (const mover of this.movers) {
+      const travel = Math.sin(this.elapsed * mover.rate + mover.offset) * mover.span;
+      const at = [...mover.spec.pos];
+      const index = { x: 0, y: 1, z: 2 }[mover.axis];
+      at[index] += travel;
+      mover.body.setNextKinematicTranslation({ x: at[0], y: at[1], z: at[2] });
+    }
+  }
+
   addZone(zone) {
     const mesh = new THREE.Mesh(
       new THREE.BoxGeometry(zone.size[0], zone.size[1], zone.size[2]),
@@ -145,6 +207,14 @@ export class Arena {
   }
 
   reset() {
+    this.elapsed = 0;
+    this.seed = randomSeed();
+    for (const mover of this.movers) {
+      const rng = makeRng(this.seed + this.movers.indexOf(mover) * 7919);
+      const [slow, fast] = mover.spec.speed ?? [0.8, 1.9];
+      mover.rate = between(rng, slow, fast);
+      mover.offset = between(rng, 0, Math.PI * 2);
+    }
     for (const { spec, body } of this.props.values()) {
       body.setTranslation({ x: spec.pos[0], y: spec.pos[1], z: spec.pos[2] }, true);
       body.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
@@ -154,6 +224,10 @@ export class Arena {
   }
 
   sync() {
+    for (const mover of this.movers) {
+      const t = mover.body.translation();
+      mover.mesh.position.set(t.x, t.y, t.z);
+    }
     for (const { body, mesh } of this.props.values()) {
       const t = body.translation();
       const r = body.rotation();
@@ -173,5 +247,6 @@ export class Arena {
     }
     this.objects = [];
     this.props.clear();
+    this.movers = [];
   }
 }

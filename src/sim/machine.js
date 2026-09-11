@@ -246,6 +246,7 @@ export class Machine {
       const command = {
         pitch: this.forced(entry.placed.id, 'pitch') ?? keys.pitch,
         yaw: this.forced(entry.placed.id, 'yaw') ?? keys.yaw,
+        roll: this.forced(entry.placed.id, 'roll') ?? 0,
         climb: this.forced(entry.placed.id, 'climb') ?? keys.climb,
       };
       const holdAt = this.forced(entry.placed.id, 'targetAltitude');
@@ -335,9 +336,22 @@ export class Machine {
     return collider.collisionGroups() !== GROUP_MACHINE;
   }
 
+  // A sensor can be aimed off its mounting, swept round the machine's up axis,
+  // so a machine can carry whiskers that look ahead and out to the side at the
+  // same time instead of only straight down an axis.
+  sensorAxis(placed, part) {
+    const sweep = ((placed.config.yaw ?? 0) * Math.PI) / 180;
+    const [x, y, z] = part.sensor.axis;
+    return [
+      x * Math.cos(sweep) + z * Math.sin(sweep),
+      y,
+      -x * Math.sin(sweep) + z * Math.cos(sweep),
+    ];
+  }
+
   readSensors(bus) {
     for (const { placed, part } of this.sensors) {
-      const dir = this.partWorldAxis(placed, part.sensor.axis);
+      const dir = this.partWorldAxis(placed, this.sensorAxis(placed, part));
       const start = this.partWorldPoint(placed).addScaledVector(dir, CELL * 0.55);
       const ray = new this.RAPIER.Ray(vec(start), vec(dir));
       const hit = this.world.castRay(

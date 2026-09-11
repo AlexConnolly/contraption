@@ -171,6 +171,40 @@ export const LEVELS = [
     ],
     par: 60,
   },
+
+  {
+    id: 'traffic',
+    name: '7 — Traffic',
+    brief: 'Straight down the corridor to the pad. Three blockers slide across it, and they run at a different speed and start from a different place every single run.',
+    hint: 'There is no timetable to learn here. Point a sensor forwards and one out each side, and use what they read: stop or slide across when the way ahead is blocked, carry on when it clears. The Dodger preset does exactly that.',
+    handsOff: true,
+    spawn: [0, 1.2, -24],
+    groundSize: 180,
+    budget: { cost: 170 },
+    pieces: [
+      { pos: [-9.5, 6, 0.5], size: [1, 12, 51], colour: DARK },
+      { pos: [9.5, 6, 0.5], size: [1, 12, 51], colour: DARK },
+      { pos: [0, 11.6, 0.5], size: [20, 0.8, 51], colour: DARK },
+      { pos: [0, 2.5, 20], size: [7, 5, 7], colour: DARK },
+      { pos: [0, 5.2, 20], size: [9, 0.6, 9], colour: GREY },
+    ],
+    // Each blocker always covers the middle of the corridor, so there is never
+    // a straight line through, and never reaches within reach of a wall, so a
+    // machine cannot be pinned against one and crushed.
+    movers: [
+      { pos: [0, 5.5, -10], size: [6, 9, 1.4], axis: 'x', span: 2.5, speed: [0.3, 0.65] },
+      { pos: [0, 5.5, -1], size: [6, 9, 1.4], axis: 'x', span: 2.5, speed: [0.35, 0.75] },
+      { pos: [0, 5.5, 8], size: [6, 9, 1.4], axis: 'x', span: 2.5, speed: [0.32, 0.7] },
+    ],
+    props: [],
+    zones: [
+      { id: 'pad', pos: [0, 7.2, 20], size: [7, 3.2, 7], colour: 0x4ade80 },
+    ],
+    objectives: [
+      { type: 'coreInZone', zone: 'pad', hold: 3, label: 'Machine holding station over the pad' },
+    ],
+    par: 120,
+  },
 ];
 
 export function getLevel(id) {

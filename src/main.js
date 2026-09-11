@@ -6,6 +6,7 @@ import { Blueprint } from './core/blueprint.js';
 import { Input } from './core/input.js';
 import { Studio } from './studio/studio.js';
 import { starterRover, quadcopter, autoDrone } from './studio/presets.js';
+import { dodger } from './studio/dodger.js';
 import { Machine } from './sim/machine.js';
 import { Arena } from './sim/arena.js';
 import { SignalBus } from './sim/signals.js';
@@ -337,6 +338,8 @@ function selectTool(tool) {
 // ------------------------------------------------------------------- main loop
 
 function simulateStep() {
+  // Movers first, so the sensors read where the obstacles actually are.
+  state.arena.step(STEP);
   state.machine.update(STEP, bus);
   world.step();
   const report = state.tracker.update(STEP, {
@@ -479,7 +482,7 @@ async function boot() {
     onReselect: refreshInspector,
     onPreset: (id) => {
       const presets = {
-        rover: starterRover, quadcopter, auto: autoDrone, empty: () => new Blueprint(),
+        rover: starterRover, quadcopter, auto: autoDrone, dodger, empty: () => new Blueprint(),
       };
       studio.replaceBlueprint(presets[id]());
       hud.toast(`Loaded the ${id} to start from`);
