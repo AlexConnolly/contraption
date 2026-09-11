@@ -13,7 +13,7 @@ import { makeRng } from '../src/sim/rng.js';
 const STEP = 1 / 60;
 const NO_INPUT = { isDown: () => false, wasPressed: () => false };
 
-function fly(seed, seconds = 110) {
+function fly(seed, seconds = 170) {
   const level = getLevel('traffic');
   const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
   world.timestep = STEP;
@@ -31,12 +31,14 @@ function fly(seed, seconds = 110) {
   let report = tracker.report();
   let worstClearance = Infinity;
   let wandered = 0;
+  let touched = null;
   const steps = Math.round(seconds / STEP);
   for (let i = 0; i < steps && !report.complete; i += 1) {
     arena.step(STEP);
     machine.update(STEP, bus);
     world.step();
     states.add(machine.computers[0].stateId);
+    if (!touched) touched = machine.contact();
     report = tracker.update(STEP, {
       propPosition: (id) => arena.propPosition(id),
       corePosition: () => machine.corePosition(),
@@ -55,7 +57,7 @@ function fly(seed, seconds = 110) {
       }
     }
   }
-  return { level, arena, machine, report, states, worstClearance, wandered };
+  return { level, arena, machine, report, states, worstClearance, wandered, touched };
 }
 
 beforeAll(async () => {
@@ -133,12 +135,20 @@ describe('the traffic challenge', () => {
   });
 
   it('goes round the blockers rather than straight down the middle', () => {
-    // Passing a blocker means being well off the centreline when level with
-    // it. A machine that flew straight would sit near x = 0 and be hit.
+    // Every blocker covers the middle of the corridor, so passing one means
+    // being a long way off the centreline when level with it. A machine that
+    // flew straight at the pad would be square in the way.
     const runs = seeds.slice(0, 6).map((seed) => fly(seed));
     for (const run of runs) {
       expect(run.report.complete).toBe(true);
-      expect(run.wandered).toBeGreaterThan(1.5);
+      expect(run.wandered).toBeGreaterThan(3);
+    }
+  });
+
+  it('flies the whole course without touching anything', () => {
+    for (const seed of seeds) {
+      const run = fly(seed);
+      expect(run.touched, `seed ${seed}`).toBe(null);
     }
   });
 
@@ -204,6 +214,63 @@ describe('the seeded generator', () => {
       const value = rng();
       expect(value).toBeGreaterThanOrEqual(0);
       expect(value).toBeLessThan(1);
+    }
+  });
+});
+
+describe('the no-contact rule', () => {
+  it('is switched on for this challenge', () => {
+    expect(getLevel('traffic').noContact).toBe(true);
+    expect(getLevel('first-haul').noContact).toBeUndefined();
+  });
+
+  it('reports what a machine is touching, and nothing while it is clear', () => {
+    const level = getLevel('traffic');
+    const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
+    world.timestep = STEP;
+    const scene = new THREE.Scene();
+    const arena = new Arena({ RAPIER, world, scene, level, seed: 3 });
+    const machine = new Machine({
+      RAPIER, world, scene, blueprint: dodger(), level,
+      spawn: new THREE.Vector3(...level.spawn),
+    });
+    const bus = new SignalBus(NO_INPUT);
+    for (let i = 0; i < 120; i += 1) {
+      arena.step(STEP);
+      machine.update(STEP, bus);
+      world.step();
+    }
+    // Airborne in clear air at the start of the run.
+    expect(machine.contact()).toBe(null);
+
+    // Put it where a blocker is and it should notice on the next step.
+    const body = machine.bodies[machine.grouping.rootBody];
+    const blocker = arena.movers[0].body.translation();
+    body.setTranslation({ x: blocker.x, y: blocker.y, z: blocker.z }, true);
+    arena.step(STEP);
+    machine.update(STEP, bus);
+    world.step();
+    expect(machine.contact()).not.toBe(null);
+  });
+
+  it('does not count a machine touching its own parts', () => {
+    // The dodger is one chassis plus four rotors, all bolted together and all
+    // in contact with each other; none of that is a crash.
+    const level = getLevel('traffic');
+    const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
+    world.timestep = STEP;
+    const scene = new THREE.Scene();
+    const arena = new Arena({ RAPIER, world, scene, level, seed: 11 });
+    const machine = new Machine({
+      RAPIER, world, scene, blueprint: dodger(), level,
+      spawn: new THREE.Vector3(...level.spawn),
+    });
+    const bus = new SignalBus(NO_INPUT);
+    for (let i = 0; i < 200; i += 1) {
+      arena.step(STEP);
+      machine.update(STEP, bus);
+      world.step();
+      expect(machine.contact()).toBe(null);
     }
   });
 });

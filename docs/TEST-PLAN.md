@@ -13,7 +13,8 @@
 | `flight/mixer` | Each thruster's authority per channel follows from where it sits and which way it points: upward rotors all lift, front and rear oppose in pitch, diagonals oppose in yaw through reaction torque, a lone centred rotor has lift and yaw but nothing else, and a forward-facing jet counts as pitch rather than lift. |
 | `program/graph` | Nodes evaluate only after what feeds them; a cycle is reported rather than run; every node kind produces the right value; a state hands over on a `Go to` and its timer restarts; validation catches a kind mismatch, a missing part and a dangling transition. |
 | `movers` | Obstacles draw a different speed and start point per seed, reproduce exactly for a repeated seed, redraw on reset, and can never slide far enough to seal the course or to pin a machine against a wall. |
-| `avoidance` | The traffic challenge is solved hands-off across ten different seeds, going round the blockers rather than down the middle, by a different path each time, with clearance to spare; and it is **not** solved when the forward sensor is made blind. |
+| `avoidance` | The traffic challenge is solved hands-off across ten different seeds, and **flown clean** on every one of them — no contact at all. It goes round the blockers rather than down the middle, by a different path each time; and it is **not** solved when the forward sensor is made blind. |
+| `no contact` | The rule is on for the traffic challenge and off elsewhere; contact is reported when a machine is put where an obstacle is, and never for a machine's own parts touching each other. |
 | `computer` | Module reads come off the running machine; writes are clamped to the port's range; a program drives actuators directly, and drives the flight controller by naming a height. |
 | `flight/loops` | Hover throttle matches weight over available lift; sinking adds throttle and rising removes it; a banked machine asks for more; the climb key drags the held altitude with it; the controller leans against drift and **away** from sideways drift; zero lift authority asks for nothing; every mixed throttle stays in range. |
 
@@ -31,5 +32,6 @@
 10. A quadcopter wired to a flight controller lifts off, holds height hands-off, flies on WASD and climbs on Space/Shift; after a hard shove or a long turning run it comes back to level and stops.
 11. The node editor opens from a Computer, lays out with Tidy, and wires only between sockets of the same kind; a link into an occupied input replaces it.
 12. Challenge 6 completes with every key held down and ignored.
-13. Challenge 7 completes hands-off several times running, with visibly different obstacle timing and finishing times each run.
-14. Save, reload the page, and load the design back unchanged.
+13. Challenge 7 completes hands-off several times running, with visibly different obstacle timing and finishing times each run, and the objectives panel shows the no-contact rule.
+14. Blinding the sensors on challenge 7 ends the run with the failure card rather than a win.
+15. Save, reload the page, and load the design back unchanged.

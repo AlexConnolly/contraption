@@ -37,6 +37,7 @@ export class Machine {
     this.blueprint = blueprint;
     this.spawn = spawn.clone();
     this.bodies = [];
+    this.colliders = [];
     this.groups = [];
     this.joints = [];
     this.actuators = [];
@@ -113,7 +114,7 @@ export class Machine {
       .setFriction(part.friction ?? 0.85)
       .setRestitution(0.04)
       .setCollisionGroups(GROUP_MACHINE);
-    world.createCollider(desc, body);
+    this.colliders.push(world.createCollider(desc, body));
 
     const mesh = createPartMesh(part);
     mesh.position.copy(local);
@@ -268,6 +269,33 @@ export class Machine {
       entry.forwardSpeed = flat(frameWorld.forward);
       entry.rightSpeed = flat(frameWorld.right);
     }
+  }
+
+  /**
+   * Whatever the machine is actually touching this step, or null if it is
+   * touching nothing. Query it after the world has stepped, since that is when
+   * the contacts are worked out.
+   *
+   * Broad-phase pairs include things that are merely near, so each pair is
+   * checked for a contact point that has actually closed.
+   */
+  contact() {
+    let found = null;
+    for (const collider of this.colliders) {
+      if (found) break;
+      this.world.contactPairsWith(collider, (other) => {
+        if (found || other.collisionGroups() === GROUP_MACHINE) return;
+        this.world.contactPair(collider, other, (manifold) => {
+          for (let i = 0; i < manifold.numContacts(); i += 1) {
+            if (manifold.contactDist(i) <= 0) {
+              found = other;
+              return;
+            }
+          }
+        });
+      });
+    }
+    return found;
   }
 
   sensorDistance(partId) {
@@ -565,6 +593,7 @@ export class Machine {
       });
     }
     this.bodies = [];
+    this.colliders = [];
     this.groups = [];
     this.joints = [];
     this.actuators = [];

@@ -6,6 +6,9 @@ import { makeId, tidyLayout } from '../sim/program.js';
 
 const CRUISE_HEIGHT = 7;
 const NOTICE = 6;
+const STAND_OFF = 4.5;
+const TOP_SPEED = 5;
+const CLOSE = 4.5;
 
 function graph() {
   const nodes = [];
@@ -38,7 +41,9 @@ function facing(axis) {
  * every single run.
  */
 function dodgeProgram(parts) {
-  const { gps, controller, ahead, portSide, starboard } = parts;
+  const {
+    gps, controller, ahead, portSide, starboard, guardPort, guardStarboard,
+  } = parts;
 
   /**
    * What every state needs: hold the height, and hold the nose pointing
@@ -93,92 +98,43 @@ function dodgeProgram(parts) {
   }
 
   /**
-   * One state that flies and avoids at the same time.
-   *
-   * Along the corridor and across it are each a proportional-derivative pair:
-   * lean on how far there is to go, lean back on how fast it is already
-   * moving. Position alone oscillates — it overshoots, comes back, overshoots
-   * again — and the speed term is what settles it. Being signed, it also
-   * reverses of its own accord if the machine ever overruns the pad.
-   *
-   * On top of the sideways pair sits the only part that knows about
-   * obstacles: how much more crowded one whisker is than the other.
+   * Sees the whole frontal arc, not just the one ray down the nose. A single
+   * beam lines up with a gap, reads clear, and the machine commits — and then
+   * the gap slides shut in front of it. The narrow guards either side close
+   * that off. They are kept narrow on purpose: a wide beam picks up the
+   * corridor walls whenever the machine is near one and would stop it dead.
    */
-  const run = graph();
-  {
-    const { add, wire } = run;
-    const { full, here, pad, range } = holdCourse(run, CRUISE_HEIGHT);
+  const frontalArc = (g) => {
+    const { add, wire } = g;
+    const nose = add('read', { partId: ahead, port: 'distance' });
+    const guardS = add('read', { partId: guardStarboard, port: 'distance' });
+    const guardP = add('read', { partId: guardPort, port: 'distance' });
+    const nearer = add('maths', { op: 'min' });
+    const nearest = add('maths', { op: 'min' });
+    wire(nose, 'value', nearer, 'a');
+    wire(guardS, 'value', nearer, 'b');
+    wire(nearer, 'r', nearest, 'a');
+    wire(guardP, 'value', nearest, 'b');
+    return nearest;
+  };
 
-    const velocity = add('read', { partId: gps, port: 'velocity' });
-    const speed = add('split');
-    const padParts = add('split');
-    const hereParts = add('split');
-    wire(velocity, 'value', speed, 'v');
-    wire(pad, 'position', padParts, 'v');
-    wire(here, 'value', hereParts, 'v');
-
-    // Along the corridor.
-    const toGo = add('maths', { op: 'subtract' });
-    const keenness = add('constant', { kind: 'number', value: 0.35 });
-    const push = add('maths', { op: 'multiply' });
-    const settle = add('constant', { kind: 'number', value: 0.45 });
-    const brake = add('maths', { op: 'multiply' });
-    const balance = add('maths', { op: 'subtract' });
-    const drive = add('maths', { op: 'clamp' });
-    wire(padParts, 'z', toGo, 'a');
-    wire(hereParts, 'z', toGo, 'b');
-    wire(toGo, 'r', push, 'a');
-    wire(keenness, 'value', push, 'b');
-    wire(speed, 'z', brake, 'a');
-    wire(settle, 'value', brake, 'b');
-    wire(push, 'r', balance, 'a');
-    wire(brake, 'r', balance, 'b');
-    wire(balance, 'r', drive, 'a');
-    wire(full, 'value', drive, 'b');
-
-    // What the beam ahead will allow. It goes negative once something is
-    // inside the stand-off, so the machine eases back off it.
-    const forward = add('read', { partId: ahead, port: 'distance' });
-    const standOff = add('constant', { kind: 'number', value: 5 });
-    const room = add('maths', { op: 'subtract' });
-    const firmness = add('constant', { kind: 'number', value: 0.35 });
-    const allowed = add('maths', { op: 'multiply' });
-    const limit = add('maths', { op: 'clamp' });
-    wire(forward, 'value', room, 'a');
-    wire(standOff, 'value', room, 'b');
-    wire(room, 'r', allowed, 'a');
-    wire(firmness, 'value', allowed, 'b');
-    wire(allowed, 'r', limit, 'a');
-    wire(full, 'value', limit, 'b');
-
-    const chosen = add('maths', { op: 'min' });
-    const pitch = add('write', { partId: controller, port: 'pitch' });
-    wire(drive, 'r', chosen, 'a');
-    wire(limit, 'r', chosen, 'b');
-    wire(chosen, 'r', pitch, 'value');
-
-    // Across the corridor. A positive roll slides toward the machine's right,
-    // which is -X, so both terms come out negated.
-    const across = add('maths', { op: 'subtract' });
-    const homing = add('constant', { kind: 'number', value: -0.22 });
-    const pull = add('maths', { op: 'multiply' });
-    const damping = add('constant', { kind: 'number', value: 0.3 });
-    const steady = add('maths', { op: 'multiply' });
-    const guided = add('maths', { op: 'add' });
-    wire(padParts, 'x', across, 'a');
-    wire(hereParts, 'x', across, 'b');
-    wire(across, 'r', pull, 'a');
-    wire(homing, 'value', pull, 'b');
-    wire(speed, 'x', steady, 'a');
-    wire(damping, 'value', steady, 'b');
-    wire(pull, 'r', guided, 'a');
-    wire(steady, 'r', guided, 'b');
-
-    // How near each whisker's beam ends, counted only once it is inside the
-    // notice distance, so a clear beam contributes nothing at all.
-    const board = add('read', { partId: starboard, port: 'distance' });
-    const port = add('read', { partId: portSide, port: 'distance' });
-    const notice = add('constant', { kind: 'number', value: NOTICE });
+  /**
+   * Which of a pair of beams has more room, as one signed number. Each counts
+   * only once it ends inside `range`, so open air on both sides gives zero and
+   * the machine is left to steer for the pad. Positive means the machine's
+   * right, which is -X, is the roomier way.
+   *
+   * Which pair matters. A beam swept out to 50 degrees only reaches about
+   * 5.8 m ahead before it runs out of range, so at a 6 m stand-off the wide
+   * whiskers cannot see the thing being stood off from at all — the narrow
+   * guards are the ones that pick the way past. The wide pair earns its keep
+   * close in, where it is the only thing that sees a wall coming.
+   */
+  const roomier = (g, left, right, range) => {
+    const { add, wire } = g;
+    const board = add('read', { partId: right, port: 'distance' });
+    const port = add('read', { partId: left, port: 'distance' });
+    const notice = add('constant', { kind: 'number', value: range });
     const none = add('constant', { kind: 'number', value: 0 });
 
     const boardGap = add('maths', { op: 'subtract' });
@@ -195,13 +151,148 @@ function dodgeProgram(parts) {
     wire(portGap, 'r', portNear, 'a');
     wire(none, 'value', portNear, 'b');
 
-    const lean = add('maths', { op: 'subtract' });
-    const eagerness = add('constant', { kind: 'number', value: 0.3 });
-    const sideways = add('maths', { op: 'multiply' });
-    wire(portNear, 'r', lean, 'a');
-    wire(boardNear, 'r', lean, 'b');
-    wire(lean, 'r', sideways, 'a');
-    wire(eagerness, 'value', sideways, 'b');
+    const difference = add('maths', { op: 'subtract' });
+    wire(portNear, 'r', difference, 'a');
+    wire(boardNear, 'r', difference, 'b');
+    return difference;
+  };
+
+  // The way past, plus a shove off anything close on either beam.
+  const sideDemand = (g, wayPastGain, wallGain) => {
+    const { add, wire } = g;
+    const wayPast = roomier(g, guardPort, guardStarboard, NOTICE);
+    const keenToPass = add('constant', { kind: 'number', value: wayPastGain });
+    const passing = add('maths', { op: 'multiply' });
+    wire(wayPast, 'r', passing, 'a');
+    wire(keenToPass, 'value', passing, 'b');
+
+    const walls = roomier(g, portSide, starboard, CLOSE);
+    const keenToClear = add('constant', { kind: 'number', value: wallGain });
+    const clearing = add('maths', { op: 'multiply' });
+    wire(walls, 'r', clearing, 'a');
+    wire(keenToClear, 'value', clearing, 'b');
+
+    const total = add('maths', { op: 'add' });
+    wire(passing, 'r', total, 'a');
+    wire(clearing, 'r', total, 'b');
+    return total;
+  };
+
+  /**
+   * How hard the machine may push forward given what is ahead of it. The room
+   * left in front of the stand-off sets a speed it is allowed to do, and the
+   * gap between that and the speed it is doing sets the lean.
+   *
+   * Leaning straight off the distance, with no speed in it, cannot brake: by
+   * the time the stand-off is reached the machine still has all its momentum
+   * and coasts into whatever it was standing off from. Inside the stand-off
+   * the permitted speed goes negative, so it gives ground.
+   */
+  const standOffFrom = (g, front, full) => {
+    const { add, wire } = g;
+    const standOff = add('constant', { kind: 'number', value: STAND_OFF });
+    const room = add('maths', { op: 'subtract' });
+    const openness = add('constant', { kind: 'number', value: 0.7 });
+    const allowed = add('maths', { op: 'multiply' });
+    const ceiling = add('constant', { kind: 'number', value: TOP_SPEED });
+    const permitted = add('maths', { op: 'clamp' });
+    wire(front, 'r', room, 'a');
+    wire(standOff, 'value', room, 'b');
+    wire(room, 'r', allowed, 'a');
+    wire(openness, 'value', allowed, 'b');
+    wire(allowed, 'r', permitted, 'a');
+    wire(ceiling, 'value', permitted, 'b');
+
+    const velocity = add('read', { partId: gps, port: 'velocity' });
+    const speed = add('split');
+    const excess = add('maths', { op: 'subtract' });
+    const firmness = add('constant', { kind: 'number', value: 0.6 });
+    const demand = add('maths', { op: 'multiply' });
+    const limit = add('maths', { op: 'clamp' });
+    wire(velocity, 'value', speed, 'v');
+    wire(permitted, 'r', excess, 'a');
+    wire(speed, 'z', excess, 'b');
+    wire(excess, 'r', demand, 'a');
+    wire(firmness, 'value', demand, 'b');
+    wire(demand, 'r', limit, 'a');
+    wire(full, 'value', limit, 'b');
+    return limit;
+  };
+
+  /**
+   * Flies and avoids at the same time.
+   *
+   * Along the corridor and across it are each a cascade: how far there is to
+   * go sets a speed to aim for, and the gap between that and the speed it is
+   * doing sets the lean. Leaning straight off the distance has no ceiling on
+   * it, and the machine arrives at the first obstacle far too fast to stop.
+   *
+   * Forward demand is then whichever is smaller, that or what the frontal arc
+   * allows. Sideways demand is the pull back toward the line to the pad plus
+   * whichever side is roomier.
+   */
+  const run = graph();
+  {
+    const { add, wire } = run;
+    const { full, here, pad, range } = holdCourse(run, CRUISE_HEIGHT);
+
+    const velocity = add('read', { partId: gps, port: 'velocity' });
+    const speed = add('split');
+    const padParts = add('split');
+    const hereParts = add('split');
+    wire(velocity, 'value', speed, 'v');
+    wire(pad, 'position', padParts, 'v');
+    wire(here, 'value', hereParts, 'v');
+
+    const toGo = add('maths', { op: 'subtract' });
+    const keenness = add('constant', { kind: 'number', value: 0.3 });
+    const wanted = add('maths', { op: 'multiply' });
+    const topSpeed = add('constant', { kind: 'number', value: TOP_SPEED });
+    const capped = add('maths', { op: 'clamp' });
+    wire(padParts, 'z', toGo, 'a');
+    wire(hereParts, 'z', toGo, 'b');
+    wire(toGo, 'r', wanted, 'a');
+    wire(keenness, 'value', wanted, 'b');
+    wire(wanted, 'r', capped, 'a');
+    wire(topSpeed, 'value', capped, 'b');
+
+    const excess = add('maths', { op: 'subtract' });
+    const urgency = add('constant', { kind: 'number', value: 0.6 });
+    const demand = add('maths', { op: 'multiply' });
+    const drive = add('maths', { op: 'clamp' });
+    wire(capped, 'r', excess, 'a');
+    wire(speed, 'z', excess, 'b');
+    wire(excess, 'r', demand, 'a');
+    wire(urgency, 'value', demand, 'b');
+    wire(demand, 'r', drive, 'a');
+    wire(full, 'value', drive, 'b');
+
+    const front = frontalArc(run);
+    const limit = standOffFrom(run, front, full);
+    const chosen = add('maths', { op: 'min' });
+    const pitch = add('write', { partId: controller, port: 'pitch' });
+    wire(drive, 'r', chosen, 'a');
+    wire(limit, 'r', chosen, 'b');
+    wire(chosen, 'r', pitch, 'value');
+
+    // Across the corridor. A positive roll slides toward the machine's right,
+    // which is -X, so both guidance terms come out negated.
+    const across = add('maths', { op: 'subtract' });
+    const homing = add('constant', { kind: 'number', value: -0.12 });
+    const pull = add('maths', { op: 'multiply' });
+    const damping = add('constant', { kind: 'number', value: 0.75 });
+    const steady = add('maths', { op: 'multiply' });
+    const guided = add('maths', { op: 'add' });
+    wire(padParts, 'x', across, 'a');
+    wire(hereParts, 'x', across, 'b');
+    wire(across, 'r', pull, 'a');
+    wire(homing, 'value', pull, 'b');
+    wire(speed, 'x', steady, 'a');
+    wire(damping, 'value', steady, 'b');
+    wire(pull, 'r', guided, 'a');
+    wire(steady, 'r', guided, 'b');
+
+    const sideways = sideDemand(run, 0.3, 0.45);
 
     const combined = add('maths', { op: 'add' });
     const slide = add('maths', { op: 'clamp' });
@@ -219,65 +310,93 @@ function dodgeProgram(parts) {
     wire(close, 'value', arrived, 'b');
     wire(arrived, 'r', land, 'when');
 
-    // Steering by the two terms together balances out exactly in front of
+    // Steering by both terms together balances out exactly in front of
     // something wide, and the machine sits there arguing with itself. Once the
-    // way ahead is genuinely shut, hand over to a state that just picks a side.
-    const shut = add('constant', { kind: 'number', value: 5.5 });
+    // way ahead is shut, hand over to a state that has already picked a side
+    // and will not reconsider. Whichever wide whisker reads further decides,
+    // and the first of these to fire wins, so a dead heat goes right.
+    const shut = add('constant', { kind: 'number', value: STAND_OFF + 1 });
     const trapped = add('compare', { op: 'lt' });
-    const backOff = add('goto', { state: 'boxed' });
-    wire(forward, 'value', trapped, 'a');
+    wire(front, 'r', trapped, 'a');
     wire(shut, 'value', trapped, 'b');
-    wire(trapped, 'r', backOff, 'when');
+
+    const scanStarboard = add('read', { partId: starboard, port: 'distance' });
+    const scanPort = add('read', { partId: portSide, port: 'distance' });
+    const rightIsClearer = add('compare', { op: 'gte' });
+    wire(scanStarboard, 'value', rightIsClearer, 'a');
+    wire(scanPort, 'value', rightIsClearer, 'b');
+
+    const goRight = add('logic', { op: 'and' });
+    const takeRight = add('goto', { state: 'slipRight' });
+    wire(trapped, 'r', goRight, 'a');
+    wire(rightIsClearer, 'r', goRight, 'b');
+    wire(goRight, 'r', takeRight, 'when');
+
+    const takeLeft = add('goto', { state: 'slipLeft' });
+    wire(trapped, 'r', takeLeft, 'when');
   }
 
   /**
-   * The way ahead is shut. Hold a stand-off and slide all the way across to
-   * whichever side has more daylight, with nothing pulling back toward the
-   * middle. Committing to one side is the whole point: it is what gets the
-   * machine out of a spot where weighing both sides up keeps it still.
+   * The way ahead is shut, and this state has already picked which way it is
+   * going: no weighing up, no changing its mind. Two states rather than one
+   * choice made afresh every tick, because a blocker square in front reads the
+   * same on both sides and a machine deciding each tick just sits there.
+   *
+   * The wide whiskers still push it off anything close, so committing to a
+   * side does not mean grinding along a wall.
    */
-  const boxed = graph();
-  {
-    const { add, wire } = boxed;
-    const { full } = holdCourse(boxed, CRUISE_HEIGHT);
+  const slip = (towards) => {
+    const g = graph();
+    const { add, wire } = g;
+    const { full } = holdCourse(g, CRUISE_HEIGHT);
 
-    const forward = add('read', { partId: ahead, port: 'distance' });
-    const standOff = add('constant', { kind: 'number', value: 5 });
-    const room = add('maths', { op: 'subtract' });
-    const firmness = add('constant', { kind: 'number', value: 0.35 });
-    const easing = add('maths', { op: 'multiply' });
-    const held = add('maths', { op: 'clamp' });
+    const front = frontalArc(g);
+    const limit = standOffFrom(g, front, full);
     const pitch = add('write', { partId: controller, port: 'pitch' });
-    wire(forward, 'value', room, 'a');
-    wire(standOff, 'value', room, 'b');
-    wire(room, 'r', easing, 'a');
-    wire(firmness, 'value', easing, 'b');
-    wire(easing, 'r', held, 'a');
-    wire(full, 'value', held, 'b');
-    wire(held, 'r', pitch, 'value');
+    wire(limit, 'r', pitch, 'value');
 
-    const board = add('read', { partId: starboard, port: 'distance' });
-    const port = add('read', { partId: portSide, port: 'distance' });
-    const clearer = add('compare', { op: 'gt' });
-    const toStarboard = add('constant', { kind: 'number', value: 1 });
-    const toPort = add('constant', { kind: 'number', value: -1 });
-    const slide = add('select');
+    // A nudge in the direction this state committed to, on top of the same
+    // reading of the way past that the run state uses. The nudge alone breaks
+    // the deadlock in front of something square-on; the proportional part is
+    // what eases the machine onto the gap instead of carrying it clean across
+    // the corridor and into the far wall.
+    const committed = add('constant', { kind: 'number', value: towards });
+    const reading = sideDemand(g, 0.35, 0.55);
+    const urged = add('maths', { op: 'add' });
+    wire(committed, 'value', urged, 'a');
+    wire(reading, 'r', urged, 'b');
+
+    // And lean against how fast it is already sliding, or it accelerates until
+    // something stops it.
+    const velocity = add('read', { partId: gps, port: 'velocity' });
+    const speed = add('split');
+    const damping = add('constant', { kind: 'number', value: 0.75 });
+    const steady = add('maths', { op: 'multiply' });
+    wire(velocity, 'value', speed, 'v');
+    wire(speed, 'x', steady, 'a');
+    wire(damping, 'value', steady, 'b');
+
+    const total = add('maths', { op: 'add' });
+    const slide = add('maths', { op: 'clamp' });
     const roll = add('write', { partId: controller, port: 'roll' });
-    wire(board, 'value', clearer, 'a');
-    wire(port, 'value', clearer, 'b');
-    wire(clearer, 'r', slide, 'when');
-    wire(toStarboard, 'value', slide, 'a');
-    wire(toPort, 'value', slide, 'b');
+    wire(urged, 'r', total, 'a');
+    wire(steady, 'r', total, 'b');
+    wire(total, 'r', slide, 'a');
+    wire(full, 'value', slide, 'b');
     wire(slide, 'r', roll, 'value');
 
-    // Well clear before handing back, so it does not bounce straight back in.
-    const clear = add('constant', { kind: 'number', value: 8 });
+    // Well clear before handing back, so it does not bounce straight in again.
+    const clear = add('constant', { kind: 'number', value: STAND_OFF + 2.5 });
     const open = add('compare', { op: 'gt' });
     const resume = add('goto', { state: 'run' });
-    wire(forward, 'value', open, 'a');
+    wire(front, 'r', open, 'a');
     wire(clear, 'value', open, 'b');
     wire(open, 'r', resume, 'when');
-  }
+    return g;
+  };
+
+  const slipRight = slip(0.4);
+  const slipLeft = slip(-0.4);
 
   // Sit on the pad. With nothing written to pitch or roll the controller holds
   // its own station, which is what keeps it there.
@@ -299,7 +418,8 @@ function dodgeProgram(parts) {
     states: [
       { id: 'climb', name: 'Climb', ...climb },
       { id: 'run', name: 'Run', ...run },
-      { id: 'boxed', name: 'Boxed in', ...boxed },
+      { id: 'slipRight', name: 'Slip right', ...slipRight },
+      { id: 'slipLeft', name: 'Slip left', ...slipLeft },
       { id: 'arrive', name: 'Arrive', ...arrive },
     ].map((state) => tidyLayout(state)),
   };
@@ -325,6 +445,8 @@ export function dodger() {
   const ahead = place('sensor', [0, 1, 1], facing([0, 0, 1]));
   const starboard = place('sensor', [-1, 1, 0], facing([0, 0, 1]), { yaw: -50 });
   const portSide = place('sensor', [1, 1, 0], facing([0, 0, 1]), { yaw: 50 });
+  const guardStarboard = place('sensor', [-1, 2, 0], facing([0, 0, 1]), { yaw: -20 });
+  const guardPort = place('sensor', [1, 2, 0], facing([0, 0, 1]), { yaw: 20 });
   for (const cell of [[-1, 1, -1], [1, 1, -1], [-1, 1, 1], [1, 1, 1]]) {
     place('propeller', cell, IDENTITY_ORIENTATION, { binding: { mode: 'flight' } });
   }
@@ -336,6 +458,8 @@ export function dodger() {
       ahead: ahead.id,
       portSide: portSide.id,
       starboard: starboard.id,
+      guardPort: guardPort.id,
+      guardStarboard: guardStarboard.id,
     }),
   });
   return bp;

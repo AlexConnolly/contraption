@@ -52,6 +52,7 @@ export class Hud {
       help: document.getElementById('help'),
       toast: document.getElementById('toast'),
       win: document.getElementById('win'),
+      winKicker: document.getElementById('win-kicker'),
       winTitle: document.getElementById('win-title'),
       winStats: document.getElementById('win-stats'),
       loading: document.getElementById('loading'),
@@ -475,7 +476,9 @@ export class Hud {
       row.fill.style.width = `${Math.round(objective.progress * 100)}%`;
     });
     const par = level.par ? ` · par ${level.par}s` : '';
-    this.dom.clock.innerHTML = `Run time <strong>${report.elapsed.toFixed(1)}s</strong>${par}`;
+    const rule = level.noContact ? ' · <strong>no contact</strong>' : '';
+    this.dom.clock.innerHTML =
+      `Run time <strong>${report.elapsed.toFixed(1)}s</strong>${par}${rule}`;
   }
 
   showWin(level, report, cost) {
@@ -489,8 +492,19 @@ export class Hud {
     this.dom.win.hidden = false;
   }
 
+  showFailure(level, report, reason) {
+    this.dom.win.classList.add('failed');
+    this.dom.winKicker.textContent = 'Run failed';
+    this.dom.winTitle.textContent = reason;
+    this.dom.winStats.innerHTML =
+      `${level.name} &nbsp;·&nbsp; lasted <strong>${report.elapsed.toFixed(1)}s</strong>`;
+    this.dom.win.hidden = false;
+  }
+
   hideWin() {
     this.dom.win.hidden = true;
+    this.dom.win.classList.remove('failed');
+    this.dom.winKicker.textContent = 'Challenge complete';
   }
 
   toast(message, bad = false) {

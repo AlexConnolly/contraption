@@ -30,6 +30,7 @@ const state = {
   tracker: null,
   cameraMode: 'chase',
   won: false,
+  crashed: false,
 };
 
 const canvas = document.getElementById('view');
@@ -151,6 +152,7 @@ function buildRun() {
   hud.buildObjectives(state.tracker.report());
   bus.reset();
   state.won = false;
+  state.crashed = false;
   hud.hideWin();
   snapCamera();
 }
@@ -205,6 +207,7 @@ function respawn() {
   state.tracker.reset();
   bus.reset();
   state.won = false;
+  state.crashed = false;
   hud.hideWin();
   snapCamera();
 }
@@ -346,6 +349,13 @@ function simulateStep() {
     propPosition: (id) => state.arena.propPosition(id),
     corePosition: () => state.machine.corePosition(),
   });
+
+  // Some courses have to be flown without touching anything at all.
+  if (state.level.noContact && !state.won && !state.crashed && state.machine.contact()) {
+    state.crashed = true;
+    hud.showFailure(state.level, report, 'You touched something');
+    return;
+  }
   if (report.complete && !state.won) {
     state.won = true;
     hud.showWin(state.level, report, state.blueprint.cost());

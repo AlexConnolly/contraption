@@ -68,3 +68,6 @@ at the start of every run, so there is no timetable to learn and no path worth
 memorising. A program has to look where it is going.
 
 The seed is recorded, so a run that went wrong can be set up again exactly.
+
+A level can also demand a clean run: with `noContact` set, touching anything at
+all ends it. Parts of the same machine touching each other do not count.

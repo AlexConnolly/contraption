@@ -426,3 +426,6 @@ select {
 .graph-config select, .graph-config input { font-size: 11px; padding: 3px 5px; width: 100%; }
 .graph-config input.narrow { width: calc(33% - 3px); }
 .graph-config.note { color: var(--muted); font-size: 11px; }
+
+#win.failed .win-kicker { color: var(--bad); }
+#win.failed .win-card { box-shadow: 0 0 0 1px rgba(255,107,107,0.35), 0 24px 60px rgba(0,0,0,0.5); }

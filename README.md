@@ -9,7 +9,7 @@ Three.js for rendering, Rapier for physics, Vite for the build.
 ```bash
 npm install
 npm run dev      # http://localhost:5173
-npm test         # 171 tests, including headless physics
+npm test         # 175 tests, including headless physics
 npm run build
 npm run preview  # serve the production build
 ```
@@ -135,6 +135,17 @@ every run. There is no timetable to learn and no path worth memorising: a
 program has to look where it is going. The seed is recorded, so a run that
 went wrong can be set up again exactly.
 
+They are sized so two things hold at once. Each blocker **always covers the
+middle** of the corridor, so flying straight at the pad never works; and
+between them they sweep the **full width**, so no lane is safe for long either.
+Getting that balance wrong is easy: narrow blockers in a wide corridor leave
+the centre clear most of the time, and a machine sails through on luck rather
+than on looking.
+
+The level also sets `noContact`, so **touching anything ends the run**. Parts of
+the same machine touching each other do not count, so a rover's wheels on the
+ground are fine on levels that allow it.
+
 Seeing is what a distance sensor is for, and it can be **aimed** off its
 mounting. One beam down the nose tells you something is there; a whisker angled
 out each side tells you which way is clearer, which is what you actually need
@@ -142,14 +153,25 @@ in order to go round it. The flight controller also takes a **strafe** command,
 so a machine can slide sideways without turning and keep its whiskers pointed
 where it is going.
 
-The **Dodger** preset solves it, and its program is worth reading. Along the
+The **Dodger** preset solves it — cleanly, on 149 of 150 different worlds — and
+its program is worth reading. Along the
 corridor and across it are each a proportional-derivative pair — lean on how
 far there is to go, lean back on how fast you are already moving — and only one
 term in the whole graph knows about obstacles: how much more crowded one
 whisker is than the other. Weighing both sides up balances out exactly in front
 of something wide and leaves the machine sitting there arguing with itself, so
-a second state takes over when the way ahead is shut and simply commits to one
-side. That is the state machine earning its keep.
+a pair of states takes over when the way ahead is shut, each having already
+picked which way it is going and not about to reconsider. That is the state
+machine earning its keep.
+
+The one that mattered most for flying clean is the stand-off. Leaning on how
+much room is left ahead, with no speed term in it, cannot brake — by the time
+the stand-off is reached the machine still has all its momentum and coasts into
+whatever it was standing off from. Room ahead has to set a speed it is allowed
+to do, and the gap between that and the speed it is doing sets the lean. Same
+shape as the drive term, and the same shape as the altitude loop; getting it
+wrong was the difference between never touching anything and touching
+something on every single run.
 
 ## How a machine is put together
 
@@ -213,9 +235,9 @@ and a rover that drives itself and stops on a sensor.
 
 `tests/avoidance.test.js` solves challenge 7 hands-off across ten different
 seeds — ten different worlds, since a program that had memorised a path would
-only ever get through the one it was written for — and checks it goes round the
-blockers rather than down the middle, by a different path each time, with
-clearance to spare. It also checks the opposite: blind the forward sensor and
+only ever get through the one it was written for — and checks that it flies
+every one of them **without touching anything**, going round the blockers
+rather than down the middle, by a different path each time. It also checks the opposite: blind the forward sensor and
 the same machine never finishes.
 
 `tests/level.test.js` plays challenge 1 from start to finish with a scripted
