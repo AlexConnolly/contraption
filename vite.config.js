@@ -1,6 +1,13 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+  server: {
+    // Off deliberately. Editing a file mid-session otherwise reloads the page
+    // and throws away whatever run or build was in progress, which makes the
+    // game unplayable while anyone is working on it. Refresh to pick changes
+    // up.
+    hmr: false,
+  },
   optimizeDeps: {
     // Rapier's wasm-bindgen glue must not be pre-bundled: the optimiser makes
     // a second copy of it, and only one of the two ends up holding the wasm
