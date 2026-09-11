@@ -59,7 +59,11 @@ export class SignalBus {
         const throttle = (down(binding.pos) ? 1 : 0) - (down(binding.neg) ? 1 : 0);
         const steer = (down(binding.right) ? 1 : 0) - (down(binding.left) ? 1 : 0);
         const side = binding.side ?? 1;
-        return Math.max(-1, Math.min(1, throttle + side * steer));
+        // Backing up swaps which way the same key swings the machine, so left
+        // is still left from where the driver is sitting. Turning on the spot
+        // has no direction of travel to reverse, so it keeps the forward sense.
+        const sense = throttle < 0 ? -1 : 1;
+        return Math.max(-1, Math.min(1, throttle + side * steer * sense));
       }
       case 'axis':
         return (down(binding.pos) ? 1 : 0) - (down(binding.neg) ? 1 : 0);

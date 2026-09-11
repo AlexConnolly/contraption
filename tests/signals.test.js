@@ -126,6 +126,37 @@ describe('drive bindings', () => {
     expect(bus.resolve('r', RIGHT)).toBe(1);
   });
 
+  // Reversing swaps which way the machine swings for the same key, the way a
+  // car does: hold left while backing up and the machine comes round to the
+  // right, which is what it looks like from behind the wheel.
+  it('swaps the steering round while reversing', () => {
+    const input = fakeInput();
+    const bus = new SignalBus(input);
+    input.down.add('KeyS');
+    input.down.add('KeyA');
+    // Forward and left drives the left wheels back and the right wheels on.
+    // Backward and left has to do the opposite of that.
+    expect(bus.resolve('l', LEFT)).toBe(0);
+    expect(bus.resolve('r', RIGHT)).toBe(-1);
+  });
+
+  it('steers normally again as soon as it is driving forward', () => {
+    const input = fakeInput();
+    const bus = new SignalBus(input);
+    input.down.add('KeyW');
+    input.down.add('KeyA');
+    expect(bus.resolve('l', LEFT)).toBe(0);
+    expect(bus.resolve('r', RIGHT)).toBe(1);
+  });
+
+  it('steers on the spot the same way whichever keys got it there', () => {
+    const input = fakeInput();
+    const bus = new SignalBus(input);
+    input.down.add('KeyA');
+    expect(bus.resolve('l', LEFT)).toBe(-1);
+    expect(bus.resolve('r', RIGHT)).toBe(1);
+  });
+
   it('reads the axle direction a wheel is bolted on with', () => {
     expect(driveSide(IDENTITY_ORIENTATION)).toBe(1);
     const flipped = yawStep(yawStep(IDENTITY_ORIENTATION));
