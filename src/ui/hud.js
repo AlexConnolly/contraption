@@ -115,11 +115,17 @@ export class Hud {
   wire() {
     const { h, dom } = this;
     document.getElementById('btn-challenges').addEventListener('click', async () => {
+      // Where this actually goes depends on how you got here, and the question
+      // has to say so — testing a level you are building goes back to the
+      // builder, not out to the challenge list.
+      const toBuilder = h.isTestingDraft?.();
       const leave = await this.confirm({
-        title: 'Back to challenges?',
-        body: 'Your machine is saved against this challenge, so it will be '
-          + 'here when you come back. The run you are on now ends.',
-        ok: 'Leave challenge',
+        title: toBuilder ? 'Back to the builder?' : 'Back to challenges?',
+        body: toBuilder
+          ? 'Your level is exactly as you left it. The run you are on now ends.'
+          : 'Your machine is saved against this challenge, so it will be '
+            + 'here when you come back. The run you are on now ends.',
+        ok: toBuilder ? 'Back to building' : 'Leave challenge',
         cancel: 'Stay here',
       });
       if (leave) h.onLeaveChallenge();

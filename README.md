@@ -68,6 +68,8 @@ same way.
 **Settings** covers the test camera, shadows and the screen effect over the
 menus. Each applies the moment it is pressed and is remembered.
 
+**Build** is where you make a problem of your own. See below.
+
 ### Seeing the problem first
 
 The first question every one of these asks is how it could be done at all, and
@@ -89,6 +91,58 @@ the list, asked for first rather than done on the click.
 The whole game is drawn from one design system — `src/ui/tokens.css` — so the
 menus, the studio and the node editor share a palette, two typefaces and the
 same cut-corner panels.
+
+## Building your own
+
+**Build** opens the same world the studio uses, with the machine put away and
+the course in your hands instead. You point at the ground and click, and the
+thing you have selected lands on a half-metre grid: ground to stand on, crates
+and balls to move, a goal zone, a no-go box, or the start mark the machine
+spawns on. Clicking something already there selects it, and `Delete` removes
+it.
+
+There is no preview of the level and no separate editor view, because the
+draft *is* the level: it is rendered through the ordinary arena, rebuilt on
+every change. A mover or a belt runs while you are editing it, so what you are
+looking at is what will be played. What the editor draws on top is a wireframe
+box round each thing you can pick, and nothing else.
+
+The right-hand rail is the level itself: name, brief, parts budget, par time,
+banned parts, and the world numbers — gravity, ground friction, fog, and the
+cap on how heavy the machine may be. Under that is the list of what is in the
+course and the objectives, each of which picks a real crate and a real zone
+from what you have placed rather than a name typed in hope. Removing a crate
+an objective needed takes the objective with it, and says so.
+
+The level's problems are listed live and in plain words — *no objectives*,
+*par is 0s*, *nothing to stand on* — from the same check the format runs, so a
+level that will not load cannot be saved by accident.
+
+**Test play** drops you into the studio on your own level with the ordinary
+rules, bans and budget applied. Coming back finds the draft exactly as you
+left it.
+
+### Getting one to somebody else
+
+A level is data — sizes, positions, numbers, ids — and never behaviour, which
+is what makes it safe to accept from a stranger. **Copy share code** turns the
+level into a string starting `CTP1`: the JSON, deflated where that helps, in
+base64url. It travels in a chat message. **Paste a level code** on the Build
+screen reads one back.
+
+Everything that comes in that way is put through `sanitiseLevel` first, and so
+is everything read back out of your own browser storage, which is no more
+trustworthy than a code from a stranger. Unknown fields are dropped, every
+number is clamped to a sane range, the lists are capped, text is stripped of
+anything unprintable, an objective pointing at a crate that is not there is
+discarded, and a code that decompresses to something enormous is refused
+before it is parsed. The format is versioned (`LEVEL_FORMAT`, currently 1) so
+a code made today can still be read when it is not.
+
+Levels you build or are sent sit on the Challenges screen under **Made by
+you**, after the campaign and unnumbered. They are marked *Yours*, they are
+not part of the campaign's difficulty ramp, and solving one does not move the
+campaign's solved count — it is your problem, not one of ours.
 
 ## Playing
 
@@ -389,10 +443,11 @@ src/parts/       part registry (mass, cost, joints, actuators) and meshes
 src/sim/         connectivity, body grouping, signal bus, machine, arena,
                  flight controller, program graph, computer runtime
 src/studio/      build mode: picking, ghost preview, undo, presets
-src/challenges/  levels and objective tracking
+src/challenges/  levels, objective tracking, the portable level format
+                 and the levels a player has built
 src/ui/          design tokens, front end (title, challenges, garage,
-                 settings), save store, thumbnail renderer, palette,
-                 inspector, objectives, win card, node editor
+                 build, settings), save store, thumbnail renderer, palette,
+                 inspector, objectives, win card, node editor, level builder
 ```
 
 ## Tests
@@ -429,6 +484,17 @@ only ever get through the one it was written for — and checks that it flies
 every one of them **without touching anything**, going round the blockers
 rather than down the middle, by a different path each time. It also checks the opposite: blind the forward sensor and
 the same machine never finishes.
+
+`tests/format.test.js` and `tests/builder.test.js` cover the portable level
+format and the editor's own logic. The format is tested chiefly on what it
+does with rubbish: a share code that is truncated, is not a code at all, or
+decompresses to something enormous, and a level whose numbers are nonsense or
+whose objectives point at nothing. The builder tests assemble a level a piece
+at a time the way clicking would, and check it survives — that every tool makes
+something the format accepts unchanged, that removing a crate takes the
+objectives that needed it, that a level comes back from a share code identical,
+and that a level somebody built stays out of the campaign's tally however many
+times it is solved.
 
 `tests/progress.test.js` covers the save store on its own — designs kept apart
 per challenge, best times that a slower later run cannot overwrite, the garage,

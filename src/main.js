@@ -17,9 +17,11 @@ import {
   ObjectiveTracker, withinBudget, withinMassCap, breachedBy,
 } from './challenges/objectives.js';
 import { bannedParts, banFor, firstBanned } from './challenges/bans.js';
-import { getLevel, LEVELS, nextLevel } from './challenges/levels.js';
+import { LEVELS, nextLevel } from './challenges/levels.js';
+import { resolveLevel, saveCustomLevel, blankLevel } from './challenges/custom.js';
 import { Hud } from './ui/hud.js';
 import { GraphEditor } from './ui/graph-editor.js';
+import { Builder } from './ui/builder.js';
 import { FrontEnd } from './ui/frontend.js';
 import { Survey, stopsFor, shotFor, lookFor } from './ui/survey.js';
 import { GameAudio } from './ui/audio.js';
@@ -92,6 +94,7 @@ let hud;
 let world;
 let editor;
 let frontEnd;
+let builder;
 const survey = new Survey({
   onCaption: (caption, step, of) => hud.setSurvey(caption, step, of),
   onEnd: () => endCourse(),
@@ -371,7 +374,7 @@ function respawn() {
 
 function changeLevel(id) {
   saveDesign(true);
-  state.level = getLevel(id);
+  state.level = resolveLevel(id);
   const stored = loadDesign(state.level.id);
   studio.replaceBlueprint(stored ?? starterRover());
   hud.setLevel(state.level);
@@ -417,6 +420,66 @@ function leaveMenu() {
   hud.setChromeVisible(true);
   studio.setShowPlate(true);
   enterStudio();
+}
+
+/**
+ * The level builder. It borrows the same scene and camera the studio uses —
+ * you are arranging a course in the world, not in a separate window — so the
+ * studio steps aside while it is up.
+ */
+function openBuilder(level) {
+  if (state.mode === 'test') enterStudio();
+  saveDesign(true);
+  frontEnd.close();
+  if (state.showpiece) state.showpiece.visible = false;
+  state.idling = false;
+  state.mode = 'build';
+  disposeRun();
+  studio.setVisible(false);
+  hud.setChromeVisible(false);
+  input.enabled = false;
+  controls.enabled = true;
+  controls.target.set(0, 1, 0);
+  camera.position.set(14, 12, 18);
+  builder.open(level);
+}
+
+function closeBuilder() {
+  builder.close();
+  state.mode = 'studio';
+  openMenu('build');
+}
+
+/**
+ * Play the draft without losing it. The level goes in as a normal level, the
+ * builder's furniture is put away rather than torn down, and coming back finds
+ * the draft exactly as it was.
+ */
+function tryDraft(level) {
+  state.testingDraft = level;
+  builder.setChromeVisible(false);
+  state.level = level;
+  state.mode = 'studio';
+  hud.setChromeVisible(true);
+  hud.setLevel(level);
+  applyBans();
+  const stored = loadDesign(level.id);
+  studio.replaceBlueprint(stored ?? starterRover());
+  input.enabled = true;
+  enterStudio();
+  hud.toast('Testing your level — Back returns to the builder');
+}
+
+function backToBuilder() {
+  if (state.mode === 'test') enterStudio();
+  disposeRun();
+  state.testingDraft = null;
+  state.mode = 'build';
+  studio.setVisible(false);
+  hud.setChromeVisible(false);
+  input.enabled = false;
+  builder.setChromeVisible(true);
+  builder.refresh();
 }
 
 function applySetting(key, value) {
@@ -515,28 +578,35 @@ let pointerDownAt = null;
 
 function setPointerFromEvent(event) {
   const rect = canvas.getBoundingClientRect();
-  studio.setPointer(
-    ((event.clientX - rect.left) / rect.width) * 2 - 1,
-    -((event.clientY - rect.top) / rect.height) * 2 + 1,
-  );
+  const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+  studio.setPointer(x, y);
+  builder?.setPointer(x, y);
 }
 
 canvas.addEventListener('pointermove', (event) => {
-  if (state.mode !== 'studio') return;
+  if (state.mode !== 'studio' && state.mode !== 'build') return;
   setPointerFromEvent(event);
 });
 
 canvas.addEventListener('pointerdown', (event) => {
-  if (state.mode !== 'studio' || event.button !== 0) return;
+  if ((state.mode !== 'studio' && state.mode !== 'build') || event.button !== 0) return;
   pointerDownAt = { x: event.clientX, y: event.clientY };
 });
 
 canvas.addEventListener('pointerup', (event) => {
-  if (state.mode !== 'studio' || event.button !== 0 || !pointerDownAt) return;
+  if ((state.mode !== 'studio' && state.mode !== 'build') || event.button !== 0) return;
+  if (!pointerDownAt) return;
   const moved = Math.hypot(event.clientX - pointerDownAt.x, event.clientY - pointerDownAt.y);
   pointerDownAt = null;
+  // A drag is the camera being moved, not a click on the course.
   if (moved > 5) return;
   setPointerFromEvent(event);
+  if (state.mode === 'build') {
+    builder.update();
+    builder.click();
+    return;
+  }
   studio.update();
   const result = studio.click();
   if (result && result.ok === false) {
@@ -549,6 +619,7 @@ canvas.addEventListener('pointerleave', () => studio?.clearPointer());
 canvas.addEventListener('contextmenu', (event) => event.preventDefault());
 
 function handleShortcuts() {
+  if (state.mode === 'build') return;
   if (survey.isRunning) {
     if (input.wasPressed('Escape') || input.wasPressed('Space')) survey.skip();
     return;
@@ -672,7 +743,18 @@ function frame(now) {
 
   handleShortcuts();
 
-  if (state.mode === 'studio') {
+  if (state.mode === 'build') {
+    builder.update();
+    if (state.arena) {
+      // The course runs while you edit it, so a mover or a belt shows what it
+      // will actually do rather than sitting still looking harmless.
+      state.arena.step(dt);
+      world.step();
+      state.arena.sync();
+    }
+    audio.silenceMachine();
+    input.endFrame();
+  } else if (state.mode === 'studio') {
     if (!state.idling && !survey.isRunning) studio.update();
     audio.silenceMachine();
     input.endFrame();
@@ -722,7 +804,7 @@ function frame(now) {
 async function boot() {
   world = createWorld(RAPIER, gravityOf(state.level));
 
-  state.level = getLevel(store.lastLevel() ?? 'first-haul');
+  state.level = resolveLevel(store.lastLevel() ?? 'first-haul');
   const stored = loadDesign(state.level.id);
   state.blueprint = stored ?? starterRover();
 
@@ -752,7 +834,10 @@ async function boot() {
       else if (mode === 'view') enterView();
       else enterStudio();
     },
-    onLeaveChallenge: () => openMenu('challenges'),
+    // Testing a level you are building goes back to the builder, not out to
+    // the challenge list — the draft is not saved anywhere yet.
+    isTestingDraft: () => Boolean(state.testingDraft),
+    onLeaveChallenge: () => (state.testingDraft ? backToBuilder() : openMenu('challenges')),
     onShowCourse: () => showCourse('view'),
     onSkipCourse: () => survey.skip(),
     onNextChallenge: () => {
@@ -867,6 +952,28 @@ async function boot() {
   refreshInspector();
   hud.ready();
 
+  builder = new Builder({
+    RAPIER,
+    world,
+    scene,
+    camera,
+    handlers: {
+      onToast: (message, bad) => hud.toast(message, bad),
+      onSave: (level, id) => {
+        const saved = saveCustomLevel(level, { id });
+        return { id: saved.id };
+      },
+      onTestPlay: (level) => tryDraft(level),
+      onDone: () => closeBuilder(),
+      onShowCode: (code) => {
+        // Clipboard access can be refused, and a code you cannot reach is no
+        // use at all — so it goes somewhere it can be selected by hand.
+        hud.toast('Clipboard refused — the code is in the box', true);
+        prompt('Your level code', code);
+      },
+    },
+  });
+
   frontEnd = new FrontEnd({
     RAPIER,
     handlers: {
@@ -893,6 +1000,7 @@ async function boot() {
         leaveMenu();
         if (loadMachine(blueprint, machine.name)) hud.toast(`Loaded ${machine.name}`);
       },
+      onBuildLevel: (level) => openBuilder(level ?? blankLevel()),
       getSettings: () => ({ ...settings }),
       onSetting: applySetting,
     },
@@ -906,6 +1014,7 @@ async function boot() {
       input,
       bus,
       editor,
+      builder,
       frontEnd,
       openMenu,
       leaveMenu,

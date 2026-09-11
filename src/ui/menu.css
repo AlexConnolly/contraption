@@ -457,3 +457,10 @@
 @media (prefers-reduced-motion: reduce) {
   .fe *, .fe { transition: none !important; }
 }
+
+/* A level somebody made themselves, marked wherever it appears so it is never
+   mistaken for part of the campaign. */
+.fe-tag.own { color: var(--amber); border-color: rgba(240, 168, 37, .45); }
+
+.fe-head.sub { margin-top: 34px; }
+.fe-head.sub h2 { font-size: clamp(22px, 2.6vw, 30px); }

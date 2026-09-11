@@ -1037,3 +1037,166 @@ input[type="range"] { accent-color: var(--amber); }
 .graph-config select, .graph-config input { font-size: 11px; padding: 4px 6px; width: 100%; }
 .graph-config input.narrow { width: calc(33% - 3px); }
 .graph-config.note { font-family: var(--mono); color: var(--faint); font-size: 10.5px; }
+
+/* ========================================================== level builder */
+
+/* The two rails float over the scene rather than boxing it in: you are
+   arranging a course out there, so as much of it as possible stays visible. */
+.build-root {
+  position: fixed;
+  inset: 0;
+  z-index: 68;
+  display: grid;
+  grid-template-columns: 232px 1fr 312px;
+  grid-template-rows: 52px 1fr;
+  pointer-events: none;
+  font-family: var(--ui);
+}
+.build-root[hidden] { display: none !important; }
+.build-root > * { pointer-events: auto; }
+
+.build-bar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 14px;
+  background: var(--solid);
+  border-bottom: 1px solid var(--edge);
+}
+.build-bar .spacer { flex: 1; }
+.build-title {
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.build-name {
+  height: 32px;
+  min-width: 220px;
+  background: var(--raised);
+  border: 1px solid var(--edge);
+  color: var(--text);
+  font-family: var(--ui);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 0 10px;
+}
+.build-state {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--green);
+  white-space: nowrap;
+  max-width: 40ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.build-state.bad { color: var(--amber); }
+.build-actions { display: flex; gap: 6px; }
+.build-actions button {
+  height: 32px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  padding: 0 12px;
+}
+
+.build-side, .build-props {
+  margin: 12px;
+  padding: 13px;
+  background: var(--panel);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--edge);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--edge) transparent;
+  clip-path: polygon(0 0, calc(100% - var(--notch)) 0, 100% var(--notch), 100% 100%, var(--notch) 100%, 0 calc(100% - var(--notch)));
+}
+.build-props { grid-column: 3; }
+
+.build-tools { display: flex; flex-direction: column; gap: 5px; margin-bottom: 6px; }
+.build-tool {
+  display: grid;
+  gap: 2px;
+  text-align: left;
+  padding: 8px 10px;
+  background: var(--solid);
+  border: 1px solid var(--edge);
+  clip-path: polygon(0 0, calc(100% - var(--notch-sm)) 0, 100% var(--notch-sm), 100% 100%, var(--notch-sm) 100%, 0 calc(100% - var(--notch-sm)));
+}
+.build-tool b { font-size: 13px; font-weight: 600; letter-spacing: .02em; color: var(--text); }
+.build-tool span { font-size: 11px; line-height: 1.35; color: var(--faint); }
+.build-tool:hover { border-color: var(--cyan); }
+.build-tool.active { border-color: var(--amber); background: var(--amber-dim); }
+
+.build-counts { display: grid; gap: 3px; }
+.build-counts div {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.build-counts b { color: var(--text); font-weight: 500; font-variant-numeric: tabular-nums; }
+
+.build-fields { display: grid; gap: 7px; margin-bottom: 10px; }
+.build-field { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.build-field label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.build-field input { width: 92px; text-align: right; }
+.build-field.wide { align-items: flex-start; }
+.build-triple { display: flex; gap: 4px; }
+.build-triple input { width: 60px; text-align: right; }
+
+.build-brief {
+  width: 100%;
+  background: var(--raised);
+  border: 1px solid var(--edge);
+  color: var(--text);
+  font-family: var(--ui);
+  font-size: 12.5px;
+  line-height: 1.45;
+  padding: 8px;
+  resize: vertical;
+  margin-bottom: 10px;
+}
+
+.build-objectives { display: grid; gap: 5px; margin-bottom: 10px; }
+.build-objective { display: grid; grid-template-columns: 1fr auto; gap: 4px; align-items: center; }
+.build-objective input[type="text"] { grid-column: 1 / -1; }
+.build-objective select { font-size: 10.5px; min-width: 0; }
+.build-objective > select:nth-of-type(1) { grid-column: 1; }
+.build-mini {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: 5px 9px;
+}
+
+.build-bans { display: flex; gap: 5px; flex-wrap: wrap; }
+.build-ban {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: 6px 10px;
+}
+.build-ban.on { border-color: var(--red); color: var(--red); background: rgba(240, 106, 93, .1); }
+
+.build-remove { width: 100%; margin-bottom: 12px; }
+
+@media (max-width: 1180px) {
+  .build-root { grid-template-columns: 190px 1fr 250px; }
+}

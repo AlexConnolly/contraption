@@ -4,6 +4,8 @@ import { bansOn } from '../challenges/bans.js';
 import { store } from './progress.js';
 import { levelThumb, renderMachine } from './thumbnails.js';
 import { Blueprint } from '../core/blueprint.js';
+import { customLevels, deleteCustomLevel } from '../challenges/custom.js';
+import { toShareCode, fromShareCode } from '../challenges/format.js';
 
 const SVG = {
   play: '<path d="M8 5v14l11-7z" fill="currentColor"/>',
@@ -13,6 +15,7 @@ const SVG = {
   tick: '<path d="M4 12.5 9.5 18 20 6.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>',
   back: '<path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>',
   plus: '<path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+  build: '<path d="M3 20h18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M5 20V9l5-4 5 4v11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M15 20v-6h4v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>',
 };
 
 function icon(name, size = 18) {
@@ -90,6 +93,7 @@ export class FrontEnd {
     if (screen === 'title') this.renderTitle();
     if (screen === 'challenges') this.renderChallenges();
     if (screen === 'garage') this.renderGarage();
+    if (screen === 'build') this.renderBuild();
     if (screen === 'settings') this.renderSettings();
   }
 
@@ -137,6 +141,12 @@ export class FrontEnd {
         meta: `${store.machines().length} saved`,
         go: () => this.show('garage'),
       },
+      {
+        label: 'Build',
+        glyph: 'build',
+        meta: `${customLevels().length} of your own`,
+        go: () => this.show('build'),
+      },
       { label: 'Settings', glyph: 'cog', meta: 'Camera · Graphics', go: () => this.show('settings') },
       { label: 'Exit', glyph: 'exit', meta: '', exit: true, go: () => this.h.onExit() },
     ];
@@ -180,6 +190,17 @@ export class FrontEnd {
       grid.append(this.challengeCard(level, number));
     }
     sheet.append(grid);
+
+    // Levels people made are kept after the campaign and unnumbered. They are
+    // not part of its ramp and they do not count toward the tally, so putting
+    // them in the run of it would be saying something untrue.
+    const mine = customLevels();
+    if (mine.length > 0) {
+      sheet.append(el('div', 'fe-head sub', '<h2>Made by you</h2><p>Your own problems and any you have been sent.</p>'));
+      const own = el('div', 'fe-grid');
+      for (const level of mine) own.append(this.challengeCard(level, ''));
+      sheet.append(own);
+    }
     this.body.append(sheet);
   }
 
@@ -224,6 +245,7 @@ export class FrontEnd {
       rules.append(tag);
     }
     if (!level.objectives.length) rules.append(el('span', 'fe-tag free', 'Free play'));
+    if (level.custom) rules.append(el('span', 'fe-tag own', 'Yours'));
     shot.append(rules);
 
     const facts = el('div', 'fe-facts');
@@ -313,6 +335,107 @@ export class FrontEnd {
 
     card.append(shot, meat);
     card.addEventListener('click', () => this.h.onLoadMachine(machine.id));
+    return card;
+  }
+
+  // -------------------------------------------------------------------- build
+
+  renderBuild() {
+    this.backBar('Build');
+    const mine = customLevels();
+    this.top.append(el('div', 'fe-pill', `<b>${mine.length}</b> levels`));
+
+    const sheet = el('div', 'fe-sheet');
+    sheet.append(el('div', 'fe-head', '<h2>Build</h2><p>Make your own problem. Anything you build can be sent to somebody else as a code.</p>'));
+
+    const grid = el('div', 'fe-grid');
+
+    const add = el('button', 'fe-card add', `${icon('plus', 26)}<span>Start a new problem</span>`);
+    add.addEventListener('click', () => this.h.onBuildLevel(null));
+    grid.append(add);
+
+    const paste = el('button', 'fe-card add', `${icon('back', 22)}<span>Open a level code</span>`);
+    paste.addEventListener('click', async () => {
+      const code = prompt('Paste a level code');
+      if (!code) return;
+      const result = await fromShareCode(code);
+      if (!result.ok) {
+        this.h.onToast?.(result.reason, true);
+        return;
+      }
+      this.h.onBuildLevel(result.level);
+    });
+    grid.append(paste);
+
+    for (const level of mine) grid.append(this.customCard(level));
+    sheet.append(grid);
+
+    if (mine.length === 0) {
+      sheet.append(el('p', 'fe-empty', 'Nothing built yet. Start a new problem and put something in the way.'));
+    }
+    this.body.append(sheet);
+  }
+
+  customCard(level) {
+    const card = el('button', 'fe-card');
+    const shot = el('div', 'fe-shot');
+    const image = new Image();
+    image.alt = '';
+    try {
+      image.src = levelThumb(this.RAPIER, level);
+    } catch {
+      shot.style.background = 'linear-gradient(135deg,#101823,#0b1018)';
+    }
+    shot.append(image);
+
+    const skill = tierOf(level);
+    if (skill) {
+      const badge = el('span', `fe-skill ${skill}`, tier(skill).name);
+      shot.append(badge);
+    }
+
+    const facts = el('div', 'fe-facts');
+    facts.append(
+      el('span', null, `Budget <b>${level.budget.cost}</b>`),
+      el('span', null, `Par <b>${level.par}s</b>`),
+    );
+
+    const meat = el('div', 'fe-meat');
+    meat.append(el('h3', null, level.name), el('p', null, level.brief), facts);
+
+    const row = el('div', 'fe-row');
+    const play = el('button', 'fe-mini', 'Play');
+    play.addEventListener('click', (event) => {
+      event.stopPropagation();
+      this.h.onPlay(level.id);
+    });
+    const edit = el('button', 'fe-mini', 'Edit');
+    edit.addEventListener('click', (event) => {
+      event.stopPropagation();
+      this.h.onBuildLevel(level);
+    });
+    const share = el('button', 'fe-mini', 'Share');
+    share.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      const code = await toShareCode(level);
+      try {
+        await navigator.clipboard.writeText(code);
+        this.h.onToast?.('Share code copied');
+      } catch {
+        prompt('Your level code', code);
+      }
+    });
+    const remove = el('button', 'fe-mini danger', 'Delete');
+    remove.addEventListener('click', (event) => {
+      event.stopPropagation();
+      deleteCustomLevel(level.id);
+      this.show('build');
+    });
+    row.append(play, edit, share, remove);
+    meat.append(row);
+
+    card.append(shot, meat);
+    card.addEventListener('click', () => this.h.onBuildLevel(level));
     return card;
   }
 

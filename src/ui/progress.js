@@ -150,6 +150,33 @@ export const store = {
     return entry;
   },
 
+  // ---------------------------------------------------------------- levels
+
+  customLevels() {
+    return read().levels ?? [];
+  },
+
+  customLevel(id) {
+    return this.customLevels().find((entry) => entry.id === id) ?? null;
+  },
+
+  saveCustomLevel({ id, name, level }) {
+    const data = read();
+    data.levels = data.levels ?? [];
+    const at = data.levels.findIndex((entry) => entry.id === id);
+    const record = { id: id ?? newId(), name, level, at: Date.now() };
+    if (at >= 0) data.levels[at] = { ...data.levels[at], ...record };
+    else data.levels.unshift(record);
+    write(data);
+    return record;
+  },
+
+  deleteCustomLevel(id) {
+    const data = read();
+    data.levels = (data.levels ?? []).filter((entry) => entry.id !== id);
+    write(data);
+  },
+
   renameMachine(id, name) {
     const data = read();
     const entry = data.machines?.find((m) => m.id === id);

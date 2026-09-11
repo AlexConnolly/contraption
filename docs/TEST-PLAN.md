@@ -37,6 +37,8 @@
 | `wedge` | The ramp has a real sloped collider rather than a box that merely looks like one — a ball dropped on it runs off the low end — and it is shallow enough to lift a ball rather than bulldoze it. |
 | `progress` | Designs are kept apart per challenge; a slower later run cannot overwrite a best time; the best cost is the cost of the run that set the best time; machines saved in the same millisecond get different ids; renaming a machine that is not there is a no-op; storage that throws leaves the game running. |
 | `flight/loops` | Hover throttle matches weight over available lift; sinking adds throttle and rising removes it; a banked machine asks for more; the climb key drags the held altitude with it; the controller leans against drift and **away** from sideways drift; zero lift authority asks for nothing; every mixed throttle stays in range. |
+| `format` | A level is data and nothing else. Anything unknown in a shared level is dropped, every number is clamped, the lists are capped, text loses anything unprintable, and an objective naming a crate that is not there is discarded. A share code round-trips a level identically; a truncated code, a code that is not one, and a code that decompresses to something enormous are all refused with a reason rather than throwing. |
+| `builder` | The editor's own logic. There is a tool for every kind of thing a level is made of, and what each one makes is accepted by the format unchanged rather than quietly corrected. A level assembled a piece at a time keeps everything, every prop and zone gets an id of its own, and removing something takes the objectives that depended on it — with the format as the backstop when it does not. A level built this way comes back from a share code identical, and a sixty-piece one still fits in a code you can paste. A level somebody built is marked as theirs, is found by id without joining `LEVELS`, never moves the campaign's solved count however often it is solved, saves, lists, deletes, keeps its id when edited, and is re-checked on the way out of storage as well as on the way in. |
 
 ## Manual (browser)
 
@@ -76,3 +78,12 @@
 34. A servo hinge turned onto a face that will not attach shows a red ghost and a message naming it, and clicking does nothing; upright on the same cell it is green.
 35. Holding W and D together drives the rover round a corner at a useful rate without it stopping to pivot, and D on its own still spins it on the spot.
 36. Buttons click, placing and deleting parts sound different from each other, motors rise in pitch as they spin up, and the Sound setting silences all of it.
+37. Build opens the world with the machine put away; clicking the ground puts down the selected thing on the grid, clicking it again selects it, and `Delete` removes it.
+38. Moving the start mark moves where a test play spawns the machine.
+39. An objective picks from the crates and zones actually placed; removing that crate removes the objective and says so.
+40. The problems list names what is wrong while it is wrong — no objectives, par of 0, nothing to stand on — and clears as each is fixed.
+41. Changing gravity, friction or fog in the builder changes the course you are looking at, not just a number in a box.
+42. Test play enters the studio on your own level with its bans and budget applied; Back says it returns to the builder, and does, with the draft as it was.
+43. Save puts the level on the Build screen and under `Made by you` on Challenges, marked `Yours`, unnumbered, and the campaign's solved count does not move when it is solved.
+44. Copy share code produces a `CTP1` string; pasting it into Open a level code on another browser profile opens the same level.
+45. A share code that has been truncated or edited by hand is refused with a message rather than a broken level.
