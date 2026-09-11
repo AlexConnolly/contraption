@@ -10,6 +10,7 @@ import {
 } from '../core/orientation.js';
 import { Blueprint, occupiedCells } from '../core/blueprint.js';
 import { groupBlueprint } from '../sim/grouping.js';
+import { wouldConnect } from '../sim/connectivity.js';
 
 const OK_COLOUR = 0x4ade80;
 const BAD_COLOUR = 0xff5a5a;
@@ -215,7 +216,7 @@ export class Studio {
         hit.cell[1] + hit.normal[1] + offset[1],
         hit.cell[2] + hit.normal[2] + offset[2],
       ];
-      const check = this.blueprint.canPlace(this.partType, this.targetCell, this.rotation);
+      const check = this.checkPlacement(this.partType, this.targetCell, this.rotation);
       this.valid = check.ok;
       this.reason = check.reason ?? '';
       this.ghostHolder.visible = true;
@@ -266,6 +267,18 @@ export class Studio {
   }
 
   /**
+   * Fits in the grid, and will be held once it is there. The second half is
+   * easy to miss while building and only shows up as a part falling off when
+   * the run starts.
+   */
+  checkPlacement(typeId, cell, rot, ignoreId = null) {
+    const fits = this.blueprint.canPlace(typeId, cell, rot, ignoreId);
+    if (!fits.ok) return fits;
+    const held = wouldConnect(this.blueprint, typeId, cell, rot, ignoreId);
+    return held.ok ? fits : held;
+  }
+
+  /**
    * Turns a part that is already down, in place. Same two steps as the R and
    * T keys use before placing, so the controls mean the same thing whether a
    * part is on the plate yet or not.
@@ -274,6 +287,8 @@ export class Studio {
     const placed = this.blueprint.get(id);
     if (!placed) return { ok: false };
     const next = how === 'pitch' ? pitchStep(placed.rot) : yawStep(placed.rot);
+    const held = this.checkPlacement(placed.type, placed.cell, next, id);
+    if (!held.ok) return held;
     this.snapshot();
     const result = this.blueprint.setRotation(id, next);
     if (!result.ok) {
@@ -288,6 +303,11 @@ export class Studio {
   placeHere() {
     if (!this.targetCell) return { ok: false };
     this.snapshot();
+    const held = this.checkPlacement(this.partType, this.targetCell, this.rotation);
+    if (!held.ok) {
+      this.undoStack.pop();
+      return held;
+    }
     const result = this.blueprint.place(this.partType, this.targetCell, this.rotation);
     if (!result.ok) {
       this.undoStack.pop();

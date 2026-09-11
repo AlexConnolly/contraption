@@ -7,6 +7,7 @@
 | `orientation` | The 24 axis-aligned rotations are unique, each is a proper rotation (det = +1), and rotating a direction twice equals rotating by the composed orientation. |
 | `blueprint` | Placement rejects overlaps and out-of-bounds cells; removal frees cells; multi-cell parts claim every cell they cover; serialise → deserialise is lossless; parts can go below the build plate, which is a datum rather than a floor, and there is still a floor a long way down; a part already placed can be turned in position, keeps its cells when the new rotation will not fit, and swaps old cells for new when it does. |
 | `connectivity` | Face-adjacent parts connect only through faces both sides mark attachable; a wheel connects on its axle face alone. |
+| `placement` | A placement that fits the grid but would not be held is refused before it happens, naming whichever side is refusing; plain structure joins on any face; the first part and a part placed away from everything are both allowed; and turning a part in place does not let it hold itself up. |
 | `grouping` | Rigid parts fuse into one body; an articulated part becomes its own body jointed to its host; a structure split by a hinge yields two bodies; orphaned parts are reported. |
 | `signals` | Axis, hold and toggle bindings resolve to the right value; a sensor-driven binding follows its source; unbound actuators read zero; reversing swaps the steering round, turning on the spot does not, and a real rover swings the other way on the same key while backing up. |
 | `challenge` | Objective evaluation completes only after the hold time elapses; a failed objective resets its timer; budgets reject oversized builds. |
@@ -58,4 +59,5 @@
 30. Parts that have to be aimed show an arrow in the studio, the hinge shows its swing plane, and none of them appear during a run.
 31. A wheel can be bolted under the build plate, and dropping the camera below it fades the plate out of the way.
 32. A wheel shows an arrow for the way it drives; the Select panel turns and tips a part that is already placed, keeps its bindings, and refuses with a message when there is no room.
-33. Buttons click, placing and deleting parts sound different from each other, motors rise in pitch as they spin up, and the Sound setting silences all of it.
+33. A servo hinge turned onto a face that will not attach shows a red ghost and a message naming it, and clicking does nothing; upright on the same cell it is green.
+34. Buttons click, placing and deleting parts sound different from each other, motors rise in pitch as they spin up, and the Sound setting silences all of it.

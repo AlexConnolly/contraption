@@ -9,7 +9,7 @@ Three.js for rendering, Rapier for physics, Vite for the build.
 ```bash
 npm install
 npm run dev      # http://localhost:5173
-npm test         # 247 tests, including headless physics
+npm test         # 255 tests, including headless physics
 npm run build
 npm run preview  # serve the production build
 ```
@@ -114,6 +114,15 @@ only.
 Placing a part the wrong way round is the commonest mistake there is, so the
 **Select** panel turns and tips a part that is already down, keeping whatever
 is bound to it. `R` and `T` do the same thing before you place.
+
+And the ghost goes **red before you place it** if it would not actually be
+held there. Fitting in the grid and being attached are two different
+questions: an articulated part joins only on its attach and carry faces, so a
+servo hinge lying on its side drops into the grid perfectly happily and then
+falls off the moment the run starts. The studio says which part is refusing
+and that turning it will fix it. A part placed away from everything is a
+different mistake and still allowed — that is somebody starting a second
+assembly, and it is reported when the run begins.
 
 The build plate is a datum, not a floor. Wheels, skids and grabbers can hang
 underneath; drop the camera below the plate and it fades out of your way.
@@ -332,7 +341,7 @@ src/ui/          design tokens, front end (title, challenges, garage,
 
 ## Tests
 
-`npm test` runs 247 tests. The pure logic (orientations, grid placement, body
+`npm test` runs 255 tests. The pure logic (orientations, grid placement, body
 grouping, key bindings, objectives) is covered directly. On top of that,
 `tests/physics.test.js` builds real machines in a real Rapier world and asserts
 they behave — a rover drives, reverses and steers the correct way; an
