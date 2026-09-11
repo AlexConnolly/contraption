@@ -11,6 +11,35 @@ function propVolume(prop) {
     : prop.size[0] * prop.size[1] * prop.size[2];
 }
 
+/**
+ * Below this a surface is ice, and it has to look like ice.
+ *
+ * A frictionless floor is invisible: it is the same grey as every other
+ * floor, and the first a player knows about it is the machine sliding past
+ * the goal. A constraint you cannot see before you meet it reads as the game
+ * being broken rather than as a puzzle, so slippery surfaces are painted.
+ */
+export const ICY = 0.25;
+
+function surfaceMaterial({ colour, belt, friction }) {
+  if (friction !== undefined && friction < ICY) {
+    return new THREE.MeshStandardMaterial({
+      color: 0xbfe4f2,
+      roughness: 0.06,
+      metalness: 0.35,
+      emissive: 0x16323f,
+    });
+  }
+  // A belt reads as rubber rather than as more floor, and takes a little of
+  // its own colour so a sorting bay's lanes can be told apart at a glance.
+  return new THREE.MeshStandardMaterial({
+    color: colour,
+    roughness: belt ? 0.98 : 0.85,
+    metalness: 0.05,
+    emissive: belt ? new THREE.Color(colour).multiplyScalar(0.22) : 0x000000,
+  });
+}
+
 function fixedBox(RAPIER, world, scene, piece) {
   const { pos, size, rotX = 0, rotY = 0, colour, belt, friction } = piece;
   const quaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(rotX, rotY, 0));
@@ -28,16 +57,9 @@ function fixedBox(RAPIER, world, scene, piece) {
       .setCollisionGroups(GROUP_WORLD),
     body,
   );
-  // A belt reads as rubber rather than as more floor, and takes a little of
-  // its own colour so a sorting bay's lanes can be told apart at a glance.
   const mesh = new THREE.Mesh(
     new THREE.BoxGeometry(size[0], size[1], size[2]),
-    new THREE.MeshStandardMaterial({
-      color: colour,
-      roughness: belt ? 0.98 : 0.85,
-      metalness: 0.05,
-      emissive: belt ? new THREE.Color(colour).multiplyScalar(0.22) : 0x000000,
-    }),
+    surfaceMaterial({ colour, belt, friction }),
   );
   mesh.position.set(pos[0], pos[1], pos[2]);
   mesh.quaternion.copy(quaternion);
@@ -63,6 +85,7 @@ export class Arena {
     this.opponents = new Map();
     this.movers = [];
     this.belts = [];
+    this.winds = [];
     this.elapsed = 0;
     this.build();
   }
@@ -95,7 +118,7 @@ export class Arena {
     );
     const groundMesh = new THREE.Mesh(
       new THREE.BoxGeometry(half * 2, 2, half * 2),
-      new THREE.MeshStandardMaterial({ color: 0x3c434d, roughness: 1, metalness: 0 }),
+      surfaceMaterial({ colour: 0x3c434d, friction: level.friction }),
     );
     groundMesh.position.set(0, groundY - 1, 0);
     groundMesh.receiveShadow = true;
@@ -130,6 +153,98 @@ export class Arena {
     for (const rival of level.opponents ?? []) this.addOpponent(rival);
     for (const zone of level.zones ?? []) this.addZone(zone);
     for (const zone of level.keepout ?? []) this.addKeepOut(zone);
+    for (const wind of level.wind ?? []) this.addWind(wind);
+  }
+
+  /**
+   * Streaks drifting through a wind volume.
+   *
+   * Wind is otherwise completely invisible: the machine gets shoved sideways
+   * by nothing at all, which reads as the physics being broken rather than as
+   * weather. These say where the volume is and which way it blows, and they
+   * speed up and slow down with the gust, so a player can see a lull coming
+   * and go then.
+   *
+   * Lines rather than particles because they are one draw call, they carry
+   * direction in their own shape, and nothing has to be sorted.
+   */
+  addWind(wind, count = 90) {
+    const [dx, dy, dz] = wind.dir ?? [1, 0, 0];
+    const length = Math.hypot(dx, dy, dz) || 1;
+    const dir = [dx / length, dy / length, dz / length];
+    const rng = makeRng(this.seed + 104729);
+    const [hx, hy, hz] = wind.size.map((n) => n / 2);
+
+    // Spread across the flow, not along it: the travel below supplies the
+    // position down the wind, and seeding that axis as well would carry
+    // streaks a full half-volume outside the box they are describing.
+    const seeds = [];
+    for (let i = 0; i < count; i += 1) {
+      const at = [
+        between(rng, -hx, hx),
+        between(rng, -hy, hy),
+        between(rng, -hz, hz),
+      ];
+      const along = at[0] * dir[0] + at[1] * dir[1] + at[2] * dir[2];
+      seeds.push([
+        at[0] - dir[0] * along,
+        at[1] - dir[1] * along,
+        at[2] - dir[2] * along,
+      ]);
+    }
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute(
+      'position',
+      new THREE.BufferAttribute(new Float32Array(count * 6), 3),
+    );
+    const mesh = new THREE.LineSegments(
+      geometry,
+      new THREE.LineBasicMaterial({
+        color: 0xbcd8e6,
+        transparent: true,
+        opacity: 0.4,
+        depthWrite: false,
+      }),
+    );
+    mesh.position.set(wind.pos[0], wind.pos[1], wind.pos[2]);
+    mesh.frustumCulled = false;
+    this.scene.add(mesh);
+    this.objects.push({ mesh });
+    this.winds.push({ wind, dir, seeds, geometry, half: [hx, hy, hz], drift: 0 });
+  }
+
+  // Advances the streaks. The span they travel is the volume's own size, so
+  // they wrap inside it rather than leaking out of the edges.
+  driftWind(dt) {
+    for (const entry of this.winds) {
+      const { dir, seeds, geometry, half } = entry;
+      // Well below the force in metres per second — fast enough to read as
+      // moving air, slow enough not to strobe.
+      const speed = Math.abs(gustAt(this.elapsed, entry.wind)) * 0.06;
+      entry.drift += speed * dt;
+
+      const span = Math.abs(dir[0]) * half[0] * 2
+        + Math.abs(dir[1]) * half[1] * 2
+        + Math.abs(dir[2]) * half[2] * 2;
+      const reach = span || 1;
+      const tail = Math.min(1.6, reach * 0.08);
+      const at = geometry.getAttribute('position');
+
+      for (let i = 0; i < seeds.length; i += 1) {
+        const seed = seeds[i];
+        // Each streak starts somewhere different along the run, so they do not
+        // all cross the volume in step.
+        const travel = ((entry.drift + (i / seeds.length) * reach) % reach) - reach / 2;
+        const x = seed[0] + dir[0] * travel;
+        const y = seed[1] + dir[1] * travel;
+        const z = seed[2] + dir[2] * travel;
+        at.setXYZ(i * 2, x, y, z);
+        at.setXYZ(i * 2 + 1, x - dir[0] * tail, y - dir[1] * tail, z - dir[2] * tail);
+      }
+      at.needsUpdate = true;
+      geometry.computeBoundingSphere();
+    }
   }
 
   /**
@@ -544,6 +659,7 @@ export class Arena {
     this.driveBelts();
     this.driveOpponents();
     this.driveWind(dt);
+    this.driftWind(dt);
     for (const mover of this.movers) {
       const travel = Math.sin(this.elapsed * mover.rate + mover.offset) * mover.span;
       const at = [...mover.spec.pos];
@@ -665,5 +781,6 @@ export class Arena {
     this.opponents.clear();
     this.movers = [];
     this.belts = [];
+    this.winds = [];
   }
 }
