@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GROUP_WORLD } from './machine.js';
 import { makeRng, randomSeed, between } from './rng.js';
+import { setTag, clearTag } from './tags.js';
 
 // Props are authored with a mass in kilograms; Rapier wants a density.
 function propVolume(prop) {
@@ -101,13 +102,16 @@ export class Arena {
     const desc = prop.radius
       ? RAPIER.ColliderDesc.ball(prop.radius)
       : RAPIER.ColliderDesc.cuboid(prop.size[0] / 2, prop.size[1] / 2, prop.size[2] / 2);
-    world.createCollider(
+    const collider = world.createCollider(
       desc.setDensity(prop.mass / propVolume(prop))
         .setFriction(prop.friction ?? 0.85)
         .setRestitution(0.05)
         .setCollisionGroups(GROUP_WORLD),
       body,
     );
+    // What a sensor pointed at this reads back, so a machine can sort one
+    // crate from another without a part dedicated to it.
+    setTag(world, collider, prop.tag);
     const geometry = prop.radius
       ? new THREE.SphereGeometry(prop.radius, 24, 16)
       : new THREE.BoxGeometry(prop.size[0], prop.size[1], prop.size[2]);
@@ -119,7 +123,7 @@ export class Arena {
     mesh.receiveShadow = true;
     scene.add(mesh);
     this.props.set(prop.id, { spec: prop, body, mesh });
-    this.objects.push({ body, mesh });
+    this.objects.push({ body, mesh, collider });
   }
 
   /**
@@ -261,6 +265,7 @@ export class Arena {
         entry.mesh.geometry?.dispose();
         entry.mesh.material?.dispose();
       }
+      if (entry.collider) clearTag(this.world, entry.collider);
       if (entry.body) this.world.removeRigidBody(entry.body);
     }
     this.objects = [];

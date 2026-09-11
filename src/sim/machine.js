@@ -6,6 +6,7 @@ import { PISTON_ROD_TOP, PISTON_REST } from '../parts/geometry.js';
 import { orientationQuaternion, applyOrientation } from '../core/orientation.js';
 import { groupBlueprint } from './grouping.js';
 import { driveSide } from './signals.js';
+import { tagOf } from './tags.js';
 import {
   FlightController, deriveGains, defaultSpin, frameFromAxes, attitudeOf,
   readFlightKeys, controllerOf,
@@ -327,6 +328,11 @@ export class Machine {
     return this.sensorReadings.get(partId)?.tripped ?? false;
   }
 
+  /** What the beam is looking at, as the level labelled it. 0 is anything unlabelled. */
+  sensorTag(partId) {
+    return this.sensorReadings.get(partId)?.tag ?? 0;
+  }
+
   buildComputers() {
     for (const placed of this.blueprint.list()) {
       if (!getPart(placed.type).computer) continue;
@@ -413,6 +419,7 @@ export class Machine {
       this.sensorReadings.set(placed.id, {
         distance: hit ? hit.timeOfImpact : part.sensor.range,
         tripped: Boolean(tripped),
+        tag: hit ? tagOf(this.world, hit.collider) : 0,
       });
       bus.setSensor(placed.id, tripped);
       const mesh = this.partMeshes.get(placed.id);

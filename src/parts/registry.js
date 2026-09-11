@@ -450,6 +450,7 @@ const PARTS = [
       out: [
         { id: 'distance', name: 'Distance', kind: 'number' },
         { id: 'tripped', name: 'Tripped', kind: 'bool' },
+        { id: 'tag', name: 'What it is', kind: 'number' },
       ],
     },
     name: 'Distance Sensor',
@@ -461,7 +462,7 @@ const PARTS = [
     sensor: { range: 9, axis: [0, 0, 1] },
     emits: true,
     config: { threshold: 0.5, invert: false },
-    blurb: 'Looks along its face. Bind a motor to it to drive itself.',
+    blurb: 'Looks along its face, and says how far and what. Bind a motor to it to drive itself.',
   },
 ];
 

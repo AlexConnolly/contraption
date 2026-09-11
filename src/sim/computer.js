@@ -185,6 +185,7 @@ const READERS = {
   sensor: {
     distance: (machine, placed) => machine.sensorDistance(placed.id),
     tripped: (machine, placed) => machine.sensorTripped(placed.id),
+    tag: (machine, placed) => machine.sensorTag(placed.id),
   },
 
   controller: {
