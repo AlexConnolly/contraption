@@ -19,8 +19,23 @@ export function partDensity(part) {
  * `act` is something the part does to the world, `read` something it takes
  * from it, which is the same split as amber and cyan everywhere else.
  */
+function cross(a, b) {
+  return [
+    a[1] * b[2] - a[2] * b[1],
+    a[2] * b[0] - a[0] * b[2],
+    a[0] * b[1] - a[1] * b[0],
+  ];
+}
+
 export function workingAxis(part) {
   if (part.thruster) return { axis: part.thruster.axis, kind: 'act' };
+  // A wheel rolls in the plane across its axle. Drawing the axle tells you
+  // nothing a round part does not already tell you; what you cannot see is
+  // which way it will drive you, which is the axle crossed with its own up.
+  if (part.radius && part.joint === 'revolute') {
+    const roll = cross(part.axis, [0, 1, 0]);
+    return { axis: roll.some(Boolean) ? roll : cross(part.axis, [0, 0, 1]), kind: 'act' };
+  }
   if (part.sensor) return { axis: part.sensor.axis, kind: 'read' };
   if (part.flight) return { axis: [0, 0, 1], kind: 'read' };
   if (part.grabber) return { axis: [0, 1, 0], kind: 'act' };

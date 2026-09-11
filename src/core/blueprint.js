@@ -137,6 +137,33 @@ export class Blueprint {
     return [...this.parts.values()];
   }
 
+  /**
+   * Turns a part that is already down. Getting an orientation wrong is the
+   * commonest mistake there is, and deleting and replacing the part to fix it
+   * loses whatever was bound to it. The old cells are given up first so a
+   * part is never blocked by itself, and put back if the new rotation will
+   * not fit.
+   */
+  setRotation(id, rot) {
+    const placed = this.parts.get(id);
+    if (!placed) return { ok: false, reason: 'No such part' };
+
+    const held = occupiedCells(placed.type, placed.cell, placed.rot);
+    for (const c of held) {
+      if (this.occupancy.get(key(c)) === id) this.occupancy.delete(key(c));
+    }
+
+    const check = this.canPlace(placed.type, placed.cell, rot, id);
+    if (!check.ok) {
+      for (const c of held) this.occupancy.set(key(c), id);
+      return check;
+    }
+
+    placed.rot = rot;
+    for (const c of check.cells) this.occupancy.set(key(c), id);
+    return { ok: true };
+  }
+
   setConfig(id, config) {
     const placed = this.parts.get(id);
     if (!placed) return false;

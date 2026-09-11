@@ -83,6 +83,42 @@ describe('blueprint', () => {
     expect(bp.lowestCell()).toBe(-1);
   });
 
+  // Getting a part's orientation wrong is the commonest mistake there is, and
+  // until now the only fix was to delete it and place it again.
+  it('turns a part that is already placed', () => {
+    const bp = new Blueprint();
+    const { id } = bp.place('wheel', [0, 0, 0], IDENTITY_ORIENTATION);
+    const turned = yawStep(IDENTITY_ORIENTATION);
+    expect(bp.setRotation(id, turned).ok).toBe(true);
+    expect(bp.get(id).rot).toBe(turned);
+  });
+
+  it('leaves a part alone when turning it would clash', () => {
+    const bp = new Blueprint();
+    const { id } = bp.place('beam', [0, 0, 0], IDENTITY_ORIENTATION);
+    bp.place('block', [0, 0, 1]);
+    const before = bp.get(id).rot;
+    const result = bp.setRotation(id, yawStep(IDENTITY_ORIENTATION));
+    expect(result.ok).toBe(false);
+    expect(result.reason).toMatch(/already/i);
+    expect(bp.get(id).rot).toBe(before);
+    // and the cells it had are still its own
+    expect(bp.partAt([1, 0, 0]).id).toBe(id);
+  });
+
+  it('claims the new cells and frees the old ones when it does turn', () => {
+    const bp = new Blueprint();
+    const { id } = bp.place('beam', [0, 0, 0], IDENTITY_ORIENTATION);
+    expect(bp.partAt([1, 0, 0]).id).toBe(id);
+    bp.setRotation(id, yawStep(IDENTITY_ORIENTATION));
+    expect(bp.partAt([1, 0, 0])).toBe(null);
+    expect(bp.partAt([0, 0, 1]).id).toBe(id);
+  });
+
+  it('says so when there is no such part', () => {
+    expect(new Blueprint().setRotation('nope', IDENTITY_ORIENTATION).ok).toBe(false);
+  });
+
   it('still has a floor, a long way down', () => {
     const bp = new Blueprint();
     expect(bp.place('block', [0, DEFAULT_BOUNDS.min[1], 0]).ok).toBe(true);

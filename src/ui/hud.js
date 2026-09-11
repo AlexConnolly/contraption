@@ -1,4 +1,4 @@
-import { CATEGORIES, partsInCategory, getPart, pistonStroke } from '../parts/registry.js';
+import { CATEGORIES, partsInCategory, getPart, pistonStroke, workingAxis } from '../parts/registry.js';
 import { BINDING_MODES, bindingLabel, keyLabel, defaultBinding } from '../sim/signals.js';
 import { estimateGains, firstController, controllerOf } from '../sim/flight.js';
 import { renderPart } from './thumbnails.js';
@@ -264,6 +264,7 @@ export class Hud {
     head.append(swatch, el('h3', null, part.name));
     body.append(head, el('p', 'insp-blurb', part.blurb));
 
+    this.renderFacing(body, placed, part);
     if (part.computer) this.renderComputer(body, placed);
     if (part.flight) this.renderController(body, placed, part, blueprint);
     if (part.actuator) this.renderBinding(body, placed, part, blueprint);
@@ -280,6 +281,27 @@ export class Hud {
     remove.style.marginTop = '6px';
     remove.addEventListener('click', () => this.h.onDeleteSelected());
     body.append(remove);
+  }
+
+  /**
+   * Turning a part after it is down. Placing one the wrong way round is the
+   * commonest mistake there is, and the fix used to be deleting it and
+   * starting again, which threw away its bindings with it.
+   */
+  renderFacing(body, placed, part) {
+    const row = el('div', 'row');
+    row.append(el('label', null, 'Facing'));
+    const buttons = el('div', 'keybind');
+    for (const [how, label] of [['yaw', 'Turn R'], ['pitch', 'Tip T']]) {
+      const button = el('button', null, label);
+      button.addEventListener('click', () => this.h.onTurnPart(placed.id, how));
+      buttons.append(button);
+    }
+    row.append(buttons);
+    body.append(row);
+    if (workingAxis(part)) {
+      body.append(el('p', 'insp-blurb', 'The arrow on it shows which way it faces.'));
+    }
   }
 
   renderBinding(body, placed, part, blueprint) {

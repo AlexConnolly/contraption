@@ -616,7 +616,7 @@ async function boot() {
     camera,
     blueprint: state.blueprint,
     onChange: ({ reason } = {}) => {
-      if (reason === 'place') audio.place();
+      if (reason === 'place' || reason === 'turn') audio.place();
       else if (reason === 'delete') audio.remove();
       else if (reason === 'undo' || reason === 'redo') audio.click();
       refreshReadouts();
@@ -670,6 +670,13 @@ async function boot() {
       refreshInspector();
     },
     onConfigChange: (id, config) => state.blueprint.setConfig(id, config),
+    onTurnPart: (id, how) => {
+      const result = studio.turnPart(id, how);
+      if (!result.ok) {
+        audio.deny();
+        hud.toast(result.reason ?? 'No room to turn it there', true);
+      }
+    },
     onDeleteSelected: () => studio.deleteSelected(),
     onOpenProgram: (computerId) => {
       const placed = state.blueprint.get(computerId);

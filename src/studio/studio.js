@@ -265,6 +265,26 @@ export class Studio {
     return { ok: true };
   }
 
+  /**
+   * Turns a part that is already down, in place. Same two steps as the R and
+   * T keys use before placing, so the controls mean the same thing whether a
+   * part is on the plate yet or not.
+   */
+  turnPart(id, how) {
+    const placed = this.blueprint.get(id);
+    if (!placed) return { ok: false };
+    const next = how === 'pitch' ? pitchStep(placed.rot) : yawStep(placed.rot);
+    this.snapshot();
+    const result = this.blueprint.setRotation(id, next);
+    if (!result.ok) {
+      this.undoStack.pop();
+      return result;
+    }
+    this.rebuild();
+    this.onChange({ reason: 'turn', id });
+    return result;
+  }
+
   placeHere() {
     if (!this.targetCell) return { ok: false };
     this.snapshot();

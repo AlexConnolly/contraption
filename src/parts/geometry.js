@@ -292,7 +292,9 @@ export function createPartMesh(part, options = {}) {
     const hint = workingAxis(part);
     if (hint) object.add(directionArrow(hint.axis, HINT_COLOUR[hint.kind]));
     // A hinge has no direction, it has a plane, so it gets the plane instead.
-    if (part.joint === 'revolute') object.add(hingeRing(part.axis));
+    // Wheels are revolute too but got the arrow above: a ring round a wheel
+    // looks like the wheel.
+    if (part.joint === 'revolute' && !part.radius) object.add(hingeRing(part.axis));
   }
   return object;
 }

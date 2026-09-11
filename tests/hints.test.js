@@ -27,6 +27,18 @@ describe('direction markers', () => {
     expect(workingAxis(getPart('piston')).axis).toEqual([0, 1, 0]);
   });
 
+  // A ring round a wheel's axle looks exactly like the wheel. What you cannot
+  // tell by looking is which way it will drive you.
+  it('points a wheel the way it drives, not round its axle', () => {
+    const wheel = getPart('wheel');
+    expect(wheel.axis).toEqual([1, 0, 0]);
+    expect(workingAxis(wheel)).toEqual({ axis: [0, 0, 1], kind: 'act' });
+  });
+
+  it('marks an unpowered roller the same way', () => {
+    expect(workingAxis(getPart('castor')).axis).toEqual([0, 0, 1]);
+  });
+
   it('leaves plain structure unmarked', () => {
     for (const id of ['block', 'beam', 'panel', 'ballast']) {
       expect(workingAxis(getPart(id)), id).toBe(null);

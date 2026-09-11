@@ -9,7 +9,7 @@ Three.js for rendering, Rapier for physics, Vite for the build.
 ```bash
 npm install
 npm run dev      # http://localhost:5173
-npm test         # 242 tests, including headless physics
+npm test         # 247 tests, including headless physics
 npm run build
 npm run preview  # serve the production build
 ```
@@ -107,7 +107,13 @@ short jab and a long lift can sit on the same machine.
 Every part that has to be aimed says which way it is facing: an arrow along
 the working axis, amber for something the part does to the world and cyan for
 something it reads from it. A hinge has no direction, it has a plane, so it
-gets a ring instead. They show in the studio only.
+gets a ring instead. A wheel gets the way it will **drive you**, not its axle
+— a ring round a wheel looks exactly like the wheel. They show in the studio
+only.
+
+Placing a part the wrong way round is the commonest mistake there is, so the
+**Select** panel turns and tips a part that is already down, keeping whatever
+is bound to it. `R` and `T` do the same thing before you place.
 
 The build plate is a datum, not a floor. Wheels, skids and grabbers can hang
 underneath; drop the camera below the plate and it fades out of your way.
@@ -326,7 +332,7 @@ src/ui/          design tokens, front end (title, challenges, garage,
 
 ## Tests
 
-`npm test` runs 242 tests. The pure logic (orientations, grid placement, body
+`npm test` runs 247 tests. The pure logic (orientations, grid placement, body
 grouping, key bindings, objectives) is covered directly. On top of that,
 `tests/physics.test.js` builds real machines in a real Rapier world and asserts
 they behave — a rover drives, reverses and steers the correct way; an

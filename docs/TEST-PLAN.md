@@ -5,7 +5,7 @@
 | Area | What is proven |
 |---|---|
 | `orientation` | The 24 axis-aligned rotations are unique, each is a proper rotation (det = +1), and rotating a direction twice equals rotating by the composed orientation. |
-| `blueprint` | Placement rejects overlaps and out-of-bounds cells; removal frees cells; multi-cell parts claim every cell they cover; serialise → deserialise is lossless; parts can go below the build plate, which is a datum rather than a floor, and there is still a floor a long way down. |
+| `blueprint` | Placement rejects overlaps and out-of-bounds cells; removal frees cells; multi-cell parts claim every cell they cover; serialise → deserialise is lossless; parts can go below the build plate, which is a datum rather than a floor, and there is still a floor a long way down; a part already placed can be turned in position, keeps its cells when the new rotation will not fit, and swaps old cells for new when it does. |
 | `connectivity` | Face-adjacent parts connect only through faces both sides mark attachable; a wheel connects on its axle face alone. |
 | `grouping` | Rigid parts fuse into one body; an articulated part becomes its own body jointed to its host; a structure split by a hinge yields two bodies; orphaned parts are reported. |
 | `signals` | Axis, hold and toggle bindings resolve to the right value; a sensor-driven binding follows its source; unbound actuators read zero; reversing swaps the steering round, turning on the spot does not, and a real rover swings the other way on the same key while backing up. |
@@ -20,7 +20,7 @@
 | `tiers` | Skill level follows from what a challenge demands, not from a label: one thing on the ground is easy, several steps or flying is medium, both is hard, and anything that has to run itself is expert whatever else it involves. Every challenge in the game has a tier, only the sandbox has none, and the campaign never gets easier as it goes on. |
 | `survey` | The course tour starts where the machine starts, shows what has to move and where it has to end up, never stops twice on the same thing, takes the moving obstacles in as one picture only where there are some, looks along the course rather than down at it, and has somewhere to look on every challenge. |
 | `audio` | The mix is silent with nothing running; the motor note follows shaft speed rather than throttle and is the same backwards as forwards; a rotor is pitched by blade passes; a thruster opens up rather than changing note; nothing runs away at any speed; and many sources of one kind get louder without ever pinning the output. |
-| `hints` | Every part that has to be aimed reports which way it faces — the grabber at the face it grabs on, a thruster the way it pushes, a sensor down its beam — and plain structure reports none. |
+| `hints` | Every part that has to be aimed reports which way it faces — the grabber at the face it grabs on, a thruster the way it pushes, a sensor down its beam, a wheel the way it will drive you rather than round its own axle — and plain structure reports none. |
 | `progress` | Designs are kept apart per challenge; a slower later run cannot overwrite a best time; the best cost is the cost of the run that set the best time; machines saved in the same millisecond get different ids; renaming a machine that is not there is a no-op; storage that throws leaves the game running. |
 | `flight/loops` | Hover throttle matches weight over available lift; sinking adds throttle and rising removes it; a banked machine asks for more; the climb key drags the held altitude with it; the controller leans against drift and **away** from sideways drift; zero lift authority asks for nothing; every mixed throttle stays in range. |
 
@@ -57,4 +57,5 @@
 29. Winning shows the time as the headline, the machine that set it, and `Play next challenge` goes to the next one and shows its course.
 30. Parts that have to be aimed show an arrow in the studio, the hinge shows its swing plane, and none of them appear during a run.
 31. A wheel can be bolted under the build plate, and dropping the camera below it fades the plate out of the way.
-32. Buttons click, placing and deleting parts sound different from each other, motors rise in pitch as they spin up, and the Sound setting silences all of it.
+32. A wheel shows an arrow for the way it drives; the Select panel turns and tips a part that is already placed, keeps its bindings, and refuses with a message when there is no room.
+33. Buttons click, placing and deleting parts sound different from each other, motors rise in pitch as they spin up, and the Sound setting silences all of it.
