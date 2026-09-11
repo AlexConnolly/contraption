@@ -27,10 +27,6 @@ export const LIMITS = {
   zones: 12,
   keepout: 12,
   objectives: 8,
-  stacks: 6,
-  stackCount: 80,
-  movers: 16,
-  wind: 4,
   chars: 64 * 1024,
   bytes: 512 * 1024,
 };
@@ -120,12 +116,24 @@ export function sanitiseLevel(input, { id } = {}) {
 
   const known = new Set([...props.map((p) => p.id), ...zones.map((z) => z.id)]);
 
+  // Nothing puts anything in these yet. They are named rather than assumed so
+  // that when stacks and hoops do travel, the objective check already covers
+  // them instead of being remembered about.
+  const stacks = new Set();
+  const hoops = new Set();
+
   // An objective that points at nothing is worse than no objective: the level
   // simply cannot be completed and there is no way for the player to tell.
   const objectives = list(raw.objectives, LIMITS.objectives)
     .filter((o) => OBJECTIVE_TYPES.includes(o?.type))
     .filter((o) => (o.prop ? known.has(slug(o.prop)) : true))
     .filter((o) => (o.zone ? known.has(slug(o.zone)) : true))
+    // Same rule for the two that name a stack or a hoop. The format carries
+    // neither yet, so an objective asking for one can never be scored — it
+    // would sanitise cleanly and produce a level nobody can finish, which is
+    // the exact failure the existence check exists to prevent.
+    .filter((o) => !o.stack || stacks.has(slug(o.stack)))
+    .filter((o) => !o.hoop || hoops.has(slug(o.hoop)))
     .map((o) => {
       const out = {
         type: o.type,

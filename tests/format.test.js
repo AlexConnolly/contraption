@@ -118,6 +118,37 @@ describe('a level someone else made is untrusted', () => {
     expect(level.objectives[0].prop).toBe('crate');
   });
 
+  /**
+   * The two objective types that name a stack or a hoop were being copied
+   * through unchecked while the format carried neither, so a level could
+   * sanitise perfectly cleanly and still be impossible — which is precisely
+   * what the existence check is for.
+   */
+  it('throws away an objective naming a stack or hoop the level has not got', () => {
+    const level = sanitiseLevel({
+      ...good,
+      objectives: [
+        { type: 'propsInZone', stack: 'rubble', zone: 'goal', label: 'rubble in' },
+        { type: 'propThroughHoop', prop: 'crate', hoop: 'ring', label: 'through' },
+        good.objectives[0],
+      ],
+    });
+    expect(level.objectives).toHaveLength(1);
+    expect(level.objectives[0].type).toBe('propInZone');
+  });
+
+  it('leaves every objective it kept actually scorable', () => {
+    const level = sanitiseLevel(good);
+    const props = new Set(level.props.map((p) => p.id));
+    const zones = new Set(level.zones.map((z) => z.id));
+    for (const objective of level.objectives) {
+      if (objective.prop) expect(props.has(objective.prop)).toBe(true);
+      if (objective.zone) expect(zones.has(objective.zone)).toBe(true);
+      expect(objective.stack).toBeUndefined();
+      expect(objective.hoop).toBeUndefined();
+    }
+  });
+
   it('refuses an objective type it does not know how to score', () => {
     const level = sanitiseLevel({
       ...good,
