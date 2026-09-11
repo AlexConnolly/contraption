@@ -691,8 +691,7 @@ function frame(now) {
 // ------------------------------------------------------------------------ boot
 
 async function boot() {
-  world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
-  world.timestep = STEP;
+  world = createWorld(RAPIER, { x: 0, y: -9.81, z: 0 });
 
   state.level = getLevel(store.lastLevel() ?? 'first-haul');
   const stored = loadDesign(state.level.id);

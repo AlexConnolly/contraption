@@ -3,15 +3,14 @@ import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 
 import { Arena } from '../src/sim/arena.js';
-import { gravityOf } from '../src/sim/world.js';
+import { createWorld, gravityOf } from '../src/sim/world.js';
 
 const STEP = 1 / 60;
 
 beforeAll(async () => { await RAPIER.init(); }, 30000);
 
 function arenaFor(level, seed = 5) {
-  const world = new RAPIER.World(gravityOf(level));
-  world.timestep = STEP;
+  const world = createWorld(RAPIER, gravityOf(level));
   const scene = new THREE.Scene();
   return { world, scene, arena: new Arena({ RAPIER, world, scene, level, seed }) };
 }
@@ -156,7 +155,7 @@ describe('fog', () => {
   });
 
   it('puts the view back when the course is torn down', () => {
-    const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
+    const world = createWorld(RAPIER, { x: 0, y: -9.81, z: 0 });
     const scene = new THREE.Scene();
     const before = new THREE.Fog(0x151a20, 32, 88);
     scene.fog = before;

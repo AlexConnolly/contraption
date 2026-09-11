@@ -5,13 +5,13 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { Arena } from '../src/sim/arena.js';
 import { ObjectiveTracker } from '../src/challenges/objectives.js';
 import { getLevel, LEVELS, tierOf } from '../src/challenges/levels.js';
+import { createWorld } from '../src/sim/world.js';
 
 const STEP = 1 / 60;
 beforeAll(async () => { await RAPIER.init(); }, 30000);
 
 function arenaFor(level, seed) {
-  const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
-  world.timestep = STEP;
+  const world = createWorld(RAPIER, { x: 0, y: -9.81, z: 0 });
   return new Arena({ RAPIER, world, scene: new THREE.Scene(), level, seed });
 }
 

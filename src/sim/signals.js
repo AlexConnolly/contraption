@@ -27,14 +27,19 @@ export const BINDING_MODES = [
  * round. It also means you slow down through a turn, which is what every
  * vehicle does.
  *
- * 0.4 was measured rather than guessed. On the starter rover it doubles the
- * turn rate — 20 to 40 deg/s from a standstill, 37 to 67 at speed — while
- * still carrying 1.3 m/s through the corner. Higher values turn faster and
- * keep dropping the speed: by 0.8 it is down to 0.4 m/s, which reads as
- * pivoting on the spot rather than driving round something. Holding the steer
+ * Measured, not guessed, and re-measured after the wheels stopped gripping
+ * like glue. On the starter rover:
+ *
+ *     bias   turn      speed through the corner
+ *     0.15   42 deg/s  1.82 m/s
+ *     0.25   49 deg/s  1.56 m/s
+ *     0.40   61 deg/s  1.14 m/s
+ *
+ * 0.25 comes round faster than the old setting managed and carries more speed
+ * while doing it, so there is no reason to pay for the rest. Holding the steer
  * key on its own still pivots, so both behaviours are available.
  */
-export const STEER_BIAS = 0.4;
+export const STEER_BIAS = 0.25;
 
 export function driveMix(throttle, steer) {
   return throttle * (1 - Math.abs(steer) * STEER_BIAS);

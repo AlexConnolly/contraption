@@ -10,6 +10,7 @@ import { getLevel } from '../src/challenges/levels.js';
 import { starterRover, quadcopter } from '../src/studio/presets.js';
 import { Blueprint } from '../src/core/blueprint.js';
 import { IDENTITY_ORIENTATION, pitchStep } from '../src/core/orientation.js';
+import { createWorld } from '../src/sim/world.js';
 
 const STEP = 1 / 60;
 
@@ -20,8 +21,7 @@ function keyboard() {
 
 function playLevel(levelId, blueprint, drive, seconds) {
   const level = getLevel(levelId);
-  const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
-  world.timestep = STEP;
+  const world = createWorld(RAPIER, { x: 0, y: -9.81, z: 0 });
   const scene = new THREE.Scene();
   const arena = new Arena({ RAPIER, world, scene, level });
   const machine = new Machine({
@@ -146,8 +146,7 @@ function speedOf(machine) {
 describe('airlift, flown end to end', () => {
   it('is solvable by a drone under its flight controller', () => {
     const level = getLevel('airlift');
-    const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
-    world.timestep = STEP;
+    const world = createWorld(RAPIER, { x: 0, y: -9.81, z: 0 });
     const scene = new THREE.Scene();
     const arena = new Arena({ RAPIER, world, scene, level });
     const blueprint = liftDrone();

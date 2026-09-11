@@ -37,7 +37,51 @@ function shell(part) {
   return mesh;
 }
 
+/**
+ * The eight-corners-minus-two solid: full height along +Z, tapering to the
+ * floor at -Z. Written out as explicit corners rather than extruded from a
+ * shape so the same six points can be handed to the physics engine, which
+ * means the thing you can see and the thing you collide with cannot drift
+ * apart.
+ */
+export function wedgeCorners(size = [1, 1, 1]) {
+  const x = (size[0] * CELL - INSET) / 2;
+  const y = (size[1] * CELL - INSET) / 2;
+  const z = (size[2] * CELL - INSET) / 2;
+  return [
+    [-x, -y, -z], [x, -y, -z], [x, -y, z], [-x, -y, z],
+    [-x, y, z], [x, y, z],
+  ];
+}
+
+function wedgeGeometry(part) {
+  const c = wedgeCorners(part.size);
+  // bottom, back, slope, and the two triangular cheeks
+  const faces = [
+    [0, 2, 1], [0, 3, 2],
+    [3, 5, 2], [3, 4, 5],
+    [0, 1, 5], [0, 5, 4],
+    [1, 2, 5],
+    [0, 4, 3],
+  ];
+  const positions = [];
+  for (const [a, b, d] of faces) positions.push(...c[a], ...c[b], ...c[d]);
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
 const BUILDERS = {
+  wedge(part) {
+    const mesh = new THREE.Mesh(wedgeGeometry(part), material(part.colour));
+    mesh.add(new THREE.LineSegments(
+      new THREE.EdgesGeometry(mesh.geometry),
+      new THREE.LineBasicMaterial({ color: 0x101418, transparent: true, opacity: 0.35 }),
+    ));
+    return mesh;
+  },
+
   core(part) {
     const group = new THREE.Group();
     group.add(shell(part));

@@ -3,14 +3,14 @@ import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 
 import { Arena } from '../src/sim/arena.js';
+import { createWorld } from '../src/sim/world.js';
 
 const STEP = 1 / 60;
 
 beforeAll(async () => { await RAPIER.init(); }, 30000);
 
 function arenaFor(level, seed = 4) {
-  const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
-  world.timestep = STEP;
+  const world = createWorld(RAPIER, { x: 0, y: -9.81, z: 0 });
   const scene = new THREE.Scene();
   return { world, scene, arena: new Arena({ RAPIER, world, scene, level, seed }) };
 }

@@ -6,6 +6,7 @@ import { Arena } from '../src/sim/arena.js';
 import { getLevel } from '../src/challenges/levels.js';
 import { breached, throughHoop } from '../src/challenges/objectives.js';
 import { getPart, turntableSpin } from '../src/parts/registry.js';
+import { createWorld } from '../src/sim/world.js';
 
 const STEP = 1 / 60;
 
@@ -23,8 +24,7 @@ const ring = level.hoops[0];
 // A ball given this velocity from this point: where does it end up, and does
 // it go through the ring on the way?
 function fling(from, velocity, seconds = 4) {
-  const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
-  world.timestep = STEP;
+  const world = createWorld(RAPIER, { x: 0, y: -9.81, z: 0 });
   const scene = new THREE.Scene();
   const arena = new Arena({ RAPIER, world, scene, level, seed: 1 });
 

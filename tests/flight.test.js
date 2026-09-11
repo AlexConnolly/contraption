@@ -11,6 +11,7 @@ import { Machine, GROUP_WORLD } from '../src/sim/machine.js';
 import { SignalBus } from '../src/sim/signals.js';
 import { quadcopter } from '../src/studio/presets.js';
 import { getPart } from '../src/parts/registry.js';
+import { createWorld } from '../src/sim/world.js';
 
 const STEP = 1 / 60;
 const FRAME = frameFromAxes([0, 0, 1], [0, 1, 0]);
@@ -196,8 +197,7 @@ describe('controller loops', () => {
 // ----------------------------------------------------------------- in a world
 
 function fly(blueprint, spawnY = 1.2) {
-  const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
-  world.timestep = STEP;
+  const world = createWorld(RAPIER, { x: 0, y: -9.81, z: 0 });
   const ground = world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(0, -1, 0));
   world.createCollider(
     RAPIER.ColliderDesc.cuboid(400, 1, 400).setFriction(1).setCollisionGroups(GROUP_WORLD),

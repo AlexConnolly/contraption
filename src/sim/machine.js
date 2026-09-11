@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {
   getPart, partDensity, pistonStroke, turntableSpin, turntableTorque, CELL,
 } from '../parts/registry.js';
-import { PISTON_ROD_TOP, PISTON_REST } from '../parts/geometry.js';
+import { PISTON_ROD_TOP, PISTON_REST, wedgeCorners } from '../parts/geometry.js';
 import { orientationQuaternion, applyOrientation } from '../core/orientation.js';
 import { groupBlueprint } from './grouping.js';
 import { driveSide } from './signals.js';
@@ -121,6 +121,12 @@ export class Machine {
         .multiply(CYLINDER_TO_X);
       desc = RAPIER.ColliderDesc.cylinder(part.width / 2, part.radius)
         .setRotation({ x: spin.x, y: spin.y, z: spin.z, w: spin.w });
+    } else if (part.shape === 'wedge') {
+      // The same six corners the mesh is built from, so what you see and what
+      // you hit are the same solid. A box here would look like a ramp and
+      // behave like a crate.
+      const points = new Float32Array(wedgeCorners(part.size).flat());
+      desc = RAPIER.ColliderDesc.convexHull(points).setRotation(quat);
     } else {
       desc = RAPIER.ColliderDesc.cuboid(
         (part.size[0] * CELL) / 2,

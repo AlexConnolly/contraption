@@ -6,6 +6,7 @@ import { Blueprint } from '../src/core/blueprint.js';
 import { Machine } from '../src/sim/machine.js';
 import { Arena } from '../src/sim/arena.js';
 import { SignalBus } from '../src/sim/signals.js';
+import { createWorld } from '../src/sim/world.js';
 
 const STEP = 1 / 60;
 const keyboard = () => ({ down: new Set(), isDown: () => false, wasPressed: () => false });
@@ -29,8 +30,7 @@ function belted({ speed = 2, withMachine = false, propPos = [0, 1.2, -4] } = {})
     zones: [],
     objectives: [],
   };
-  const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
-  world.timestep = STEP;
+  const world = createWorld(RAPIER, { x: 0, y: -9.81, z: 0 });
   const scene = new THREE.Scene();
   const arena = new Arena({ RAPIER, world, scene, level, seed: 1 });
 
@@ -115,8 +115,7 @@ describe('conveyor belts', () => {
       zones: [],
       objectives: [],
     };
-    const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
-    world.timestep = STEP;
+    const world = createWorld(RAPIER, { x: 0, y: -9.81, z: 0 });
     const arena = new Arena({ RAPIER, world, scene: new THREE.Scene(), level, seed: 1 });
     const from = arena.propPosition('box').z;
     for (let i = 0; i < 150; i += 1) { arena.step(STEP); world.step(); }

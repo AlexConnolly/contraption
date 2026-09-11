@@ -9,14 +9,14 @@ import { ObjectiveTracker, withinBudget } from '../src/challenges/objectives.js'
 import { getLevel } from '../src/challenges/levels.js';
 import { dodger } from '../src/studio/dodger.js';
 import { makeRng } from '../src/sim/rng.js';
+import { createWorld } from '../src/sim/world.js';
 
 const STEP = 1 / 60;
 const NO_INPUT = { isDown: () => false, wasPressed: () => false };
 
 function fly(seed, seconds = 170) {
   const level = getLevel('traffic');
-  const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
-  world.timestep = STEP;
+  const world = createWorld(RAPIER, { x: 0, y: -9.81, z: 0 });
   const scene = new THREE.Scene();
   const arena = new Arena({ RAPIER, world, scene, level, seed });
   const blueprint = dodger();
@@ -68,8 +68,7 @@ beforeAll(async () => {
 
 function arenaFor(seed) {
   const level = getLevel('traffic');
-  const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
-  world.timestep = STEP;
+  const world = createWorld(RAPIER, { x: 0, y: -9.81, z: 0 });
   return new Arena({ RAPIER, world, scene: new THREE.Scene(), level, seed });
 }
 
@@ -213,8 +212,7 @@ describe('the traffic challenge', () => {
     // course where touching anything ends the run, that is no use to it.
     for (const seed of [1, 2, 3, 4, 5]) {
       const level = getLevel('traffic');
-      const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
-      world.timestep = STEP;
+      const world = createWorld(RAPIER, { x: 0, y: -9.81, z: 0 });
       const scene = new THREE.Scene();
       const arena = new Arena({ RAPIER, world, scene, level, seed });
       const machine = new Machine({
@@ -261,8 +259,7 @@ describe('the no-contact rule', () => {
 
   it('reports what a machine is touching, and nothing while it is clear', () => {
     const level = getLevel('traffic');
-    const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
-    world.timestep = STEP;
+    const world = createWorld(RAPIER, { x: 0, y: -9.81, z: 0 });
     const scene = new THREE.Scene();
     const arena = new Arena({ RAPIER, world, scene, level, seed: 3 });
     const machine = new Machine({
@@ -292,8 +289,7 @@ describe('the no-contact rule', () => {
     // The dodger is one chassis plus four rotors, all bolted together and all
     // in contact with each other; none of that is a crash.
     const level = getLevel('traffic');
-    const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
-    world.timestep = STEP;
+    const world = createWorld(RAPIER, { x: 0, y: -9.81, z: 0 });
     const scene = new THREE.Scene();
     const arena = new Arena({ RAPIER, world, scene, level, seed: 11 });
     const machine = new Machine({

@@ -435,6 +435,11 @@ altogether.
 driver, and flies challenge 4 with a drone that picks the payload up and puts
 it on the platform. Both assert the objective actually completes.
 
+Every physics world, in the game and in the tests, is made by `createWorld` in
+`sim/world.js`, so a solver setting the game uses is always a setting the tests
+are checking. That file carries the measurements behind the one setting that is
+not a Rapier default.
+
 Four conventions are worth stating because getting them wrong cost real bugs.
 Forward is **+Z** and up is **+Y**, so the machine's right-hand side is
 `forward x up` = **-X** — steering felt inverted until that was fixed. And

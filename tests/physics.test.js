@@ -8,6 +8,7 @@ import { Machine, GROUP_WORLD } from '../src/sim/machine.js';
 import { getPart, CELL, pistonStroke } from '../src/parts/registry.js';
 import { SignalBus } from '../src/sim/signals.js';
 import { starterRover } from '../src/studio/presets.js';
+import { createWorld } from '../src/sim/world.js';
 
 const STEP = 1 / 60;
 
@@ -21,8 +22,7 @@ function keyboard(...codes) {
 }
 
 function makeWorld() {
-  const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
-  world.timestep = STEP;
+  const world = createWorld(RAPIER, { x: 0, y: -9.81, z: 0 });
   const ground = world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(0, -1, 0));
   world.createCollider(
     RAPIER.ColliderDesc.cuboid(200, 1, 200)
@@ -167,26 +167,43 @@ describe('what a machine sounds like', () => {
 describe('steering direction', () => {
   // The machine's right-hand side is forward x up, which with forward at +Z
   // and up at +Y is -X. Getting this backwards makes A and D feel swapped.
+  /**
+   * How far it comes round, signed, rather than where it is pointing at the
+   * end. The machine now pivots fast enough to pass ninety degrees inside the
+   * measuring window, and a dot product against its old right-hand side
+   * changes sign when it does — which read as "it did not turn" when in fact
+   * it had turned further than the test could describe.
+   */
   function turnTest(key) {
     const { machine, bus } = build(starterRover(), keyboard());
     run(machine, bus, 1);
-    const before = machine.coreForward().clone();
+    const heading = () => {
+      const f = machine.coreForward();
+      return Math.atan2(f.x, f.z);
+    };
     bus.input.down.add(key);
-    run(machine, bus, 1.5);
-    const right = before.clone().cross(new THREE.Vector3(0, 1, 0)).normalize();
-    return { before, after: machine.coreForward(), right };
+    let last = heading();
+    let turned = 0;
+    for (let i = 0; i < Math.round(1.5 / STEP); i += 1) {
+      machine.update(STEP, bus);
+      machine.world.step();
+      let d = heading() - last;
+      while (d > Math.PI) d -= 2 * Math.PI;
+      while (d < -Math.PI) d += 2 * Math.PI;
+      turned += d;
+      last = heading();
+    }
+    return (turned * 180) / Math.PI;
   }
 
+  // Forward is +Z and the machine's right is -X, so coming round to the right
+  // makes the heading fall.
   it('turns the machine to its right on the right-steer key', () => {
-    const { before, after, right } = turnTest('KeyD');
-    expect(right.x).toBeLessThan(-0.99);
-    expect(after.dot(right)).toBeGreaterThan(0.25);
-    expect(after.dot(before)).toBeLessThan(0.95);
+    expect(turnTest('KeyD')).toBeLessThan(-60);
   });
 
   it('turns the machine to its left on the left-steer key', () => {
-    const { after, right } = turnTest('KeyA');
-    expect(after.dot(right)).toBeLessThan(-0.25);
+    expect(turnTest('KeyA')).toBeGreaterThan(60);
   });
 
   /**
@@ -232,8 +249,20 @@ describe('steering direction', () => {
     expect(corner({ windUp: 2.5 }).rate).toBeGreaterThan(30);
   });
 
+  // Against a pivot rather than against a number, because what matters is the
+  // difference between the two: turning on the spot is a thing you ask for by
+  // letting go of the throttle, and cornering has to stay clearly faster than
+  // it however the grip is tuned.
   it('drives round the corner rather than stopping to pivot', () => {
-    expect(corner().speed).toBeGreaterThan(0.8);
+    const { machine, bus } = build(starterRover(), keyboard());
+    run(machine, bus, 1.2);
+    bus.input.down.add('KeyD');
+    run(machine, bus, 2);
+    const v = machine.bodies[0].linvel();
+    const pivotSpeed = Math.hypot(v.x, v.z);
+
+    expect(pivotSpeed).toBeLessThan(0.5);
+    expect(corner().speed).toBeGreaterThan(pivotSpeed * 3);
   });
 
   // Backing up on the same key has to swing the machine the other way, which
@@ -504,5 +533,43 @@ describe('grabber', () => {
     run(machine, bus, 1.5);
     const gapLater = crateBody.translation().y - machine.partWorldPoint(grabber).y;
     expect(Math.abs(gapLater - gap)).toBeLessThan(0.15);
+  });
+});
+
+/**
+ * The bug this pins: a machine standing on wheels was rebounding off the
+ * ground at most of the speed it arrived with, on parts whose restitution is
+ * 0.04. A cylinder touches a plane along a line rather than across a face, so
+ * it sinks further in each step than a box does, and with Rapier's default of
+ * a single internal solve pass the solver turned that penetration back into
+ * upward velocity on the way out.
+ */
+describe('landing', () => {
+  function drop(blueprint, from) {
+    const { machine, bus } = build(blueprint, keyboard(), from);
+    let arrived = 0;
+    let left = 0;
+    for (let i = 0; i < Math.round(3 / STEP); i += 1) {
+      for (const body of machine.bodies) arrived = Math.min(arrived, body.linvel().y);
+      machine.update(STEP, bus);
+      machine.world.step();
+      for (const body of machine.bodies) left = Math.max(left, body.linvel().y);
+    }
+    return left / Math.abs(arrived);
+  }
+
+  // It was 0.92 — it came back up at nearly the speed it went down. Now it is
+  // about a third, most of which is the suspension of four sprung wheel
+  // joints rather than the ground.
+  it('does not throw a machine back up off its wheels', () => {
+    expect(drop(starterRover(), 1.6)).toBeLessThan(0.45);
+  });
+
+  it('settles rather than bouncing about', () => {
+    const { machine, bus } = build(starterRover(), keyboard(), 1.6);
+    run(machine, bus, 4);
+    const v = machine.bodies[0].linvel();
+    expect(Math.abs(v.y)).toBeLessThan(0.05);
+    expect(machine.isUpsideDown()).toBe(false);
   });
 });

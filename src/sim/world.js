@@ -29,3 +29,43 @@ export function gustAt(elapsed, wind) {
   const swell = Math.sin(elapsed * 0.7) * 0.6 + Math.sin(elapsed * 1.9 + 1.3) * 0.4;
   return (wind.force ?? 0) * (1 + depth * swell);
 }
+
+// -------------------------------------------------------------- the solver
+
+export const STEP = 1 / 60;
+
+/**
+ * Rapier's default is one internal solve pass per contact, and on a machine
+ * standing on wheels that is not enough. A cylinder resting on a plane touches
+ * it along a line rather than across a face, so it sinks further into the
+ * ground each step than a box does, and the solver turns that penetration back
+ * into upward velocity when it pushes it out again.
+ *
+ * Measured on the starter rover dropped from 1.2 m: it lands at 3.9 m/s and
+ * leaves again at 2.0 m/s, a 52 per cent rebound, on parts whose restitution
+ * is 0.04. The same machine built on blocks rather than wheels rebounds at 6
+ * per cent, which is what those numbers say it should.
+ *
+ * More passes fix it, and cost nothing worth measuring:
+ *
+ *     passes   rebound
+ *          1       52%
+ *          2       30%
+ *          4       11%
+ *          8        3%
+ *
+ * Eight is where it stops being a bounce and becomes a bump.
+ */
+export const PGS_PASSES = 8;
+
+/**
+ * Every world in the game and in the tests is made here, so the two cannot
+ * drift apart: a solver setting only the game uses is a setting no test is
+ * checking.
+ */
+export function createWorld(RAPIER, gravity = gravityOf(null)) {
+  const world = new RAPIER.World(gravity);
+  world.timestep = STEP;
+  world.integrationParameters.numInternalPgsIterations = PGS_PASSES;
+  return world;
+}

@@ -7,14 +7,14 @@ import { Machine } from '../src/sim/machine.js';
 import { Arena } from '../src/sim/arena.js';
 import { ObjectiveTracker, withinMassCap, machineMass } from '../src/challenges/objectives.js';
 import { starterRover } from '../src/studio/presets.js';
+import { createWorld } from '../src/sim/world.js';
 
 const STEP = 1 / 60;
 
 beforeAll(async () => { await RAPIER.init(); }, 30000);
 
 function build(blueprint, level = { spawn: [0, 1, 0], objectives: [] }) {
-  const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
-  world.timestep = STEP;
+  const world = createWorld(RAPIER, { x: 0, y: -9.81, z: 0 });
   const machine = new Machine({
     RAPIER,
     world,
@@ -155,8 +155,7 @@ describe('scored levels', () => {
   };
 
   function tracked(inside) {
-    const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
-    world.timestep = STEP;
+    const world = createWorld(RAPIER, { x: 0, y: -9.81, z: 0 });
     const arena = new Arena({ RAPIER, world, scene: new THREE.Scene(), level: yard, seed: 3 });
     const ids = [...arena.props.keys()];
     const tracker = new ObjectiveTracker(yard);

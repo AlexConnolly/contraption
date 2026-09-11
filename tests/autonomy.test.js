@@ -11,6 +11,7 @@ import { autoDrone } from '../src/studio/presets.js';
 import { Blueprint } from '../src/core/blueprint.js';
 import { IDENTITY_ORIENTATION, yawStep } from '../src/core/orientation.js';
 import { validateProgram } from '../src/sim/program.js';
+import { createWorld } from '../src/sim/world.js';
 
 const STEP = 1 / 60;
 
@@ -18,8 +19,7 @@ const STEP = 1 / 60;
 const NO_INPUT = { isDown: () => false, wasPressed: () => false };
 
 function bare(level) {
-  const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
-  world.timestep = STEP;
+  const world = createWorld(RAPIER, { x: 0, y: -9.81, z: 0 });
   const scene = new THREE.Scene();
   if (level) return { world, scene, arena: new Arena({ RAPIER, world, scene, level }) };
   const ground = world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(0, -1, 0));

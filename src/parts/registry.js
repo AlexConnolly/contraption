@@ -142,6 +142,25 @@ const PARTS = [
     blurb: 'Three cells long. Cheaper per cell than blocks.',
   },
   {
+    id: 'wedge',
+    name: 'Wedge',
+    category: 'structure',
+    // Full height at +Z, tapering to nothing at -Z over three cells. Nothing
+    // else in the game has a sloped face, and this is what lets a machine pick
+    // something up by driving at it rather than by grabbing it.
+    //
+    // Three cells long rather than one on purpose. A single cell is a 45
+    // degree face, and a ball meeting that is bulldozed along the floor rather
+    // than lifted — measured, not assumed. Over three cells it is about 18
+    // degrees, which is shallow enough to get under something and roll it up.
+    shape: 'wedge',
+    size: [1, 1, 3],
+    mass: 1.1,
+    colour: 0x7f8b99,
+    cost: 2,
+    blurb: 'A shallow ramp, three cells long. Drive it under something and the something rides up.',
+  },
+  {
     id: 'panel',
     name: 'Panel',
     category: 'structure',
@@ -179,7 +198,12 @@ const PARTS = [
     attach: [[-1, 0, 0]],
     radius: 0.42,
     width: 0.28,
-    friction: 2.4,
+    // Rubber on tarmac is about 0.9. This was 2.4, which gripped so hard that
+    // a machine could not scrub its wheels sideways — and skid steering is
+    // nothing but scrubbing sideways. Measured on the starter rover, dropping
+    // it to 1.6 turned a 14 deg/s pivot back into 61, and cornering from 69
+    // to 83, while still hauling everything the campaign asks it to.
+    friction: 1.6,
     actuator: {
       kind: 'motor',
       port: 'throttle',

@@ -8,6 +8,7 @@ import { Machine, GROUP_WORLD } from '../src/sim/machine.js';
 import { Arena } from '../src/sim/arena.js';
 import { SignalBus } from '../src/sim/signals.js';
 import { getPart, portsOf } from '../src/parts/registry.js';
+import { createWorld } from '../src/sim/world.js';
 
 const STEP = 1 / 60;
 const keyboard = () => ({ down: new Set(), isDown: () => false, wasPressed: () => false });
@@ -29,8 +30,7 @@ function look(props) {
     zones: [],
     objectives: [],
   };
-  const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
-  world.timestep = STEP;
+  const world = createWorld(RAPIER, { x: 0, y: -9.81, z: 0 });
   const scene = new THREE.Scene();
   const arena = new Arena({ RAPIER, world, scene, level, seed: 3 });
 
