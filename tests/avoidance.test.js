@@ -156,12 +156,17 @@ describe('the traffic challenge', () => {
   // get through the one it was written for.
   const seeds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
+  // Each case below flies whole 170-second courses, several of them in some
+  // cases, so how long it takes is a fact about the machine it runs on rather
+  // than about anything under test. They all carry their own timeout.
+  const LONG = 30000;
+
   it.each(seeds)('is solved hands-off on seed %i', (seed) => {
     const { level, machine, report } = fly(seed);
     expect(machine.isUpsideDown()).toBe(false);
     expect(report.complete).toBe(true);
     expect(report.elapsed).toBeLessThan(level.par);
-  });
+  }, LONG);
 
   it('goes round the blockers rather than straight down the middle', () => {
     // Every blocker covers the middle of the corridor, so passing one means
@@ -172,20 +177,19 @@ describe('the traffic challenge', () => {
       expect(run.report.complete).toBe(true);
       expect(run.wandered).toBeGreaterThan(3.5);
     }
-  });
+  }, LONG);
 
-  // Ten full 170-second runs in one case, so it needs longer than the default.
   it('flies the whole course without touching anything', () => {
     for (const seed of seeds) {
       const run = fly(seed);
       expect(run.touched, `seed ${seed}`).toBe(null);
     }
-  }, 30000);
+  }, LONG);
 
   it('takes a different path through each time', () => {
     const paths = [1, 2, 3, 4].map((seed) => fly(seed).wandered.toFixed(2));
     expect(new Set(paths).size).toBeGreaterThan(1);
-  });
+  }, LONG);
 
   it('keeps well away from the corridor walls', () => {
     // Hugging a wall to squeeze past is exactly what the gates are shaped to
@@ -197,7 +201,7 @@ describe('the traffic challenge', () => {
       for (const x of run.track) nearest = Math.min(nearest, 14 - Math.abs(x) - 0.75);
       expect(nearest).toBeGreaterThan(1.5);
     }
-  });
+  }, LONG);
 
   it('keeps the dodger inside the budget', () => {
     expect(withinBudget(dodger(), getLevel('traffic')).ok).toBe(true);
@@ -229,7 +233,7 @@ describe('the traffic challenge', () => {
       }
       expect(touched, `seed ${seed}`).not.toBe(null);
     }
-  });
+  }, LONG);
 });
 
 describe('the seeded generator', () => {

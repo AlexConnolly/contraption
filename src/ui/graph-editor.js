@@ -23,7 +23,10 @@ const OP_LABEL = {
   and: 'and', or: 'or', not: 'not',
 };
 
-const KIND_COLOUR = { number: '#4ea1ff', bool: '#4ade80', vec3: '#ffb347' };
+// One colour per kind of value, from the shared palette: cyan for plain
+// numbers, green for true/false, amber for a position in the world.
+const KIND_COLOUR = { number: '#35d0e0', bool: '#3ecf8e', vec3: '#f0a825' };
+const KIND_FALLBACK = '#5a6878';
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -405,7 +408,7 @@ export class GraphEditor {
     const row = el('div', `graph-row ${direction}`);
     row.style.height = `${ROW}px`;
     const dot = el('span', 'graph-socket');
-    dot.style.background = KIND_COLOUR[port.kind] ?? '#8d99a6';
+    dot.style.background = KIND_COLOUR[port.kind] ?? KIND_FALLBACK;
     dot.title = port.kind;
     dot.addEventListener('pointerdown', (event) => {
       event.stopPropagation();
@@ -619,7 +622,7 @@ export class GraphEditor {
       if (!a || !b) continue;
       const source = state.nodes.find((n) => n.id === link.from.node);
       const kind = nodeOutputs(source, ctx).find((p) => p.id === link.from.port)?.kind;
-      const path = this.curve(a, b, KIND_COLOUR[kind] ?? '#8d99a6');
+      const path = this.curve(a, b, KIND_COLOUR[kind] ?? KIND_FALLBACK);
       path.addEventListener('click', () => {
         state.links = state.links.filter((l) => l !== link);
         this.changed();
@@ -634,7 +637,7 @@ export class GraphEditor {
       if (anchor) {
         const from = this.pending.direction === 'out' ? anchor : this.pointer;
         const to = this.pending.direction === 'out' ? this.pointer : anchor;
-        this.svg.append(this.curve(from, to, '#ffd166', true));
+        this.svg.append(this.curve(from, to, '#ffc95c', true));
       }
     }
   }

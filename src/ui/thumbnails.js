@@ -20,15 +20,18 @@ let shared = null;
  * WebGL contexts, and building one per thumbnail runs the tab out of them and
  * hangs it.
  */
-function sharedRenderer() {
-  if (shared) return shared;
+function sharedRenderer(width = WIDTH, height = HEIGHT) {
+  if (shared) {
+    shared.setSize(width, height, false);
+    return shared;
+  }
   shared = new THREE.WebGLRenderer({
     antialias: true,
     preserveDrawingBuffer: true,
     alpha: false,
   });
   shared.setPixelRatio(1);
-  shared.setSize(WIDTH, HEIGHT, false);
+  shared.setSize(width, height, false);
   shared.shadowMap.enabled = true;
   shared.shadowMap.type = THREE.PCFShadowMap;
   return shared;
@@ -66,8 +69,8 @@ function lightUp(scene) {
  * ground, and framing the whole of it leaves the interesting part a speck in
  * the middle of a grey field.
  */
-function frame(camera, look, reach, pull = 0.62, lift = 0.34) {
-  const distance = (Math.max(reach, 4) * pull) / Math.tan((camera.fov * Math.PI) / 360);
+function frame(camera, look, reach, pull = 0.62, lift = 0.34, floor = 4) {
+  const distance = (Math.max(reach, floor) * pull) / Math.tan((camera.fov * Math.PI) / 360);
   const direction = new THREE.Vector3(0.5, lift, -0.82).normalize();
   camera.position.copy(look).addScaledVector(direction, distance);
   camera.lookAt(look);
@@ -165,10 +168,40 @@ export function renderMachine(blueprint) {
   if (box.isEmpty()) box.setFromCenterAndSize(new THREE.Vector3(), new THREE.Vector3(2, 2, 2));
   const size = box.getSize(new THREE.Vector3());
   const camera = new THREE.PerspectiveCamera(38, WIDTH / HEIGHT, 0.1, 100);
-  frame(camera, box.getCenter(new THREE.Vector3()), Math.max(size.x, size.y, size.z), 0.78, 0.46);
+  frame(camera, box.getCenter(new THREE.Vector3()), Math.max(size.x, size.y, size.z), 0.78, 0.46, 1.5);
 
   renderer.render(scene, camera);
   const url = renderer.domElement.toDataURL('image/webp', 0.72);
+  scrub(scene);
+  return url;
+}
+
+const PART = 132;
+
+/**
+ * A picture of a single part on its own, for the palette. The part is drawn
+ * from the same mesh the studio places, so the rack always shows what you are
+ * actually about to build with.
+ */
+export function renderPart(partId) {
+  const renderer = sharedRenderer(PART, PART);
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0b1018);
+  lightUp(scene);
+
+  const mesh = createPartMesh(getPart(partId));
+  scene.add(mesh);
+
+  const box = new THREE.Box3().setFromObject(mesh);
+  if (box.isEmpty()) box.setFromCenterAndSize(new THREE.Vector3(), new THREE.Vector3(CELL, CELL, CELL));
+  const size = box.getSize(new THREE.Vector3());
+  // A part is a handful of centimetres across, so the course framer's floor
+  // would push the camera back far enough to lose it altogether.
+  const camera = new THREE.PerspectiveCamera(34, 1, 0.05, 40);
+  frame(camera, box.getCenter(new THREE.Vector3()), Math.max(size.x, size.y, size.z), 0.92, 0.44, 0);
+
+  renderer.render(scene, camera);
+  const url = renderer.domElement.toDataURL('image/webp', 0.8);
   scrub(scene);
   return url;
 }

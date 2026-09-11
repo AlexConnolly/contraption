@@ -347,7 +347,7 @@ canvas.addEventListener('pointerleave', () => studio?.clearPointer());
 canvas.addEventListener('contextmenu', (event) => event.preventDefault());
 
 function handleShortcuts() {
-  if (editor?.isOpen || frontEnd?.isOpen) return;
+  if (editor?.isOpen || frontEnd?.isOpen || hud?.modalIsOpen) return;
   // Escape drops out of the game and back to the menu.
   if (input.wasPressed('Escape')) {
     openMenu();
@@ -494,7 +494,7 @@ async function boot() {
     },
     onSelectTool: selectTool,
     onModeChange: (mode) => (mode === 'test' ? enterTest() : enterStudio()),
-    onLevelChange: changeLevel,
+    onLeaveChallenge: () => openMenu('challenges'),
     onSave: () => saveDesign(),
     onLoad: () => {
       const design = loadDesign(state.level.id);

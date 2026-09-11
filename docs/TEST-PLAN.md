@@ -8,7 +8,7 @@
 | `blueprint` | Placement rejects overlaps and out-of-bounds cells; removal frees cells; multi-cell parts claim every cell they cover; serialise → deserialise is lossless. |
 | `connectivity` | Face-adjacent parts connect only through faces both sides mark attachable; a wheel connects on its axle face alone. |
 | `grouping` | Rigid parts fuse into one body; an articulated part becomes its own body jointed to its host; a structure split by a hinge yields two bodies; orphaned parts are reported. |
-| `signals` | Axis, hold and toggle bindings resolve to the right value; a sensor-driven binding follows its source; unbound actuators read zero. |
+| `signals` | Axis, hold and toggle bindings resolve to the right value; a sensor-driven binding follows its source; unbound actuators read zero; reversing swaps the steering round, turning on the spot does not, and a real rover swings the other way on the same key while backing up. |
 | `challenge` | Objective evaluation completes only after the hold time elapses; a failed objective resets its timer; budgets reject oversized builds. |
 | `flight/mixer` | Each thruster's authority per channel follows from where it sits and which way it points: upward rotors all lift, front and rear oppose in pitch, diagonals oppose in yaw through reaction torque, a lone centred rotor has lift and yaw but nothing else, and a forward-facing jet counts as pitch rather than lift. |
 | `program/graph` | Nodes evaluate only after what feeds them; a cycle is reported rather than run; every node kind produces the right value; a state hands over on a `Go to` and its timer restarts; validation catches a kind mismatch, a missing part and a dangling transition. |
@@ -16,6 +16,7 @@
 | `avoidance` | The traffic challenge is solved hands-off across ten different seeds, and **flown clean** on every one of them — no contact at all. It goes round the blockers rather than down the middle, by a different path each time; and it is **not** solved when the forward sensor is made blind. |
 | `no contact` | The rule is on for the traffic challenge and off elsewhere; contact is reported when a machine is put where an obstacle is, and never for a machine's own parts touching each other. |
 | `computer` | Module reads come off the running machine; writes are clamped to the port's range; a program drives actuators directly, and drives the flight controller by naming a height. |
+| `piston` | A piston pushes as far as its own reach setting says and no further; a reach outside the part's range is pulled back to the nearest end; the foot stays planted on the base while the part rides up, so the rod always spans the gap. |
 | `progress` | Designs are kept apart per challenge; a slower later run cannot overwrite a best time; the best cost is the cost of the run that set the best time; machines saved in the same millisecond get different ids; renaming a machine that is not there is a no-op; storage that throws leaves the game running. |
 | `flight/loops` | Hover throttle matches weight over available lift; sinking adds throttle and rising removes it; a banked machine asks for more; the climb key drags the held altitude with it; the controller leans against drift and **away** from sideways drift; zero lift authority asks for nothing; every mixed throttle stays in range. |
 
@@ -41,3 +42,8 @@
 18. Winning a challenge puts a tick and a best time on its card, and the best time only improves.
 19. A machine saved to the garage appears with its own picture, opens into the current challenge, renames and deletes.
 20. Each setting takes effect as it is pressed and is still set after a reload.
+21. The studio, the menus and the node editor share one palette, two typefaces and the same panel shape; no screen still shows the old blue accent or rounded corners.
+22. The parts rack shows a picture of each part, and the selected one is marked.
+23. Inside a challenge the top bar names it and offers the way back to the list; the way back asks first, and both Stay here and `Esc` leave you where you were.
+24. A piston's Reach slider changes how far it pushes on the next run, and the rod spans the gap at every extension rather than leaving open air.
+25. Holding left while reversing swings the machine the opposite way to holding left while driving forward.

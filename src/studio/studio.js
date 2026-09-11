@@ -395,10 +395,12 @@ export class Studio {
     };
   }
 
-  // The title screen turns the machine on an empty stage, with no grid.
+  // The title screen turns the machine on an empty stage: no grid, and nothing
+  // to point at, so the placement ghost goes with the plate.
   setShowPlate(show) {
     this.plate.visible = show;
     if (this.grid) this.grid.visible = show;
+    if (!show) this.clearPointer();
   }
 
   setVisible(visible) {

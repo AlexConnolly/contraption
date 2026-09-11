@@ -1,28 +1,15 @@
+@import "./tokens.css";
+
 /* ============================================================================
-   Front end: title screen, challenge browser, garage, settings.
-   Amber leads, cyan marks anything to do with rules and logic.
+   Front end: title screen, challenge browser, garage, settings. Tokens and
+   typefaces come from tokens.css, which the studio reads too.
    ========================================================================= */
 
 .fe {
-  --void: #070a0f;
-  --panel: rgba(18, 26, 37, .86);
-  --solid: #121a25;
-  --raised: #1a2431;
-  --edge: #26323f;
-  --text: #e8eef5;
-  --dim: #8595a6;
-  --faint: #5a6878;
-  --amber: #f0a825;
-  --amber-b: #ffc95c;
-  --cyan: #35d0e0;
-  --green: #3ecf8e;
-  --red: #f06a5d;
-  --notch: 14px;
-
   position: fixed;
   inset: 0;
   z-index: 80;
-  font-family: "Chakra Petch", ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--ui);
   color: var(--text);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
@@ -80,7 +67,7 @@
   background: var(--panel);
   backdrop-filter: blur(10px);
   border: 1px solid var(--edge);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--mono);
   font-size: 11px;
   letter-spacing: .06em;
   color: var(--dim);
@@ -143,7 +130,7 @@
   clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
 }
 .fe-kicker span {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--mono);
   font-size: 10.5px;
   letter-spacing: .3em;
   text-transform: uppercase;
@@ -202,7 +189,7 @@
 .fe-item .g { color: var(--faint); display: grid; place-items: center; }
 .fe-item:hover .g { color: var(--amber); }
 .fe-item .m {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--mono);
   font-size: 11px;
   font-weight: 500;
   letter-spacing: .05em;
@@ -248,7 +235,7 @@
 }
 .fe-head p {
   margin: 0;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--mono);
   font-size: 12px;
   letter-spacing: .08em;
   color: var(--dim);
@@ -297,7 +284,7 @@
 .fe-shot .num {
   position: absolute;
   top: 10px; left: 10px;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--mono);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: .1em;
@@ -324,7 +311,7 @@
 }
 
 .fe-tag {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--mono);
   font-size: 9.5px;
   font-weight: 500;
   letter-spacing: .1em;
@@ -358,7 +345,7 @@
   display: flex;
   gap: 14px;
   flex-wrap: wrap;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--mono);
   font-size: 10.5px;
   letter-spacing: .05em;
   color: var(--faint);
@@ -396,7 +383,7 @@
   background: var(--raised);
   border: 1px solid var(--edge);
   color: var(--dim);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--mono);
   font-size: 10px;
   letter-spacing: .08em;
   text-transform: uppercase;
@@ -428,7 +415,7 @@
   background: transparent;
   border: 0;
   color: var(--dim);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--mono);
   font-size: 11px;
   letter-spacing: .08em;
   text-transform: uppercase;
@@ -448,7 +435,7 @@
   flex-wrap: wrap;
   padding-top: 13px;
   border-top: 1px solid var(--edge);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--mono);
   font-size: 11px;
   color: var(--dim);
 }

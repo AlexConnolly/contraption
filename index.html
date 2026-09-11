@@ -12,14 +12,14 @@
     <div id="loading"><span>Loading physics…</span></div>
 
     <header id="topbar">
-      <div class="brand">CONTRAPTION</div>
-      <label class="field">
-        <span>Challenge</span>
-        <select id="level-select"></select>
-      </label>
+      <div class="brand">Contrap<i>tion</i></div>
+      <button id="btn-challenges" class="crumb">
+        <span class="crumb-back">Challenges</span>
+        <span id="crumb-level" class="crumb-level"></span>
+      </button>
       <div class="mode-switch">
         <button id="mode-studio" class="mode active" data-mode="studio">Studio</button>
-        <button id="mode-test" class="mode" data-mode="test">Test ▸</button>
+        <button id="mode-test" class="mode" data-mode="test">Test</button>
       </div>
       <div class="spacer"></div>
       <div id="budget" class="readout"></div>
@@ -74,6 +74,17 @@
 
     <footer id="help"></footer>
     <div id="toast"></div>
+
+    <div id="modal" hidden>
+      <div class="modal-card">
+        <h2 id="modal-title"></h2>
+        <p id="modal-body"></p>
+        <div class="modal-actions">
+          <button id="modal-cancel">Stay here</button>
+          <button id="modal-ok" class="primary">Leave</button>
+        </div>
+      </div>
+    </div>
 
     <div id="win" hidden>
       <div class="win-card">

@@ -9,7 +9,7 @@ Three.js for rendering, Rapier for physics, Vite for the build.
 ```bash
 npm install
 npm run dev      # http://localhost:5173
-npm test         # 193 tests, including headless physics
+npm test         # 201 tests, including headless physics
 npm run build
 npm run preview  # serve the production build
 ```
@@ -39,6 +39,12 @@ same way.
 menus. Each applies the moment it is pressed and is remembered.
 
 `Esc` leaves the game for the menu and backs out of any screen to the title.
+Inside a challenge the top bar shows which one you are on and the way back to
+the list, asked for first rather than done on the click.
+
+The whole game is drawn from one design system — `src/ui/tokens.css` — so the
+menus, the studio and the node editor share a palette, two typefaces and the
+same cut-corner panels.
 
 ## Playing
 
@@ -67,6 +73,12 @@ rotor or grabber can be bound to whatever keys you like, in one of six modes:
 - **Sensor** — driven by a distance sensor instead of a key.
 - **Flight controller** — handed over to the controller's mixer.
 - **Always on**.
+
+Drive mode swaps the steering round while you are reversing, so left is still
+left from where the driver is sitting.
+
+A piston's **reach** is set on the piston, anywhere from 0.4 m to 2.4 m, so a
+short jab and a long lift can sit on the same machine.
 
 Designs autosave per challenge and survive a reload.
 
@@ -251,14 +263,14 @@ src/sim/         connectivity, body grouping, signal bus, machine, arena,
                  flight controller, program graph, computer runtime
 src/studio/      build mode: picking, ghost preview, undo, presets
 src/challenges/  levels and objective tracking
-src/ui/          front end (title, challenges, garage, settings), save store,
-                 thumbnail renderer, palette, inspector, objectives, win card,
-                 node editor
+src/ui/          design tokens, front end (title, challenges, garage,
+                 settings), save store, thumbnail renderer, palette,
+                 inspector, objectives, win card, node editor
 ```
 
 ## Tests
 
-`npm test` runs 193 tests. The pure logic (orientations, grid placement, body
+`npm test` runs 201 tests. The pure logic (orientations, grid placement, body
 grouping, key bindings, objectives) is covered directly. On top of that,
 `tests/physics.test.js` builds real machines in a real Rapier world and asserts
 they behave — a rover drives, reverses and steers the correct way; an
@@ -278,6 +290,11 @@ detection, every node kind, state transitions and the validation a player sees.
 provably untouched: the hands-off challenge flown by the preset program, a
 drone holding height on maths nodes alone with no flight controller anywhere,
 and a rover that drives itself and stops on a sensor.
+
+The piston tests check both halves of what a piston is: it pushes as far as it
+is set to and no further, and its foot stays planted on the base while the
+part itself rides up — a piston whose rod does not follow it leaves a gap of
+open air and looks broken however well it works.
 
 `tests/avoidance.test.js` solves challenge 7 hands-off across ten different
 seeds — ten different worlds, since a program that had memorised a path would

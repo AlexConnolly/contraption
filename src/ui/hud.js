@@ -1,7 +1,7 @@
-import { CATEGORIES, partsInCategory, getPart } from '../parts/registry.js';
+import { CATEGORIES, partsInCategory, getPart, pistonStroke } from '../parts/registry.js';
 import { BINDING_MODES, bindingLabel, keyLabel, defaultBinding } from '../sim/signals.js';
-import { LEVELS } from '../challenges/levels.js';
 import { estimateGains, firstController, controllerOf } from '../sim/flight.js';
+import { renderPart } from './thumbnails.js';
 
 const HELP = {
   studio: [
@@ -34,7 +34,12 @@ export class Hud {
   constructor(handlers) {
     this.h = handlers;
     this.dom = {
-      levelSelect: document.getElementById('level-select'),
+      crumbLevel: document.getElementById('crumb-level'),
+      modal: document.getElementById('modal'),
+      modalTitle: document.getElementById('modal-title'),
+      modalBody: document.getElementById('modal-body'),
+      modalOk: document.getElementById('modal-ok'),
+      modalCancel: document.getElementById('modal-cancel'),
       presetSelect: document.getElementById('preset-select'),
       modeStudio: document.getElementById('mode-studio'),
       modeTest: document.getElementById('mode-test'),
@@ -58,13 +63,21 @@ export class Hud {
       loading: document.getElementById('loading'),
     };
     this.wire();
-    this.buildLevelSelect();
     this.buildPalette();
   }
 
   wire() {
     const { h, dom } = this;
-    dom.levelSelect.addEventListener('change', (e) => h.onLevelChange(e.target.value));
+    document.getElementById('btn-challenges').addEventListener('click', async () => {
+      const leave = await this.confirm({
+        title: 'Back to challenges?',
+        body: 'Your machine is saved against this challenge, so it will be '
+          + 'here when you come back. The run you are on now ends.',
+        ok: 'Leave challenge',
+        cancel: 'Stay here',
+      });
+      if (leave) h.onLeaveChallenge();
+    });
     dom.presetSelect.addEventListener('change', (e) => {
       if (!e.target.value) return;
       h.onPreset(e.target.value);
@@ -90,14 +103,6 @@ export class Hud {
     }
   }
 
-  buildLevelSelect() {
-    for (const level of LEVELS) {
-      const option = el('option', null, level.name);
-      option.value = level.id;
-      this.dom.levelSelect.append(option);
-    }
-  }
-
   buildPalette() {
     const list = this.dom.paletteList;
     list.innerHTML = '';
@@ -106,17 +111,22 @@ export class Hud {
       const parts = partsInCategory(category.id);
       if (parts.length === 0) continue;
       list.append(el('div', 'cat-title', category.name));
+      const grid = el('div', 'part-grid');
       for (const part of parts) {
         const button = el('button', 'part-btn');
-        const swatch = el('span', 'part-swatch');
-        swatch.style.background = `#${part.colour.toString(16).padStart(6, '0')}`;
-        button.append(swatch, el('span', 'part-name', part.name));
-        if (part.cost > 0) button.append(el('span', 'part-cost', String(part.cost)));
+        const shot = el('div', 'part-shot');
+        const image = document.createElement('img');
+        image.src = renderPart(part.id);
+        image.alt = '';
+        shot.append(image);
+        if (part.cost > 0) shot.append(el('span', 'part-cost', String(part.cost)));
+        button.append(shot, el('span', 'part-name', part.name));
         button.title = part.blurb;
         button.addEventListener('click', () => this.h.onSelectPart(part.id));
-        list.append(button);
+        grid.append(button);
         this.partButtons.set(part.id, button);
       }
+      list.append(grid);
     }
   }
 
@@ -183,7 +193,7 @@ export class Hud {
   }
 
   setLevel(level) {
-    this.dom.levelSelect.value = level.id;
+    this.dom.crumbLevel.textContent = level.name;
     this.dom.briefTitle.textContent = level.name;
     this.dom.briefText.textContent = level.brief;
     this.dom.briefHint.textContent = level.hint ?? '';
@@ -226,6 +236,7 @@ export class Hud {
         this.h.onConfigChange(placed.id, { power: value });
       });
     }
+    if (part.strokeRange) this.renderStroke(body, placed, part);
 
     const remove = el('button', 'danger', 'Delete part');
     remove.style.width = '100%';
@@ -439,6 +450,20 @@ export class Hud {
     body.append(el('p', 'insp-blurb', `Trips within ${metres.toFixed(1)} m.`));
   }
 
+  // How far this piston reaches. Set per part, so a short jab and a long lift
+  // can sit on the same machine.
+  renderStroke(body, placed, part) {
+    const [min, max] = part.strokeRange;
+    const note = el('p', 'insp-blurb');
+    const say = (value) => { note.textContent = `Reaches ${value.toFixed(2)} m when held.`; };
+    this.renderSlider(body, 'Reach', pistonStroke(placed, part), min, max, 0.1, (value) => {
+      this.h.onConfigChange(placed.id, { stroke: value });
+      say(value);
+    });
+    say(pistonStroke(placed, part));
+    body.append(note);
+  }
+
   renderSlider(body, label, value, min, max, step, onInput) {
     const row = el('div', 'row');
     row.append(el('label', null, label));
@@ -496,14 +521,16 @@ export class Hud {
       `Run time <strong>${report.elapsed.toFixed(1)}s</strong>${par}${rule}`;
   }
 
+  // The same facts, in the same order, as the card the challenge was started
+  // from: time, par, cost.
   showWin(level, report, cost) {
     this.dom.winTitle.textContent = level.name;
     const beatPar = level.par && report.elapsed <= level.par;
     this.dom.winStats.innerHTML = [
-      `Time <strong>${report.elapsed.toFixed(1)}s</strong>`,
-      level.par ? `Par <strong>${level.par}s</strong>${beatPar ? ' ✓' : ''}` : '',
-      `Cost <strong>${cost}</strong>`,
-    ].filter(Boolean).join(' &nbsp;·&nbsp; ');
+      `<span${beatPar ? ' class="beat"' : ''}>Time <strong>${report.elapsed.toFixed(1)}s</strong></span>`,
+      level.par ? `<span>Par <strong>${level.par}s</strong></span>` : '',
+      `<span>Cost <strong>${cost}</strong></span>`,
+    ].filter(Boolean).join('');
     this.dom.win.hidden = false;
   }
 
@@ -512,7 +539,7 @@ export class Hud {
     this.dom.winKicker.textContent = 'Run failed';
     this.dom.winTitle.textContent = reason;
     this.dom.winStats.innerHTML =
-      `${level.name} &nbsp;·&nbsp; lasted <strong>${report.elapsed.toFixed(1)}s</strong>`;
+      `<span>${level.name}</span><span>Lasted <strong>${report.elapsed.toFixed(1)}s</strong></span>`;
     this.dom.win.hidden = false;
   }
 
@@ -520,6 +547,48 @@ export class Hud {
     this.dom.win.hidden = true;
     this.dom.win.classList.remove('failed');
     this.dom.winKicker.textContent = 'Challenge complete';
+  }
+
+  /**
+   * A yes-or-no question, resolving to what was chosen. Escape and the
+   * backdrop both count as no, so there is no way to leave by accident.
+   */
+  confirm({ title, body, ok = 'Yes', cancel = 'Cancel' }) {
+    const dom = this.dom;
+    dom.modalTitle.textContent = title;
+    dom.modalBody.textContent = body;
+    dom.modalOk.textContent = ok;
+    dom.modalCancel.textContent = cancel;
+    dom.modal.hidden = false;
+    dom.modalOk.focus();
+
+    return new Promise((resolve) => {
+      const finish = (answer) => {
+        dom.modal.hidden = true;
+        dom.modalOk.removeEventListener('click', yes);
+        dom.modalCancel.removeEventListener('click', no);
+        dom.modal.removeEventListener('mousedown', backdrop);
+        removeEventListener('keydown', key, true);
+        resolve(answer);
+      };
+      const yes = () => finish(true);
+      const no = () => finish(false);
+      const backdrop = (event) => { if (event.target === dom.modal) finish(false); };
+      const key = (event) => {
+        if (event.key !== 'Escape' && event.key !== 'Enter') return;
+        event.preventDefault();
+        event.stopPropagation();
+        finish(event.key === 'Enter');
+      };
+      dom.modalOk.addEventListener('click', yes);
+      dom.modalCancel.addEventListener('click', no);
+      dom.modal.addEventListener('mousedown', backdrop);
+      addEventListener('keydown', key, true);
+    });
+  }
+
+  get modalIsOpen() {
+    return !this.dom.modal.hidden;
   }
 
   toast(message, bad = false) {

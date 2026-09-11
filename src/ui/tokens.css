@@ -1,0 +1,70 @@
+/* ============================================================================
+   The design system, shared by the front end and the studio.
+
+   Amber leads. Cyan marks anything to do with rules, logic and wiring — the
+   node editor, the no-input and no-collision badges, the sensor readouts.
+   Green is only ever "done"; red is only ever "failed".
+
+   Two faces, used for two different jobs: Chakra Petch for anything a person
+   reads as a label, JetBrains Mono for anything that is a number, a key, or a
+   piece of machine state. Nothing is rounded — panels and controls take a cut
+   corner instead, which is what makes the whole thing read as one object.
+   ========================================================================= */
+
+/* Latin only. The full packages carry Cyrillic, Greek and Vietnamese subsets
+   that nothing in the game ever renders. */
+@import "@fontsource/chakra-petch/latin-400.css";
+@import "@fontsource/chakra-petch/latin-500.css";
+@import "@fontsource/chakra-petch/latin-600.css";
+@import "@fontsource/chakra-petch/latin-700.css";
+@import "@fontsource-variable/jetbrains-mono/wght.css";
+
+:root {
+  --void: #070a0f;
+  --panel: rgba(18, 26, 37, .86);
+  --solid: #121a25;
+  --raised: #1a2431;
+  --edge: #26323f;
+  --edge-soft: rgba(255, 255, 255, .07);
+  --text: #e8eef5;
+  --dim: #8595a6;
+  --faint: #5a6878;
+  --amber: #f0a825;
+  --amber-b: #ffc95c;
+  --amber-dim: rgba(240, 168, 37, .16);
+  --cyan: #35d0e0;
+  --cyan-dim: rgba(53, 208, 224, .14);
+  --green: #3ecf8e;
+  --red: #f06a5d;
+
+  --ui: "Chakra Petch", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
+
+  --notch: 14px;
+  --notch-sm: 8px;
+
+  color-scheme: dark;
+}
+
+/* The cut corner, on opposite sides, at two sizes. Applied by hand rather than
+   through a class in most places, because the elements that take it are
+   already carrying a background and a border. */
+.cut { clip-path: polygon(0 0, calc(100% - var(--notch)) 0, 100% var(--notch), 100% 100%, var(--notch) 100%, 0 calc(100% - var(--notch))); }
+.cut-sm { clip-path: polygon(0 0, calc(100% - var(--notch-sm)) 0, 100% var(--notch-sm), 100% 100%, var(--notch-sm) 100%, 0 calc(100% - var(--notch-sm))); }
+
+/* ------------------------------------------------------------- type helpers */
+
+.mono {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Small uppercase label above a group of controls. */
+.label {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
