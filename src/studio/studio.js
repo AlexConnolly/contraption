@@ -73,6 +73,7 @@ export class Studio {
     grid.position.y = PLATE_Y + 0.002;
     grid.material.transparent = true;
     grid.material.opacity = 0.5;
+    this.grid = grid;
     this.root.add(grid);
   }
 
@@ -373,6 +374,31 @@ export class Studio {
       }
     }
     this.grouping = grouping;
+  }
+
+  /**
+   * Where the machine sits and how big it is, for a camera that wants to frame
+   * it. Falls back to a sensible empty-plate shot when nothing is built.
+   */
+  machineFraming() {
+    const box = new THREE.Box3();
+    let any = false;
+    for (const mesh of this.partMeshes.values()) {
+      box.expandByObject(mesh);
+      any = true;
+    }
+    if (!any) return { centre: new THREE.Vector3(0, 1, 0), reach: 3 };
+    const size = box.getSize(new THREE.Vector3());
+    return {
+      centre: box.getCenter(new THREE.Vector3()),
+      reach: Math.max(size.x, size.y, size.z, 1.6),
+    };
+  }
+
+  // The title screen turns the machine on an empty stage, with no grid.
+  setShowPlate(show) {
+    this.plate.visible = show;
+    if (this.grid) this.grid.visible = show;
   }
 
   setVisible(visible) {

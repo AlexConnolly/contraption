@@ -132,6 +132,21 @@ export class Hud {
     }
   }
 
+  // The menu owns the screen while it is up, so the game's panels step aside.
+  setChromeVisible(visible) {
+    this.chromeHidden = !visible;
+    for (const node of [
+      document.getElementById('topbar'),
+      document.getElementById('brief'),
+      document.getElementById('help'),
+      this.dom.palette,
+      this.dom.inspector,
+      this.dom.objectives,
+    ]) {
+      if (node) node.style.display = visible ? '' : 'none';
+    }
+  }
+
   setMode(mode, flightKeys = null) {
     const test = mode === 'test';
     this.flightKeys = flightKeys;

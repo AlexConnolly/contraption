@@ -1,0 +1,143 @@
+const KEY = 'contraption.v1';
+
+function read() {
+  try {
+    return JSON.parse(localStorage.getItem(KEY) ?? '{}');
+  } catch {
+    return {};
+  }
+}
+
+function write(data) {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(data));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Two machines saved in the same millisecond would otherwise share an id, and
+// the second would quietly replace the first.
+function newId() {
+  return `m${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+}
+
+/**
+ * Everything the game remembers between sessions: the work in progress on each
+ * challenge, which ones have been solved and how fast, and the garage of named
+ * machines that can be taken into any challenge.
+ */
+export const store = {
+  all: read,
+
+  lastLevel() {
+    return read().lastLevel ?? null;
+  },
+
+  setLastLevel(id) {
+    const data = read();
+    data.lastLevel = id;
+    write(data);
+  },
+
+  // ---------------------------------------------------------------- settings
+
+  settings(defaults) {
+    return { ...defaults, ...(read().settings ?? {}) };
+  },
+
+  setSetting(key, value) {
+    const data = read();
+    data.settings = data.settings ?? {};
+    data.settings[key] = value;
+    write(data);
+  },
+
+  // ------------------------------------------------------------- in progress
+
+  design(levelId) {
+    return read().designs?.[levelId] ?? null;
+  },
+
+  saveDesign(levelId, blueprintJson) {
+    const data = read();
+    data.designs = data.designs ?? {};
+    data.designs[levelId] = blueprintJson;
+    data.lastLevel = levelId;
+    return write(data);
+  },
+
+  // ----------------------------------------------------------------- results
+
+  result(levelId) {
+    return read().results?.[levelId] ?? null;
+  },
+
+  solved(levelId) {
+    return Boolean(read().results?.[levelId]?.best);
+  },
+
+  solvedCount(levelIds) {
+    const results = read().results ?? {};
+    return levelIds.filter((id) => results[id]?.best).length;
+  },
+
+  // Keeps the best time only, so a scrappy win is never overwritten by a
+  // slower one on a later attempt.
+  recordWin(levelId, seconds, cost) {
+    const data = read();
+    data.results = data.results ?? {};
+    const previous = data.results[levelId];
+    const better = !previous?.best || seconds < previous.best;
+    data.results[levelId] = {
+      best: better ? seconds : previous.best,
+      bestCost: better ? cost : previous.bestCost,
+      runs: (previous?.runs ?? 0) + 1,
+      at: Date.now(),
+    };
+    write(data);
+    return better;
+  },
+
+  // ------------------------------------------------------------------ garage
+
+  machines() {
+    return read().machines ?? [];
+  },
+
+  machine(id) {
+    return this.machines().find((m) => m.id === id) ?? null;
+  },
+
+  saveMachine({ id, name, blueprint, thumb }) {
+    const data = read();
+    data.machines = data.machines ?? [];
+    const existing = data.machines.findIndex((m) => m.id === id);
+    const entry = {
+      id: id ?? newId(),
+      name,
+      blueprint,
+      thumb,
+      at: Date.now(),
+    };
+    if (existing >= 0) data.machines[existing] = { ...data.machines[existing], ...entry };
+    else data.machines.unshift(entry);
+    write(data);
+    return entry;
+  },
+
+  renameMachine(id, name) {
+    const data = read();
+    const entry = data.machines?.find((m) => m.id === id);
+    if (!entry) return;
+    entry.name = name;
+    write(data);
+  },
+
+  deleteMachine(id) {
+    const data = read();
+    data.machines = (data.machines ?? []).filter((m) => m.id !== id);
+    write(data);
+  },
+};

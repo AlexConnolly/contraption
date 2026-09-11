@@ -16,10 +16,12 @@ import { ObjectiveTracker, withinBudget } from './challenges/objectives.js';
 import { getLevel, LEVELS } from './challenges/levels.js';
 import { Hud } from './ui/hud.js';
 import { GraphEditor } from './ui/graph-editor.js';
+import { FrontEnd } from './ui/frontend.js';
+import { store } from './ui/progress.js';
+import { renderMachine } from './ui/thumbnails.js';
 import { emptyProgram } from './sim/program.js';
 
 const STEP = 1 / 60;
-const STORAGE_KEY = 'contraption.v1';
 
 const state = {
   mode: 'studio',
@@ -31,6 +33,7 @@ const state = {
   cameraMode: 'chase',
   won: false,
   crashed: false,
+  idling: false,
 };
 
 const canvas = document.getElementById('view');
@@ -80,38 +83,23 @@ let studio;
 let hud;
 let world;
 let editor;
+let frontEnd;
+
+const settings = store.settings({
+  camera: 'chase',
+  shadows: 'on',
+  scanlines: 'on',
+});
 
 // ---------------------------------------------------------------- persistence
 
-function readStore() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}');
-  } catch {
-    return {};
-  }
-}
-
-function writeStore(data) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 function saveDesign(quiet = false) {
-  const store = readStore();
-  store.designs = store.designs ?? {};
-  store.designs[state.level.id] = state.blueprint.toJSON();
-  store.lastLevel = state.level.id;
-  const ok = writeStore(store);
+  const ok = store.saveDesign(state.level.id, state.blueprint.toJSON());
   if (!quiet) hud.toast(ok ? 'Design saved' : 'Could not save — storage blocked', !ok);
 }
 
 function loadDesign(levelId) {
-  const store = readStore();
-  const data = store.designs?.[levelId];
+  const data = store.design(levelId);
   return data ? Blueprint.fromJSON(data, { bounds: state.blueprint.bounds }) : null;
 }
 
@@ -221,6 +209,63 @@ function changeLevel(id) {
   if (state.mode === 'test') enterTest(); else refreshReadouts();
 }
 
+// --------------------------------------------------------------------- menu
+
+function openMenu(screen = 'title') {
+  if (state.mode === 'test') enterStudio();
+  saveDesign(true);
+  input.enabled = false;
+  hud.setChromeVisible(false);
+  // The title screen has the workshop turning slowly behind it.
+  studio.setVisible(true);
+  studio.setShowPlate(false);
+  state.idling = true;
+  frontEnd.open(screen);
+}
+
+function leaveMenu() {
+  frontEnd.close();
+  state.idling = false;
+  input.enabled = !state.level.handsOff || state.mode !== 'test';
+  hud.setChromeVisible(true);
+  studio.setShowPlate(true);
+  enterStudio();
+}
+
+function applySetting(key, value) {
+  settings[key] = value;
+  store.setSetting(key, value);
+  if (key === 'camera') state.cameraMode = value;
+  if (key === 'shadows') renderer.shadowMap.enabled = value === 'on';
+  if (key === 'scanlines') frontEnd.setScanlines(value === 'on');
+  if (key === 'shadows') scene.traverse((o) => { if (o.isMesh) o.material.needsUpdate = true; });
+}
+
+// A slow orbit of whatever is on the build plate, behind the title screen. The
+// machine is pushed into the right of the frame so the menu down the left side
+// never sits on top of it.
+const idleLook = new THREE.Vector3();
+const idleRight = new THREE.Vector3();
+
+function idleCamera(dt) {
+  const { centre, reach } = studio.machineFraming();
+
+  state.idleAngle = (state.idleAngle ?? 0.6) + dt * 0.12;
+  const radius = reach * 2.8;
+  camera.position.set(
+    centre.x + Math.sin(state.idleAngle) * radius,
+    centre.y + reach * 1.25,
+    centre.z + Math.cos(state.idleAngle) * radius,
+  );
+  camera.lookAt(centre);
+
+  // Pan the aim to the left of the machine, which slides the machine itself
+  // into the right of the picture.
+  idleRight.set(1, 0, 0).applyQuaternion(camera.quaternion);
+  idleLook.copy(centre).addScaledVector(idleRight, -reach * 0.75);
+  camera.lookAt(idleLook);
+}
+
 // --------------------------------------------------------------------- camera
 
 const chaseTarget = new THREE.Vector3();
@@ -302,14 +347,19 @@ canvas.addEventListener('pointerleave', () => studio?.clearPointer());
 canvas.addEventListener('contextmenu', (event) => event.preventDefault());
 
 function handleShortcuts() {
-  if (editor?.isOpen) return;
+  if (editor?.isOpen || frontEnd?.isOpen) return;
+  // Escape drops out of the game and back to the menu.
+  if (input.wasPressed('Escape')) {
+    openMenu();
+    return;
+  }
   if (input.wasPressed('Tab')) {
     if (state.mode === 'studio') enterTest(); else enterStudio();
   }
   if (state.mode === 'test') {
     if (input.wasPressed('KeyK')) respawn();
     if (input.wasPressed('KeyC')) {
-      state.cameraMode = state.cameraMode === 'chase' ? 'orbit' : 'chase';
+      applySetting('camera', state.cameraMode === 'chase' ? 'orbit' : 'chase');
       controls.enabled = state.cameraMode === 'orbit';
       hud.toast(`Camera: ${state.cameraMode}`);
     }
@@ -358,6 +408,7 @@ function simulateStep() {
   }
   if (report.complete && !state.won) {
     state.won = true;
+    store.recordWin(state.level.id, report.elapsed, state.blueprint.cost());
     hud.showWin(state.level, report, state.blueprint.cost());
   }
 }
@@ -381,7 +432,7 @@ function frame(now) {
   handleShortcuts();
 
   if (state.mode === 'studio') {
-    studio.update();
+    if (!state.idling) studio.update();
     input.endFrame();
   } else if (state.machine) {
     accumulator += dt;
@@ -403,8 +454,9 @@ function frame(now) {
     input.endFrame();
   }
 
-  updateCamera(dt);
-  if (controls.enabled) controls.update();
+  if (state.idling) idleCamera(dt);
+  else updateCamera(dt);
+  if (controls.enabled && !state.idling) controls.update();
   const focus = state.mode === 'test' && state.machine
     ? state.machine.corePosition()
     : new THREE.Vector3(0, 0, 0);
@@ -419,8 +471,7 @@ async function boot() {
   world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
   world.timestep = STEP;
 
-  const store = readStore();
-  state.level = getLevel(store.lastLevel ?? 'first-haul');
+  state.level = getLevel(store.lastLevel() ?? 'first-haul');
   const stored = loadDesign(state.level.id);
   state.blueprint = stored ?? starterRover();
 
@@ -520,6 +571,36 @@ async function boot() {
   refreshInspector();
   hud.ready();
 
+  frontEnd = new FrontEnd({
+    RAPIER,
+    handlers: {
+      onPlay: (levelId) => {
+        if (levelId !== state.level.id) changeLevel(levelId);
+        leaveMenu();
+      },
+      onExit: () => { saveDesign(true); location.reload(); },
+      onSaveMachine: (name) => {
+        store.saveMachine({
+          name,
+          blueprint: state.blueprint.toJSON(),
+          thumb: renderMachine(state.blueprint),
+        });
+      },
+      suggestName: () => state.blueprint.name || 'New machine',
+      onLoadMachine: (id) => {
+        const machine = store.machine(id);
+        if (!machine) return;
+        studio.replaceBlueprint(
+          Blueprint.fromJSON(machine.blueprint, { bounds: state.blueprint.bounds }),
+        );
+        leaveMenu();
+        hud.toast(`Loaded ${machine.name}`);
+      },
+      getSettings: () => ({ ...settings }),
+      onSetting: applySetting,
+    },
+  });
+
   if (import.meta.env.DEV) {
     window.__contraption = {
       state,
@@ -528,6 +609,15 @@ async function boot() {
       input,
       bus,
       editor,
+      frontEnd,
+      openMenu,
+      leaveMenu,
+      // One pass of the keyboard shortcuts, for checks that cannot rely on the
+      // frame loop running.
+      shortcuts() {
+        handleShortcuts();
+        input.endFrame();
+      },
       // Steps and redraws on demand. A browser tab in the background stops
       // calling requestAnimationFrame, so automated checks drive it from here.
       advance(seconds) {
@@ -551,6 +641,8 @@ async function boot() {
   addEventListener('resize', resize);
   addEventListener('beforeunload', () => saveDesign(true));
   resize();
+  for (const [key, value] of Object.entries(settings)) applySetting(key, value);
+  openMenu('title');
   requestAnimationFrame(frame);
 }
 

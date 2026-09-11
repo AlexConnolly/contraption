@@ -16,6 +16,7 @@
 | `avoidance` | The traffic challenge is solved hands-off across ten different seeds, and **flown clean** on every one of them — no contact at all. It goes round the blockers rather than down the middle, by a different path each time; and it is **not** solved when the forward sensor is made blind. |
 | `no contact` | The rule is on for the traffic challenge and off elsewhere; contact is reported when a machine is put where an obstacle is, and never for a machine's own parts touching each other. |
 | `computer` | Module reads come off the running machine; writes are clamped to the port's range; a program drives actuators directly, and drives the flight controller by naming a height. |
+| `progress` | Designs are kept apart per challenge; a slower later run cannot overwrite a best time; the best cost is the cost of the run that set the best time; machines saved in the same millisecond get different ids; renaming a machine that is not there is a no-op; storage that throws leaves the game running. |
 | `flight/loops` | Hover throttle matches weight over available lift; sinking adds throttle and rising removes it; a banked machine asks for more; the climb key drags the held altitude with it; the controller leans against drift and **away** from sideways drift; zero lift authority asks for nothing; every mixed throttle stays in range. |
 
 ## Manual (browser)
@@ -35,3 +36,8 @@
 13. Challenge 7 completes hands-off several times running, with visibly different obstacle timing and finishing times each run, and the objectives panel shows the no-contact rule.
 14. Blinding the sensors on challenge 7 ends the run with the failure card rather than a win.
 15. Save, reload the page, and load the design back unchanged.
+16. The game opens on the title screen with the machine turning behind it and the build UI hidden; `Esc` in game returns to it.
+17. Every challenge card shows a picture of its own course, its budget and par, and the `No input` / `No collisions` rules where they apply; clicking one starts that challenge.
+18. Winning a challenge puts a tick and a best time on its card, and the best time only improves.
+19. A machine saved to the garage appears with its own picture, opens into the current challenge, renames and deletes.
+20. Each setting takes effect as it is pressed and is still set after a reload.

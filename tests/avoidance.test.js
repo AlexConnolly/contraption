@@ -174,12 +174,13 @@ describe('the traffic challenge', () => {
     }
   });
 
+  // Ten full 170-second runs in one case, so it needs longer than the default.
   it('flies the whole course without touching anything', () => {
     for (const seed of seeds) {
       const run = fly(seed);
       expect(run.touched, `seed ${seed}`).toBe(null);
     }
-  });
+  }, 30000);
 
   it('takes a different path through each time', () => {
     const paths = [1, 2, 3, 4].map((seed) => fly(seed).wandered.toFixed(2));

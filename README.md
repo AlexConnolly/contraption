@@ -9,10 +9,36 @@ Three.js for rendering, Rapier for physics, Vite for the build.
 ```bash
 npm install
 npm run dev      # http://localhost:5173
-npm test         # 177 tests, including headless physics
+npm test         # 193 tests, including headless physics
 npm run build
 npm run preview  # serve the production build
 ```
+
+## The front end
+
+The game opens on a title screen with the workshop turning slowly behind it,
+and four ways in.
+
+**Challenges** is a grid of every problem in the game. Each card carries a
+picture of the actual course, the parts budget, the par time, and the rules it
+is played under — *No input* where the machine has to run on its own program,
+*No collisions* where touching anything fails the run. A solved challenge shows
+a tick and the best time you have set on it.
+
+The course pictures are not screenshots taken by hand. Each one is built from
+the level itself — the same arena the game plays, stepped on a little so the
+moving parts are somewhere interesting — and drawn once per session. A course
+therefore cannot show something the challenge no longer contains.
+
+**Garage** holds machines you have saved by name. Any of them can be taken into
+any challenge, which is the point: a drone that solves the airlift is a
+reasonable starting point for the traffic run. Saving one draws its picture the
+same way.
+
+**Settings** covers the test camera, shadows and the screen effect over the
+menus. Each applies the moment it is pressed and is remembered.
+
+`Esc` leaves the game for the menu and backs out of any screen to the title.
 
 ## Playing
 
@@ -225,12 +251,14 @@ src/sim/         connectivity, body grouping, signal bus, machine, arena,
                  flight controller, program graph, computer runtime
 src/studio/      build mode: picking, ghost preview, undo, presets
 src/challenges/  levels and objective tracking
-src/ui/          palette, inspector, objectives, win card, node editor
+src/ui/          front end (title, challenges, garage, settings), save store,
+                 thumbnail renderer, palette, inspector, objectives, win card,
+                 node editor
 ```
 
 ## Tests
 
-`npm test` runs 71 tests. The pure logic (orientations, grid placement, body
+`npm test` runs 193 tests. The pure logic (orientations, grid placement, body
 grouping, key bindings, objectives) is covered directly. On top of that,
 `tests/physics.test.js` builds real machines in a real Rapier world and asserts
 they behave — a rover drives, reverses and steers the correct way; an
@@ -257,6 +285,11 @@ only ever get through the one it was written for — and checks that it flies
 every one of them **without touching anything**, going round the blockers
 rather than down the middle, by a different path each time. It also checks the opposite: blind the forward sensor and
 the same machine never finishes.
+
+`tests/progress.test.js` covers the save store on its own — designs kept apart
+per challenge, best times that a slower later run cannot overwrite, the garage,
+and settings — including what happens when the browser refuses storage
+altogether.
 
 `tests/level.test.js` plays challenge 1 from start to finish with a scripted
 driver, and flies challenge 4 with a drone that picks the payload up and puts
