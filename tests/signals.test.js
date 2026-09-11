@@ -87,21 +87,34 @@ describe('signals', () => {
 
 describe('drive bindings', () => {
   const binding = { mode: 'drive', pos: 'KeyW', neg: 'KeyS', left: 'KeyA', right: 'KeyD' };
+  // Forward is +Z and up is +Y, so the machine's right is forward x up = -X.
+  // driveSide is +1 for a wheel whose axle points along +X, which puts it on
+  // the machine's left.
+  const LEFT = { ...binding, side: 1 };
+  const RIGHT = { ...binding, side: -1 };
 
   it('drives both sides equally on throttle alone', () => {
     const input = fakeInput();
     const bus = new SignalBus(input);
     input.down.add('KeyW');
-    expect(bus.resolve('r', { ...binding, side: 1 })).toBe(1);
-    expect(bus.resolve('l', { ...binding, side: -1 })).toBe(1);
+    expect(bus.resolve('l', LEFT)).toBe(1);
+    expect(bus.resolve('r', RIGHT)).toBe(1);
   });
 
-  it('slows the inside wheels when steering', () => {
+  it('steers right by driving the left wheels and reversing the right', () => {
     const input = fakeInput();
     const bus = new SignalBus(input);
     input.down.add('KeyD');
-    expect(bus.resolve('r', { ...binding, side: 1 })).toBe(-1);
-    expect(bus.resolve('l', { ...binding, side: -1 })).toBe(1);
+    expect(bus.resolve('l', LEFT)).toBe(1);
+    expect(bus.resolve('r', RIGHT)).toBe(-1);
+  });
+
+  it('steers left the opposite way round', () => {
+    const input = fakeInput();
+    const bus = new SignalBus(input);
+    input.down.add('KeyA');
+    expect(bus.resolve('l', LEFT)).toBe(-1);
+    expect(bus.resolve('r', RIGHT)).toBe(1);
   });
 
   it('clamps throttle and steer together to the motor range', () => {
@@ -109,11 +122,11 @@ describe('drive bindings', () => {
     const bus = new SignalBus(input);
     input.down.add('KeyW');
     input.down.add('KeyA');
-    expect(bus.resolve('r', { ...binding, side: 1 })).toBe(1);
-    expect(bus.resolve('l', { ...binding, side: -1 })).toBe(0);
+    expect(bus.resolve('l', LEFT)).toBe(0);
+    expect(bus.resolve('r', RIGHT)).toBe(1);
   });
 
-  it('reads the machine side a wheel sits on from its rotation', () => {
+  it('reads the axle direction a wheel is bolted on with', () => {
     expect(driveSide(IDENTITY_ORIENTATION)).toBe(1);
     const flipped = yawStep(yawStep(IDENTITY_ORIENTATION));
     expect(driveSide(flipped)).toBe(-1);

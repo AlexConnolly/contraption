@@ -351,7 +351,7 @@ export class Studio {
 
     for (const placed of this.blueprint.list()) {
       const part = getPart(placed.type);
-      const mesh = createPartMesh(part);
+      const mesh = createPartMesh(part, { hints: true });
       mesh.position.set(
         placed.cell[0] * CELL, placed.cell[1] * CELL, placed.cell[2] * CELL,
       );

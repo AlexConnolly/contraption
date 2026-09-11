@@ -9,7 +9,7 @@ Three.js for rendering, Rapier for physics, Vite for the build.
 ```bash
 npm install
 npm run dev      # http://localhost:5173
-npm test         # 65 tests, including headless physics
+npm test         # 71 tests, including headless physics
 npm run build
 npm run preview  # serve the production build
 ```
@@ -61,7 +61,10 @@ axis-aligned rotations. Turning that into physics is the interesting part:
   reported as **seized** and you are told before the run starts. Parts with no
   path back to the core are reported as **disconnected**.
 - Rotors and thrusters are not articulated. They apply force to the body they
-  are part of, which is far more stable than spinning a real blade.
+  are part of, which is far more stable than spinning a real blade. Both push
+  along their local **+Y**, so yawing one with `R` does not change where it
+  points — tilt it with `T`. The studio draws an arrow through each one showing
+  which way it will push.
 
 Machine parts do not collide with each other, only with the world.
 
@@ -78,18 +81,24 @@ src/ui/          palette, inspector, objectives, win card
 
 ## Tests
 
-`npm test` runs 65 tests. The pure logic (orientations, grid placement, body
+`npm test` runs 71 tests. The pure logic (orientations, grid placement, body
 grouping, key bindings, objectives) is covered directly. On top of that,
 `tests/physics.test.js` builds real machines in a real Rapier world and asserts
-they behave — a rover drives, reverses and steers; a hinged arm lifts and
-lowers; a piston extends; a rotor machine takes off and comes back down; a
+they behave — a rover drives, reverses and steers the correct way; an
+off-centre thruster pushes without spinning the machine up; a hinged arm lifts
+and lowers; a piston extends; a rotor machine takes off and comes back down; a
 sensor trips; a grabber picks something up and holds it.
 
 `tests/level.test.js` plays challenge 1 from start to finish with a scripted
-driver and asserts the objective actually completes inside par. Those tests
-found three real bugs during development — wheels on opposite sides fighting
-each other, thrust accumulating every step because Rapier keeps applied forces
-until they are cleared, and articulated parts welding themselves solid.
+driver and asserts the objective actually completes inside par.
+
+Two conventions are worth stating because getting them wrong cost real bugs.
+Forward is **+Z** and up is **+Y**, so the machine's right-hand side is
+`forward x up` = **-X** — steering felt inverted until that was fixed. And
+Rapier's `addForceAtPoint` records a force *and* the `r x F` torque, which are
+cleared by **separate** calls: `resetForces` alone left the torque to
+accumulate, and a single off-centre thruster would wind a machine up until it
+threw itself off the floor.
 
 Part masses are given in kilograms per cell and prop masses in kilograms, so
 the numbers in the registry and levels mean something when you tune them.

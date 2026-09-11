@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 
 import { Blueprint } from '../src/core/blueprint.js';
-import { IDENTITY_ORIENTATION, yawStep } from '../src/core/orientation.js';
+import { IDENTITY_ORIENTATION, yawStep, pitchStep } from '../src/core/orientation.js';
 import { Machine, GROUP_WORLD } from '../src/sim/machine.js';
 import { SignalBus } from '../src/sim/signals.js';
 import { starterRover } from '../src/studio/presets.js';
@@ -116,6 +116,83 @@ describe('driving', () => {
     const before = machine.corePosition().clone();
     run(machine, bus, 2);
     expect(machine.corePosition().distanceTo(before)).toBeLessThan(0.25);
+  });
+});
+
+describe('steering direction', () => {
+  // The machine's right-hand side is forward x up, which with forward at +Z
+  // and up at +Y is -X. Getting this backwards makes A and D feel swapped.
+  function turnTest(key) {
+    const { machine, bus } = build(starterRover(), keyboard());
+    run(machine, bus, 1);
+    const before = machine.coreForward().clone();
+    bus.input.down.add(key);
+    run(machine, bus, 1.5);
+    const right = before.clone().cross(new THREE.Vector3(0, 1, 0)).normalize();
+    return { before, after: machine.coreForward(), right };
+  }
+
+  it('turns the machine to its right on the right-steer key', () => {
+    const { before, after, right } = turnTest('KeyD');
+    expect(right.x).toBeLessThan(-0.99);
+    expect(after.dot(right)).toBeGreaterThan(0.25);
+    expect(after.dot(before)).toBeLessThan(0.95);
+  });
+
+  it('turns the machine to its left on the left-steer key', () => {
+    const { after, right } = turnTest('KeyA');
+    expect(after.dot(right)).toBeLessThan(-0.25);
+  });
+});
+
+describe('thruster torque', () => {
+  function rearThruster(rot) {
+    const bp = starterRover();
+    bp.place('thruster', [0, 1, -1], rot, { binding: { mode: 'hold', pos: 'KeyE' } });
+    return bp;
+  }
+
+  // addForceAtPoint sets both a force and the r x F torque, and Rapier keeps
+  // each until it is cleared separately. Missing resetTorques let an
+  // off-centre thruster wind the machine up until it was thrown off the floor.
+  it('does not spin the machine up when a thruster is mounted off-centre', () => {
+    const { machine, bus } = build(rearThruster(pitchStep(IDENTITY_ORIENTATION)), keyboard());
+    run(machine, bus, 1.5);
+    const start = machine.corePosition().clone();
+    bus.input.down.add('KeyE');
+    run(machine, bus, 3);
+    const end = machine.corePosition();
+
+    expect(machine.isUpsideDown()).toBe(false);
+    expect(end.y - start.y).toBeLessThan(0.3);
+    const spin = machine.bodies[machine.grouping.rootBody].angvel();
+    expect(Math.hypot(spin.x, spin.y, spin.z)).toBeLessThan(3);
+  });
+
+  it('pushes the machine along the way the nozzle points', () => {
+    const forward = build(rearThruster(pitchStep(IDENTITY_ORIENTATION)), keyboard());
+    run(forward.machine, forward.bus, 1.5);
+    const fromZ = forward.machine.corePosition().z;
+    forward.bus.input.down.add('KeyE');
+    run(forward.machine, forward.bus, 3);
+    expect(forward.machine.corePosition().z - fromZ).toBeGreaterThan(1);
+
+    const back = pitchStep(pitchStep(pitchStep(IDENTITY_ORIENTATION)));
+    const reverse = build(rearThruster(back), keyboard());
+    run(reverse.machine, reverse.bus, 1.5);
+    const backZ = reverse.machine.corePosition().z;
+    reverse.bus.input.down.add('KeyE');
+    run(reverse.machine, reverse.bus, 3);
+    expect(reverse.machine.corePosition().z - backZ).toBeLessThan(-1);
+  });
+
+  it('cannot lift the machine with a single thruster pointing up', () => {
+    const { machine, bus } = build(rearThruster(IDENTITY_ORIENTATION), keyboard());
+    run(machine, bus, 1.5);
+    const start = machine.corePosition().y;
+    bus.input.down.add('KeyE');
+    run(machine, bus, 3);
+    expect(machine.corePosition().y - start).toBeLessThan(0.2);
   });
 });
 

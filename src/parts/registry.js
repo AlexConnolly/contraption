@@ -189,7 +189,7 @@ const PARTS = [
       signal: 'hold',
       defaultBinding: { mode: 'hold', pos: 'Space' },
     },
-    blurb: 'Strong lift straight up its axis. Hungry for power.',
+    blurb: 'Strong lift out of its top face. Tilt it with T — R only spins it on the spot.',
   },
   {
     id: 'thruster',
@@ -199,13 +199,13 @@ const PARTS = [
     mass: 1.1,
     colour: 0xff7a45,
     cost: 5,
-    thruster: { axis: [0, 1, 0], maxThrust: 18, spin: 0 },
+    thruster: { axis: [0, 1, 0], maxThrust: 55, spin: 0 },
     actuator: {
       kind: 'thrust',
       signal: 'hold',
       defaultBinding: { mode: 'hold', pos: 'ShiftLeft' },
     },
-    blurb: 'Steady push along its axis. Aim it any way you like.',
+    blurb: 'Steady push out of its nozzle. Tilt it with T — R only spins it on the spot.',
   },
   {
     id: 'sensor',

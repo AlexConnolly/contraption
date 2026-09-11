@@ -133,8 +133,10 @@ const BUILDERS = {
 
   thruster(part) {
     const group = new THREE.Group();
+    // Narrow at the top, flared at the bottom: the exhaust leaves the wide end
+    // and the push is the other way, along local +Y.
     const nozzle = new THREE.Mesh(
-      new THREE.CylinderGeometry(CELL * 0.34, CELL * 0.2, CELL * 0.8, 16),
+      new THREE.CylinderGeometry(CELL * 0.2, CELL * 0.34, CELL * 0.8, 16),
       material(part.colour),
     );
     group.add(nozzle);
@@ -178,7 +180,35 @@ const BUILDERS = {
   },
 };
 
-export function createPartMesh(part) {
+// A thrust axis is invisible until it fires, and yawing a part does not change
+// which way it points, so the studio draws the direction on it.
+function thrustArrow(part) {
+  const group = new THREE.Group();
+  // Drawn without depth testing and last, so an arrow pointing into the middle
+  // of the machine is still visible instead of being swallowed by the part in
+  // front of it.
+  const skin = () => new THREE.MeshBasicMaterial({
+    color: 0xffd166,
+    depthTest: false,
+    transparent: true,
+    opacity: 0.95,
+  });
+  const shaft = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.022, 0.022, CELL * 0.7, 8),
+    skin(),
+  );
+  shaft.position.y = CELL * 0.85;
+  const head = new THREE.Mesh(new THREE.ConeGeometry(0.075, CELL * 0.34, 12), skin());
+  head.position.y = CELL * 1.35;
+  group.add(shaft, head);
+  group.renderOrder = 999;
+  group.traverse((child) => { child.renderOrder = 999; });
+  const axis = new THREE.Vector3(...part.thruster.axis);
+  group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis);
+  return group;
+}
+
+export function createPartMesh(part, options = {}) {
   const build = BUILDERS[part.id] ?? shell;
   const object = build(part);
   object.traverse((child) => {
@@ -186,11 +216,12 @@ export function createPartMesh(part) {
     child.castShadow = true;
     child.receiveShadow = true;
   });
+  if (options.hints && part.thruster) object.add(thrustArrow(part));
   return object;
 }
 
 export function makeGhost(part) {
-  const object = createPartMesh(part);
+  const object = createPartMesh(part, { hints: true });
   object.traverse((child) => {
     if (!child.isMesh && !child.isLineSegments) return;
     child.castShadow = false;

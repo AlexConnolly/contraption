@@ -61,11 +61,14 @@ function pushToward(targetZ) {
     const aim = new THREE.Vector3(0, 0, crate.z + 1);
     const heading = aim.sub(machine.corePosition()).setY(0).normalize();
     const forward = machine.coreForward();
-    const turn = forward.z * heading.x - forward.x * heading.z;
+    // The machine's right is forward x up, so a heading with a positive
+    // component along it needs a right turn.
+    const right = forward.clone().cross(new THREE.Vector3(0, 1, 0));
+    const offRight = heading.dot(right);
 
     input.down.add('KeyW');
-    if (turn > 0.04) input.down.add('KeyD');
-    else if (turn < -0.04) input.down.add('KeyA');
+    if (offRight > 0.04) input.down.add('KeyD');
+    else if (offRight < -0.04) input.down.add('KeyA');
   };
 }
 

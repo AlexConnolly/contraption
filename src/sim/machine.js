@@ -213,9 +213,14 @@ export class Machine {
   }
 
   update(dt, bus) {
-    // Rapier keeps an applied force until it is cleared, so thrust has to be
-    // wiped and re-applied every step or it accumulates.
-    for (const body of this.bodies) body.resetForces(false);
+    // Rapier keeps applied forces until they are cleared, so thrust has to be
+    // wiped and re-applied every step or it accumulates. Force and torque are
+    // cleared separately, and addForceAtPoint sets both: an off-centre
+    // thruster adds the r x F torque as well as the force.
+    for (const body of this.bodies) {
+      body.resetForces(false);
+      body.resetTorques(false);
+    }
     this.readSensors(bus);
     for (const actuator of this.actuators) {
       const { placed, part, joint } = actuator;

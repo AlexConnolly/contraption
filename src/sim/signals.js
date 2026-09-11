@@ -42,12 +42,13 @@ export class SignalBus {
     const down = (code) => (code ? this.input.isDown(code) : false);
     switch (binding.mode) {
       // One wheel either side of the machine turns by slowing itself and
-      // speeding up its opposite number, so WASD steers like a tank.
+      // speeding up its opposite number, so WASD steers like a tank. Steering
+      // right means driving the left-hand wheels harder, hence the plus.
       case 'drive': {
         const throttle = (down(binding.pos) ? 1 : 0) - (down(binding.neg) ? 1 : 0);
         const steer = (down(binding.right) ? 1 : 0) - (down(binding.left) ? 1 : 0);
         const side = binding.side ?? 1;
-        return Math.max(-1, Math.min(1, throttle - side * steer));
+        return Math.max(-1, Math.min(1, throttle + side * steer));
       }
       case 'axis':
         return (down(binding.pos) ? 1 : 0) - (down(binding.neg) ? 1 : 0);
@@ -100,10 +101,13 @@ export function keyLabel(code) {
 }
 
 /**
- * Which way round a wheel is bolted on. A wheel connects through its local -X
- * face, so two wheels facing each other across a chassis have opposite axle
- * directions: one of them has to be driven in reverse to roll the same way,
- * and it is the one on the left when steering.
+ * Which way round a wheel is bolted on: +1 when its axle points along a
+ * positive world axis, -1 when it points the other way. Two wheels facing each
+ * other across a chassis have opposite axle directions, so one of them has to
+ * be driven in reverse to roll the same way as the other.
+ *
+ * With forward at +Z and up at +Y, the machine's right is forward x up = -X,
+ * so a wheel returning +1 sits on the machine's LEFT.
  */
 export function driveSide(rot) {
   const axle = applyOrientation(rot, [1, 0, 0]);
