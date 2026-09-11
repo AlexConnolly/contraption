@@ -1,5 +1,7 @@
 import * as THREE from 'three';
-import { getPart, partDensity, pistonStroke, CELL } from '../parts/registry.js';
+import {
+  getPart, partDensity, pistonStroke, turntableSpin, turntableTorque, CELL,
+} from '../parts/registry.js';
 import { PISTON_ROD_TOP, PISTON_REST } from '../parts/geometry.js';
 import { orientationQuaternion, applyOrientation } from '../core/orientation.js';
 import { groupBlueprint } from './grouping.js';
@@ -455,6 +457,14 @@ export class Machine {
             signal * part.actuator.range,
             part.actuator.stiffness,
             part.actuator.damping,
+          );
+          break;
+        // Its own speed and torque, and no handedness: a turntable is not on
+        // one side of the machine the way a wheel is.
+        case 'spin':
+          joint?.configureMotorVelocity(
+            signal * turntableSpin(placed, part) * power,
+            turntableTorque(placed, part),
           );
           break;
         case 'linear':

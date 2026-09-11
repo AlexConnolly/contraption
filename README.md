@@ -9,7 +9,7 @@ Three.js for rendering, Rapier for physics, Vite for the build.
 ```bash
 npm install
 npm run dev      # http://localhost:5173
-npm test         # 265 tests, including headless physics
+npm test         # 278 tests, including headless physics
 npm run build
 npm run preview  # serve the production build
 ```
@@ -108,6 +108,14 @@ machine already moving is a wheel being dragged. Leaving room for a real
 difference lets the inside wheel reverse, which doubles the turn rate and
 costs some speed through the corner — which is what every vehicle does.
 Holding the steer key on its own still pivots on the spot.
+
+A **turntable** is a motorised bearing: it joins two things and turns one
+against the other, with no end stops, so you can stand a boom on it and swing
+it round. Both its speed and its torque are set per part. Torque buys spin-up
+rather than top speed — a level boom on an upright axis has no gravity pulling
+back — and the range runs from 12 Nm, which stalls a loaded boom outright, to
+1800, which is instant. That span is what takes the same part from nudging a
+flap to throwing something.
 
 A piston's **reach** is set on the piston, anywhere from 0.4 m to 2.4 m, so a
 short jab and a long lift can sit on the same machine.
@@ -350,7 +358,7 @@ src/ui/          design tokens, front end (title, challenges, garage,
 
 ## Tests
 
-`npm test` runs 265 tests. The pure logic (orientations, grid placement, body
+`npm test` runs 278 tests. The pure logic (orientations, grid placement, body
 grouping, key bindings, objectives) is covered directly. On top of that,
 `tests/physics.test.js` builds real machines in a real Rapier world and asserts
 they behave — a rover drives, reverses and steers the correct way; an

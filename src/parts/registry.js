@@ -55,6 +55,38 @@ export function workingAxis(part, rot = IDENTITY_ORIENTATION) {
   return null;
 }
 
+function clampTo(value, [lo, hi], fallback) {
+  if (typeof value !== 'number' || Number.isNaN(value)) return fallback;
+  return Math.min(hi, Math.max(lo, value));
+}
+
+/**
+ * How fast a turntable is set to turn, in radians a second.
+ */
+export function turntableSpin(placed, part = getPart('turntable')) {
+  return clampTo(placed?.config?.spin, part.spinRange, part.spin);
+}
+
+/**
+ * How hard it is allowed to push to get there, in newton-metres.
+ *
+ * The range matters more than the default, and what it buys is spin-up time
+ * rather than top speed: a level boom on an upright axis has no gravity
+ * pulling back against it, so a weak motor gets there eventually — or not at
+ * all. Swept on a three-cell boom, seconds to reach 4.5 rad/s:
+ *
+ *     torque      12     40    100    240    600   1800
+ *     bare      0.43   0.12   0.05   0.02   0.00   0.00
+ *     loaded   never   1.50   0.23   0.07   0.03   0.02
+ *
+ * So 12 stalls a loaded boom outright, 40 heaves it round over a second and a
+ * half, 100 is brisk and anything past 600 is instant. Those are the menial
+ * and the heavy ends, and the range covers both with room either side.
+ */
+export function turntableTorque(placed, part = getPart('turntable')) {
+  return clampTo(placed?.config?.torque, part.torqueRange, part.torque);
+}
+
 /**
  * How far a piston is set to push, in metres. Each one carries its own, so a
  * short jab and a long reach can sit on the same machine; anything outside
@@ -203,6 +235,40 @@ const PARTS = [
       defaultBinding: { mode: 'axis', pos: 'KeyR', neg: 'KeyF' },
     },
     blurb: 'Holds an angle. Build arms and steering knuckles from these.',
+  },
+  {
+    id: 'turntable',
+    ports: {
+      in: [{ id: 'speed', name: 'Speed', kind: 'number', min: -1, max: 1 }],
+      out: [
+        { id: 'angle', name: 'Angle', kind: 'number' },
+        { id: 'rate', name: 'Turn rate', kind: 'number' },
+      ],
+    },
+    name: 'Turntable',
+    category: 'manipulator',
+    size: [1, 1, 1],
+    mass: 2.2,
+    colour: 0xc27bd6,
+    cost: 5,
+    articulated: true,
+    joint: 'revolute',
+    axis: [0, 1, 0],
+    attach: [[0, -1, 0]],
+    carry: [[0, 1, 0]],
+    // No limits: unlike the hinge it goes round and round, which is what
+    // makes it the thing you build a launcher on.
+    spin: 6,
+    spinRange: [0.5, 14],
+    torque: 240,
+    torqueRange: [12, 1800],
+    actuator: {
+      kind: 'spin',
+      port: 'speed',
+      signal: 'axis',
+      defaultBinding: { mode: 'axis', pos: 'KeyZ', neg: 'KeyX' },
+    },
+    blurb: 'A motorised bearing. Stand anything on it and turn it. Set the speed and the torque.',
   },
   {
     id: 'piston',

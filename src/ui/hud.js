@@ -1,4 +1,7 @@
-import { CATEGORIES, partsInCategory, getPart, pistonStroke, workingAxis } from '../parts/registry.js';
+import {
+  CATEGORIES, partsInCategory, getPart, pistonStroke, workingAxis,
+  turntableSpin, turntableTorque,
+} from '../parts/registry.js';
 import { BINDING_MODES, bindingLabel, keyLabel, defaultBinding } from '../sim/signals.js';
 import { estimateGains, firstController, controllerOf } from '../sim/flight.js';
 import { renderPart } from './thumbnails.js';
@@ -275,6 +278,7 @@ export class Hud {
       });
     }
     if (part.strokeRange) this.renderStroke(body, placed, part);
+    if (part.spinRange) this.renderTurntable(body, placed, part);
 
     const remove = el('button', 'danger', 'Delete part');
     remove.style.width = '100%';
@@ -521,6 +525,34 @@ export class Hud {
     });
     say(pistonStroke(placed, part));
     body.append(note);
+  }
+
+  // A turntable is set up twice over: how fast it goes round, and how hard it
+  // is allowed to push to get there. The second is what takes it from moving
+  // a flap to swinging a loaded boom.
+  renderTurntable(body, placed, part) {
+    const [slow, fast] = part.spinRange;
+    const [weak, strong] = part.torqueRange;
+    const speedNote = el('p', 'insp-blurb');
+    const saySpeed = (v) => { speedNote.textContent = `${v.toFixed(1)} rad/s — about ${(v / (Math.PI * 2)).toFixed(1)} turns a second.`; };
+    this.renderSlider(body, 'Speed', turntableSpin(placed, part), slow, fast, 0.5, (value) => {
+      this.h.onConfigChange(placed.id, { spin: value });
+      saySpeed(value);
+    });
+    saySpeed(turntableSpin(placed, part));
+    body.append(speedNote);
+
+    const torqueNote = el('p', 'insp-blurb');
+    const sayTorque = (v) => {
+      const heft = v < 60 ? 'Light work only' : v < 250 ? 'Moves a modest arm' : v < 800 ? 'Swings a loaded boom' : 'Shifts almost anything';
+      torqueNote.textContent = `${Math.round(v)} Nm — ${heft}.`;
+    };
+    this.renderSlider(body, 'Torque', turntableTorque(placed, part), weak, strong, 4, (value) => {
+      this.h.onConfigChange(placed.id, { torque: value });
+      sayTorque(value);
+    });
+    sayTorque(turntableTorque(placed, part));
+    body.append(torqueNote);
   }
 
   renderSlider(body, label, value, min, max, step, onInput) {

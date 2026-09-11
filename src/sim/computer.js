@@ -141,6 +141,30 @@ const READERS = {
     },
   },
 
+  turntable: {
+    // Which way it is pointing, and how fast it is going round, both measured
+    // against the thing it is bolted to rather than against the world.
+    angle: (machine, placed) => {
+      const spec = machine.grouping.joints.find((j) => j.partId === placed.id);
+      if (!spec) return 0;
+      const out = machine.partWorldAxis(placed, [0, 0, 1]);
+      const host = machine.bodies[spec.hostBody].rotation();
+      const home = new THREE.Vector3(0, 0, 1)
+        .applyQuaternion(new THREE.Quaternion(host.x, host.y, host.z, host.w));
+      const up = machine.partWorldAxis(placed, [0, 1, 0]);
+      const signed = Math.atan2(new THREE.Vector3().crossVectors(home, out).dot(up), home.dot(out));
+      return (signed * 180) / Math.PI;
+    },
+    rate: (machine, placed) => {
+      const spec = machine.grouping.joints.find((j) => j.partId === placed.id);
+      if (!spec) return 0;
+      const axis = machine.partWorldAxis(placed, [0, 1, 0]);
+      const a = machine.bodies[spec.childBody].angvel();
+      const b = machine.bodies[spec.hostBody].angvel();
+      return new THREE.Vector3(a.x - b.x, a.y - b.y, a.z - b.z).dot(axis);
+    },
+  },
+
   piston: {
     // Both bodies of a joint share an origin frame, so how far the moving side
     // has slid along the joint axis is the extension.

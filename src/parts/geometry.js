@@ -99,6 +99,42 @@ const BUILDERS = {
    * on the base. The rod's geometry is shifted so its origin is at its top
    * and scaling Y grows it downwards; `machine.syncPistons` does that.
    */
+  // Reads as a bearing: a fixed collar with a plate riding on it. The split
+  // between the two is what tells you it goes round rather than being solid.
+  turntable(part) {
+    const group = new THREE.Group();
+    const collar = new THREE.Mesh(
+      new THREE.CylinderGeometry(CELL * 0.42, CELL * 0.46, CELL * 0.4, 20),
+      material(0x3a4049),
+    );
+    collar.position.y = -CELL * 0.28;
+    group.add(collar);
+
+    const race = new THREE.Mesh(
+      new THREE.TorusGeometry(CELL * 0.4, CELL * 0.06, 8, 24),
+      material(0x8b93a0, { metalness: 0.6, roughness: 0.3 }),
+    );
+    race.rotation.x = Math.PI / 2;
+    race.position.y = -CELL * 0.04;
+    group.add(race);
+
+    const plate = new THREE.Mesh(
+      new THREE.CylinderGeometry(CELL * 0.47, CELL * 0.44, CELL * 0.3, 20),
+      material(part.colour),
+    );
+    plate.position.y = CELL * 0.26;
+    group.add(plate);
+
+    // A notch on the plate, so you can see it turning at all.
+    const mark = new THREE.Mesh(
+      new THREE.BoxGeometry(CELL * 0.1, CELL * 0.32, CELL * 0.5),
+      material(0xf0e6ff, { emissive: 0x241b33 }),
+    );
+    mark.position.set(0, CELL * 0.27, CELL * 0.24);
+    group.add(mark);
+    return group;
+  },
+
   piston(part) {
     const group = new THREE.Group();
     const barrel = new THREE.Mesh(
