@@ -6,6 +6,7 @@ import { Blueprint } from './core/blueprint.js';
 import { Input } from './core/input.js';
 import { Studio } from './studio/studio.js';
 import { starterRover, quadcopter } from './studio/presets.js';
+import { crane } from './studio/showpiece.js';
 import { Machine } from './sim/machine.js';
 import { Arena } from './sim/arena.js';
 import { createWorld, gravityOf } from './sim/world.js';
@@ -23,7 +24,7 @@ import { FrontEnd } from './ui/frontend.js';
 import { Survey, stopsFor, shotFor, lookFor } from './ui/survey.js';
 import { GameAudio } from './ui/audio.js';
 import { store } from './ui/progress.js';
-import { renderMachine } from './ui/thumbnails.js';
+import { blueprintGroup, renderMachine } from './ui/thumbnails.js';
 import { emptyProgram } from './sim/program.js';
 
 const STEP = 1 / 60;
@@ -380,20 +381,37 @@ function changeLevel(id) {
 
 // --------------------------------------------------------------------- menu
 
+/**
+ * The showpiece behind the title, built from meshes alone with no physics and
+ * no build markers on it. It is kept well away from the player's own machine:
+ * swapping the studio's blueprint for a display model and swapping it back
+ * would put somebody's work one failure away from being overwritten.
+ */
+function showpiece() {
+  if (!state.showpiece) {
+    state.showpiece = blueprintGroup(crane());
+    state.showpiece.visible = false;
+    scene.add(state.showpiece);
+  }
+  return state.showpiece;
+}
+
 function openMenu(screen = 'title') {
   if (state.mode === 'test') enterStudio();
   saveDesign(true);
   input.enabled = false;
   hud.setChromeVisible(false);
-  // The title screen has the workshop turning slowly behind it.
-  studio.setVisible(true);
-  studio.setShowPlate(false);
+  // The crane turns behind the title instead of whatever the player last
+  // built: a seven-part rover does not answer "how far does this go".
+  studio.setVisible(false);
+  showpiece().visible = true;
   state.idling = true;
   frontEnd.open(screen);
 }
 
 function leaveMenu() {
   frontEnd.close();
+  if (state.showpiece) state.showpiece.visible = false;
   state.idling = false;
   input.enabled = !state.level.handsOff || state.mode !== 'test';
   hud.setChromeVisible(true);
@@ -418,13 +436,18 @@ const idleLook = new THREE.Vector3();
 const idleRight = new THREE.Vector3();
 
 function idleCamera(dt) {
-  const { centre, reach } = studio.machineFraming();
+  const box = new THREE.Box3().setFromObject(showpiece());
+  const centre = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const reach = Math.max(size.x, size.y, size.z, 3);
 
   state.idleAngle = (state.idleAngle ?? 0.6) + dt * 0.12;
-  const radius = reach * 2.8;
+  // Close enough that it fills its half of the screen. The multiplier was set
+  // for a rover, which is a tenth of this thing's reach.
+  const radius = reach * 1.45;
   camera.position.set(
     centre.x + Math.sin(state.idleAngle) * radius,
-    centre.y + reach * 1.25,
+    centre.y + reach * 0.3,
     centre.z + Math.cos(state.idleAngle) * radius,
   );
   camera.lookAt(centre);

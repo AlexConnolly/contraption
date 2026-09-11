@@ -16,8 +16,12 @@ npm run preview  # serve the production build
 
 ## The front end
 
-The game opens on a title screen with the workshop turning slowly behind it,
-and four ways in.
+The game opens on a title screen with a tower crane turning slowly behind it,
+and four ways in. The crane is there to answer the question a new player has
+before they have asked it — how far does this go — which a seven-part rover
+does not. It is built from the same parts on the same grid as anything else,
+and a test holds it to the same rules, because a display model that could not
+actually be built would be a lie told on the first screen.
 
 **Challenges** is a grid of every problem in the game. Each card carries a
 picture of the actual course, the parts budget, the par time, a skill level,
