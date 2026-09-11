@@ -505,6 +505,48 @@ input[type="range"] { accent-color: var(--amber); }
 }
 #loading.done { display: none; }
 
+/* ----------------------------------------------------- course tour bar */
+
+#survey, #viewbar {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  display: grid;
+  place-items: center;
+  padding: 0 16px 34px;
+  z-index: 30;
+  pointer-events: none;
+}
+#survey[hidden], #viewbar[hidden] { display: none; }
+
+.survey-bar {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 12px 12px 12px 18px;
+  background: var(--panel);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--edge);
+  border-left: 3px solid var(--cyan);
+  pointer-events: auto;
+  max-width: min(720px, calc(100vw - 32px));
+}
+.survey-step {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .14em;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.survey-caption {
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: .02em;
+  flex: 1;
+}
+.survey-bar button { height: 34px; min-width: 104px; }
+#viewbar .survey-bar { border-left-color: var(--amber); }
+
 /* ----------------------------------------------------------------- modal */
 
 #modal {
@@ -566,7 +608,7 @@ input[type="range"] { accent-color: var(--amber); }
   background: var(--solid);
   border: 1px solid rgba(62, 207, 142, .45);
   padding: 30px 34px 26px;
-  min-width: 360px;
+  width: min(440px, calc(100vw - 32px));
   text-align: center;
   box-shadow: 0 24px 70px rgba(0, 0, 0, .6);
   clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
@@ -603,14 +645,55 @@ input[type="range"] { accent-color: var(--amber); }
 }
 #win-stats strong { color: var(--text); font-weight: 500; }
 #win-stats .beat strong { color: var(--green); }
-.win-actions { display: flex; gap: 7px; justify-content: center; }
+
+.win-clock {
+  font-family: var(--mono);
+  font-size: 52px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 4px;
+}
+.win-clock.beat { color: var(--green); }
+
+.win-rig {
+  text-align: left;
+  border-top: 1px solid var(--edge);
+  padding-top: 13px;
+  margin-bottom: 22px;
+}
+.win-rig[hidden] { display: none; }
+.win-rig .label { margin-bottom: 8px; }
+.win-rig ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 18px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+#win-stats .beat strong { color: var(--green); }
+/* The thing you will nearly always want next gets the full width to itself;
+   the two ways of staying put share the row above it. */
+.win-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
 .win-actions button {
-  min-width: 136px;
+  min-width: 0;
   height: 36px;
+  padding: 0 8px;
   font-weight: 600;
-  letter-spacing: .1em;
+  letter-spacing: .08em;
   text-transform: uppercase;
 }
+.win-actions button.primary { grid-column: 1 / -1; height: 40px; letter-spacing: .1em; }
 
 #win.failed .win-card { border-color: rgba(240, 106, 93, .45); }
 #win.failed .win-kicker { color: var(--red); }

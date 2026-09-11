@@ -19,6 +19,7 @@
       </button>
       <div class="mode-switch">
         <button id="mode-studio" class="mode active" data-mode="studio">Studio</button>
+        <button id="mode-view" class="mode" data-mode="view">View</button>
         <button id="mode-test" class="mode" data-mode="test">Test</button>
       </div>
       <div class="spacer"></div>
@@ -72,6 +73,22 @@
       </div>
     </section>
 
+    <div id="viewbar" hidden>
+      <div class="survey-bar">
+        <span id="view-goal" class="survey-caption"></span>
+        <button id="view-tour">Take the tour</button>
+        <button id="view-build" class="primary">Build it</button>
+      </div>
+    </div>
+
+    <div id="survey" hidden>
+      <div class="survey-bar">
+        <span id="survey-step" class="survey-step"></span>
+        <span id="survey-caption" class="survey-caption"></span>
+        <button id="survey-skip" class="primary">Build it</button>
+      </div>
+    </div>
+
     <footer id="help"></footer>
     <div id="toast"></div>
 
@@ -90,10 +107,16 @@
       <div class="win-card">
         <div id="win-kicker" class="win-kicker">Challenge complete</div>
         <h2 id="win-title"></h2>
+        <div id="win-clock" class="win-clock"></div>
         <div id="win-stats"></div>
+        <section id="win-rig" class="win-rig">
+          <div class="label">What you used</div>
+          <ul id="win-parts"></ul>
+        </section>
         <div class="win-actions">
-          <button id="win-again" class="ghost">Run again</button>
-          <button id="win-studio" class="primary">Back to Studio</button>
+          <button id="win-again">Run again</button>
+          <button id="win-studio">Keep tinkering</button>
+          <button id="win-next" class="primary">Play next challenge</button>
         </div>
       </div>
     </div>

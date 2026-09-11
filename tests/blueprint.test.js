@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Blueprint, occupiedCells } from '../src/core/blueprint.js';
+import { Blueprint, occupiedCells, DEFAULT_BOUNDS } from '../src/core/blueprint.js';
 import { IDENTITY_ORIENTATION, yawStep } from '../src/core/orientation.js';
 
 describe('blueprint', () => {
@@ -31,7 +31,7 @@ describe('blueprint', () => {
 
   it('refuses placements outside the build area', () => {
     const bp = new Blueprint();
-    const out = bp.place('block', [0, -1, 0]);
+    const out = bp.place('block', [0, DEFAULT_BOUNDS.max[1] + 1, 0]);
     expect(out.ok).toBe(false);
     expect(out.reason).toMatch(/build area/i);
   });
@@ -72,5 +72,20 @@ describe('blueprint', () => {
     bp.place('ballast', [0, 1, 0]);
     expect(bp.cost()).toBe(2);
     expect(bp.lowestCell()).toBe(1);
+  });
+
+  // The build plate is a datum, not a floor: a machine can hang parts under
+  // it, and what it is spawned sitting on is its own lowest cell.
+  it('lets parts go below the build plate', () => {
+    const bp = new Blueprint();
+    bp.place('core', [0, 0, 0]);
+    expect(bp.place('wheel', [0, -1, 0]).ok).toBe(true);
+    expect(bp.lowestCell()).toBe(-1);
+  });
+
+  it('still has a floor, a long way down', () => {
+    const bp = new Blueprint();
+    expect(bp.place('block', [0, DEFAULT_BOUNDS.min[1], 0]).ok).toBe(true);
+    expect(bp.place('block', [2, DEFAULT_BOUNDS.min[1] - 1, 0]).ok).toBe(false);
   });
 });

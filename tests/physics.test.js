@@ -120,6 +120,50 @@ describe('driving', () => {
   });
 });
 
+describe('what a machine sounds like', () => {
+  it('is quiet standing still and noisy under power', () => {
+    const { machine, bus } = build(starterRover(), keyboard());
+    run(machine, bus, 1);
+    const idle = machine.audioState();
+    expect(idle.wheels.every((w) => w === 0)).toBe(true);
+    expect(idle.wheelSpeed).toBeLessThan(1);
+
+    bus.input.down.add('KeyW');
+    run(machine, bus, 2);
+    const driving = machine.audioState();
+    expect(driving.wheels.some((w) => Math.abs(w) > 0.5)).toBe(true);
+    expect(driving.wheelSpeed).toBeGreaterThan(2);
+    expect(driving.groundSpeed).toBeGreaterThan(1);
+  });
+
+  it('knows a rover is on the ground and a drone is not', () => {
+    const rover = build(starterRover(), keyboard());
+    run(rover.machine, rover.bus, 1.5);
+    expect(rover.machine.audioState().grounded).toBe(true);
+  });
+
+  it('reports rotors apart from jets', () => {
+    const bp = new Blueprint({ name: 'mixed' });
+    bp.place('panel', [0, 0, 0]);
+    bp.place('core', [0, 1, 0]);
+    bp.place('propeller', [-1, 1, 0], IDENTITY_ORIENTATION, {
+      binding: { mode: 'hold', pos: 'Space' },
+    });
+    bp.place('thruster', [1, 1, 0], IDENTITY_ORIENTATION, {
+      binding: { mode: 'hold', pos: 'KeyE' },
+    });
+    const { machine, bus } = build(bp, keyboard());
+    bus.input.down.add('Space');
+    run(machine, bus, 0.5);
+    const state = machine.audioState();
+    expect(state.rotors).toHaveLength(1);
+    expect(state.jets).toHaveLength(1);
+    expect(state.rotors[0]).toBeGreaterThan(0.5);
+    expect(state.jets[0]).toBe(0);
+    expect(state.rotorSpin).toBeGreaterThan(0);
+  });
+});
+
 describe('steering direction', () => {
   // The machine's right-hand side is forward x up, which with forward at +Z
   // and up at +Y is -X. Getting this backwards makes A and D feel swapped.

@@ -1,5 +1,5 @@
 import './menu.css';
-import { LEVELS } from '../challenges/levels.js';
+import { LEVELS, tierOf, tier } from '../challenges/levels.js';
 import { store } from './progress.js';
 import { levelThumb, renderMachine } from './thumbnails.js';
 import { Blueprint } from '../core/blueprint.js';
@@ -210,6 +210,13 @@ export class FrontEnd {
     if (number) shot.append(el('span', 'num', number));
     if (done) shot.append(el('span', 'tick', icon('tick', 15)));
 
+    const skill = tierOf(level);
+    if (skill) {
+      const badge = el('span', `fe-skill ${skill}`, tier(skill).name);
+      badge.title = tier(skill).note;
+      shot.append(badge);
+    }
+
     const rules = el('div', 'rules');
     if (level.handsOff) rules.append(el('span', 'fe-tag rule', 'No input'));
     if (level.noContact) rules.append(el('span', 'fe-tag rule', 'No collisions'));
@@ -335,6 +342,12 @@ export class FrontEnd {
         title: 'Screen effect',
         note: 'The scanline and vignette pass over the menus.',
         options: [['on', 'On'], ['off', 'Off']],
+      },
+      {
+        key: 'volume',
+        title: 'Sound',
+        note: 'Motors, rotors and the interface.',
+        options: [['full', 'Full'], ['low', 'Low'], ['off', 'Off']],
       },
     ];
 

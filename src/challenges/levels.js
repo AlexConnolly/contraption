@@ -4,6 +4,36 @@
 const GREY = 0x6b7480;
 const DARK = 0x474e57;
 
+/**
+ * What a challenge asks of you, and the skill level that follows from it.
+ * Written as the demands rather than as a label so the rule lives in one
+ * place and a level cannot quietly end up marked easier than it plays.
+ *
+ *   steps       how many distinct things the machine has to do
+ *   flies       whether it has to leave the ground
+ *   autonomous  whether it has to run without you
+ */
+export const TIERS = [
+  { id: 'easy', name: 'Easy', note: 'One thing to do, on the ground.' },
+  { id: 'medium', name: 'Medium', note: 'Several steps, or it has to fly.' },
+  { id: 'hard', name: 'Hard', note: 'Several steps, and it has to fly.' },
+  { id: 'expert', name: 'Expert', note: 'It has to run itself.' },
+];
+
+export function tierOf(level) {
+  const demands = level?.demands;
+  if (!demands) return null;
+  if (demands.autonomous) return 'expert';
+  const many = (demands.steps ?? 1) > 1;
+  if (many && demands.flies) return 'hard';
+  if (many || demands.flies) return 'medium';
+  return 'easy';
+}
+
+export function tier(id) {
+  return TIERS.find((t) => t.id === id) ?? null;
+}
+
 export const LEVELS = [
   {
     id: 'sandbox',
@@ -29,6 +59,7 @@ export const LEVELS = [
 
   {
     id: 'first-haul',
+    demands: { steps: 1, flies: false },
     name: '1 — First Haul',
     brief: 'Move the crate into the marked square and keep it there for 3 seconds.',
     hint: 'A core, a few blocks and four wheels will do it. Bind the left and right wheels to different keys so you can steer.',
@@ -50,6 +81,7 @@ export const LEVELS = [
 
   {
     id: 'rough-ground',
+    demands: { steps: 1, flies: false },
     name: '2 — Rough Ground',
     brief: 'Same job, but the crate starts past a ramp and a scattering of kerbs.',
     hint: 'Weight low and wheels wide. Ballast under the chassis stops it tipping on the ramp.',
@@ -77,6 +109,7 @@ export const LEVELS = [
 
   {
     id: 'pick-and-place',
+    demands: { steps: 2, flies: false },
     name: '3 — Pick and Place',
     brief: 'Lift the payload off its pedestal and set it on the far one. Pushing will not work.',
     hint: 'A grabber on a servo hinge. Toggle G to latch, toggle again to let go.',
@@ -101,32 +134,9 @@ export const LEVELS = [
   },
 
   {
-    id: 'airlift',
-    name: '4 — Airlift',
-    brief: 'Get the payload onto the high platform. It is too tall to drive up.',
-    hint: 'Wire the rotors to a Flight Controller and it will hold height by itself: WASD to fly, Space and Shift to climb and drop. Hang a grabber underneath to pick the payload up.',
-    spawn: [0, 1.2, -8],
-    groundSize: 140,
-    budget: { cost: 150 },
-    pieces: [
-      { pos: [0, 3, 8], size: [7, 0.8, 7], colour: GREY },
-      { pos: [0, 1.5, 8], size: [1.4, 3, 1.4], colour: DARK },
-    ],
-    props: [
-      { id: 'payload', pos: [0, 0.45, 0], size: [0.8, 0.8, 0.8], mass: 3, colour: 0x7cc4ff },
-    ],
-    zones: [
-      { id: 'roof', pos: [0, 4.1, 8], size: [6, 2.2, 6], colour: 0x4ade80 },
-    ],
-    objectives: [
-      { type: 'propInZone', prop: 'payload', zone: 'roof', hold: 3, label: 'Payload on the high platform' },
-    ],
-    par: 180,
-  },
-
-  {
     id: 'ledge-runner',
-    name: '5 — Ledge Runner',
+    demands: { steps: 2, flies: false },
+    name: '4 — Ledge Runner',
     brief: 'Park the machine itself on the pad at the end of the gantry, and hold it there for 4 seconds.',
     hint: 'There is nothing past the pad. A distance sensor pointed forward, bound to your drive, will stop you on the mark.',
     spawn: [0, 4.2, -14],
@@ -150,7 +160,33 @@ export const LEVELS = [
   },
 
   {
+    id: 'airlift',
+    demands: { steps: 2, flies: true },
+    name: '5 — Airlift',
+    brief: 'Get the payload onto the high platform. It is too tall to drive up.',
+    hint: 'Wire the rotors to a Flight Controller and it will hold height by itself: WASD to fly, Space and Shift to climb and drop. Hang a grabber underneath to pick the payload up.',
+    spawn: [0, 1.2, -8],
+    groundSize: 140,
+    budget: { cost: 150 },
+    pieces: [
+      { pos: [0, 3, 8], size: [7, 0.8, 7], colour: GREY },
+      { pos: [0, 1.5, 8], size: [1.4, 3, 1.4], colour: DARK },
+    ],
+    props: [
+      { id: 'payload', pos: [0, 0.45, 0], size: [0.8, 0.8, 0.8], mass: 3, colour: 0x7cc4ff },
+    ],
+    zones: [
+      { id: 'roof', pos: [0, 4.1, 8], size: [6, 2.2, 6], colour: 0x4ade80 },
+    ],
+    objectives: [
+      { type: 'propInZone', prop: 'payload', zone: 'roof', hold: 3, label: 'Payload on the high platform' },
+    ],
+    par: 180,
+  },
+
+  {
     id: 'hands-off',
+    demands: { steps: 1, flies: true, autonomous: true },
     name: '6 — Hands Off',
     brief: 'No controls at all on this one. Draw the program, press Test, and watch it fly itself to the pad.',
     hint: 'A Computer, a GPS and a Flight Controller. Climb, turn toward the waypoint, run in, then hold. Start from the Auto drone preset if you want a worked example to pull apart.',
@@ -174,6 +210,7 @@ export const LEVELS = [
 
   {
     id: 'traffic',
+    demands: { steps: 2, flies: true, autonomous: true },
     name: '7 — Traffic',
     brief: 'Straight down the corridor to the pad — except every blocker covers the middle, so straight never works. Touch anything at all and the run is over.',
     hint: 'They run at a different speed and start somewhere else every time, so there is no timetable to learn. Point a sensor forwards and aim one out to each side, and go where the readings say there is room. The Dodger preset does exactly that.',
@@ -217,4 +254,16 @@ export const LEVELS = [
 
 export function getLevel(id) {
   return LEVELS.find((level) => level.id === id) ?? LEVELS[0];
+}
+
+/** The campaign in order, which is everything that sets a problem. */
+export function campaign() {
+  return LEVELS.filter((level) => level.objectives.length > 0);
+}
+
+/** The one after this, or null at the end of the campaign. */
+export function nextLevel(id) {
+  const run = campaign();
+  const at = run.findIndex((level) => level.id === id);
+  return at >= 0 ? run[at + 1] ?? null : run[0] ?? null;
 }

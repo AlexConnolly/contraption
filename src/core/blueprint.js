@@ -3,8 +3,11 @@ import { getPart } from '../parts/registry.js';
 
 export const BLUEPRINT_VERSION = 1;
 
+// The build plate is a datum, not a floor. A machine can hang wheels, skids or
+// a grabber under it; what it stands on when it spawns is its own lowest cell,
+// wherever that turns out to be.
 export const DEFAULT_BOUNDS = {
-  min: [-14, 0, -14],
+  min: [-14, -12, -14],
   max: [14, 26, 14],
 };
 

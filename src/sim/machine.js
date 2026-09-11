@@ -613,6 +613,49 @@ export class Machine {
     return new THREE.Vector3().setFromMatrixPosition(foot.matrixWorld);
   }
 
+  /**
+   * What the machine is doing, in the terms the sound needs: how hard each
+   * kind of actuator is working and how fast the fastest shaft is turning.
+   * Read off the joints rather than off the commands, so a motor that is
+   * stalled against a wall sounds stalled.
+   */
+  audioState() {
+    const wheels = [];
+    const rotors = [];
+    const jets = [];
+    let wheelSpeed = 0;
+    let rotorSpin = 0;
+
+    for (const actuator of this.actuators) {
+      const { part, signal, bodyIndex } = actuator;
+      if (part.actuator.kind === 'motor') {
+        wheels.push(signal);
+        const spin = this.bodies[bodyIndex]?.angvel() ?? { x: 0, y: 0, z: 0 };
+        wheelSpeed = Math.max(wheelSpeed, Math.hypot(spin.x, spin.y, spin.z));
+      } else if (part.thruster) {
+        const level = Math.max(0, signal);
+        if (part.thruster.spin > 0) {
+          rotors.push(level);
+          rotorSpin = Math.max(rotorSpin, level * part.thruster.spin);
+        } else {
+          jets.push(level);
+        }
+      }
+    }
+
+    const body = this.bodies[0];
+    const v = body?.linvel() ?? { x: 0, y: 0, z: 0 };
+    return {
+      wheels,
+      rotors,
+      jets,
+      wheelSpeed,
+      rotorSpin,
+      groundSpeed: Math.hypot(v.x, v.z),
+      grounded: this.contact() !== null,
+    };
+  }
+
   core() {
     return this.blueprint.list().find((p) => p.type === 'core') ?? null;
   }

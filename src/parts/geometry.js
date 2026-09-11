@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CELL } from './registry.js';
+import { CELL, workingAxis } from './registry.js';
 
 // Where the rod leaves the barrel, and how long it is fully retracted, which
 // is whatever puts the foot flush with the bottom of the part's own cell.
@@ -219,17 +219,48 @@ const BUILDERS = {
 
 // A thrust axis is invisible until it fires, and yawing a part does not change
 // which way it points, so the studio draws the direction on it.
-function directionArrow(axis, colour = 0xffd166) {
-  const group = new THREE.Group();
-  // Drawn without depth testing and last, so an arrow pointing into the middle
-  // of the machine is still visible instead of being swallowed by the part in
-  // front of it.
-  const skin = () => new THREE.MeshBasicMaterial({
+// Amber for something the part does, cyan for something it reads.
+const HINT_COLOUR = { act: 0xf0a825, read: 0x35d0e0 };
+
+// Draws over whatever is in front of it, so a marker pointing into the middle
+// of a machine is still readable.
+function overlaySkin(colour) {
+  return new THREE.MeshBasicMaterial({
     color: colour,
     depthTest: false,
     transparent: true,
     opacity: 0.95,
   });
+}
+
+function onTop(group) {
+  group.renderOrder = 999;
+  group.traverse((child) => { child.renderOrder = 999; });
+  return group;
+}
+
+/** The circle a hinge swings through, drawn round its axle. */
+function hingeRing(axis, colour = HINT_COLOUR.act) {
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(CELL * 0.62, 0.018, 8, 40),
+    overlaySkin(colour),
+  );
+  // A torus lies in its own XY plane, so its normal is +Z.
+  ring.quaternion.setFromUnitVectors(
+    new THREE.Vector3(0, 0, 1),
+    new THREE.Vector3(...axis).normalize(),
+  );
+  const group = new THREE.Group();
+  group.add(ring);
+  return onTop(group);
+}
+
+function directionArrow(axis, colour = HINT_COLOUR.act) {
+  const group = new THREE.Group();
+  // Drawn without depth testing and last, so an arrow pointing into the middle
+  // of the machine is still visible instead of being swallowed by the part in
+  // front of it.
+  const skin = () => overlaySkin(colour);
   const shaft = new THREE.Mesh(
     new THREE.CylinderGeometry(0.022, 0.022, CELL * 0.7, 8),
     skin(),
@@ -238,8 +269,7 @@ function directionArrow(axis, colour = 0xffd166) {
   const head = new THREE.Mesh(new THREE.ConeGeometry(0.075, CELL * 0.34, 12), skin());
   head.position.y = CELL * 1.35;
   group.add(shaft, head);
-  group.renderOrder = 999;
-  group.traverse((child) => { child.renderOrder = 999; });
+  onTop(group);
   group.quaternion.setFromUnitVectors(
     new THREE.Vector3(0, 1, 0),
     new THREE.Vector3(...axis).normalize(),
@@ -255,13 +285,14 @@ export function createPartMesh(part, options = {}) {
     child.castShadow = true;
     child.receiveShadow = true;
   });
-  if (options.hints && part.thruster) {
-    object.add(directionArrow(part.thruster.axis));
-  }
-  // The controller's own orientation is the machine's flight frame, so the
-  // studio shows which way it thinks forward is.
-  if (options.hints && part.flight) {
-    object.add(directionArrow([0, 0, 1], 0x37d4c8));
+  if (options.hints) {
+    // Which way this part faces, for every part where that matters — the
+    // controller's arrow is the machine's flight frame, so it shows which way
+    // the whole thing thinks forward is.
+    const hint = workingAxis(part);
+    if (hint) object.add(directionArrow(hint.axis, HINT_COLOUR[hint.kind]));
+    // A hinge has no direction, it has a plane, so it gets the plane instead.
+    if (part.joint === 'revolute') object.add(hingeRing(part.axis));
   }
   return object;
 }

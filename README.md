@@ -9,7 +9,7 @@ Three.js for rendering, Rapier for physics, Vite for the build.
 ```bash
 npm install
 npm run dev      # http://localhost:5173
-npm test         # 201 tests, including headless physics
+npm test         # 242 tests, including headless physics
 npm run build
 npm run preview  # serve the production build
 ```
@@ -20,10 +20,20 @@ The game opens on a title screen with the workshop turning slowly behind it,
 and four ways in.
 
 **Challenges** is a grid of every problem in the game. Each card carries a
-picture of the actual course, the parts budget, the par time, and the rules it
-is played under — *No input* where the machine has to run on its own program,
-*No collisions* where touching anything fails the run. A solved challenge shows
-a tick and the best time you have set on it.
+picture of the actual course, the parts budget, the par time, a skill level,
+and the rules it is played under — *No input* where the machine has to run on
+its own program, *No collisions* where touching anything fails the run. A
+solved challenge shows a tick and the best time you have set on it.
+
+Skill levels are worked out from what the challenge actually demands rather
+than typed in by hand, so one cannot end up marked easier than it plays:
+
+| | |
+|---|---|
+| **Easy** | One thing to do, on the ground. |
+| **Medium** | Several steps, or it has to fly. |
+| **Hard** | Several steps, and it has to fly. |
+| **Expert** | It has to run itself. |
 
 The course pictures are not screenshots taken by hand. Each one is built from
 the level itself — the same arena the game plays, stepped on a little so the
@@ -37,6 +47,20 @@ same way.
 
 **Settings** covers the test camera, shadows and the screen effect over the
 menus. Each applies the moment it is pressed and is remembered.
+
+### Seeing the problem first
+
+The first question every one of these asks is how it could be done at all, and
+an empty build plate does not answer it. A challenge you have not solved opens
+with a look round the course: the camera visits the start, whatever has to
+move, and where it has to end up, looking along the course rather than down at
+it. Obstacles that move keep moving while you watch.
+
+`View` next to `Studio` and `Test` is the same course with the camera in your
+hands, for going back and looking properly at the bit you are stuck on.
+
+Winning shows the time as the headline, and under it the machine that set it —
+every part you spent. A time is worth nothing without what it was done with.
 
 `Esc` leaves the game for the menu and backs out of any screen to the title.
 Inside a challenge the top bar shows which one you are on and the way back to
@@ -80,7 +104,39 @@ left from where the driver is sitting.
 A piston's **reach** is set on the piston, anywhere from 0.4 m to 2.4 m, so a
 short jab and a long lift can sit on the same machine.
 
+Every part that has to be aimed says which way it is facing: an arrow along
+the working axis, amber for something the part does to the world and cyan for
+something it reads from it. A hinge has no direction, it has a plane, so it
+gets a ring instead. They show in the studio only.
+
+The build plate is a datum, not a floor. Wheels, skids and grabbers can hang
+underneath; drop the camera below the plate and it fades out of your way.
+
 Designs autosave per challenge and survive a reload.
+
+## Sound
+
+Every audio file is **CC0** — Kenney's [Interface Sounds](https://kenney.nl/assets/interface-sounds)
+and [Sci-fi Sounds](https://kenney.nl/assets/sci-fi-sounds) packs. That means
+it can ship in a paid game with no attribution and no licence screen.
+`public/audio/LICENCE.md` records which file came from where, what each one is
+used for, and the terms, so the provenance is in the repo rather than in
+somebody's memory. Keep to CC0 when adding more: CC-BY would mean shipping an
+attribution screen, and a non-commercial licence cannot go on a storefront at
+all.
+
+The machines are electric, so the engine clips are **looped and re-pitched
+rather than triggered**: the playback rate of the drive and rotor loops
+follows the shaft speed the sim is actually turning at, so a motor spinning up
+sounds like a motor spinning up. `sim/audio-mix.js` turns machine state into
+levels and rates and is plain arithmetic under test; `ui/audio.js` loads the
+files and plays them.
+
+Many sources of the same kind sum as energy rather than as amplitude and pass
+through a soft knee, so four rotors are about twice as loud as one rather than
+four times, and forty never pin the output.
+
+Sound has its own setting — full, low or off — and it is remembered.
 
 ## The flight controller
 
@@ -270,7 +326,7 @@ src/ui/          design tokens, front end (title, challenges, garage,
 
 ## Tests
 
-`npm test` runs 201 tests. The pure logic (orientations, grid placement, body
+`npm test` runs 242 tests. The pure logic (orientations, grid placement, body
 grouping, key bindings, objectives) is covered directly. On top of that,
 `tests/physics.test.js` builds real machines in a real Rapier world and asserts
 they behave — a rover drives, reverses and steers the correct way; an

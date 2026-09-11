@@ -13,10 +13,12 @@ import { SignalBus } from './sim/signals.js';
 import { controllerOf, firstController } from './sim/flight.js';
 import { getPart } from './parts/registry.js';
 import { ObjectiveTracker, withinBudget } from './challenges/objectives.js';
-import { getLevel, LEVELS } from './challenges/levels.js';
+import { getLevel, LEVELS, nextLevel } from './challenges/levels.js';
 import { Hud } from './ui/hud.js';
 import { GraphEditor } from './ui/graph-editor.js';
 import { FrontEnd } from './ui/frontend.js';
+import { Survey, stopsFor, shotFor, lookFor } from './ui/survey.js';
+import { GameAudio } from './ui/audio.js';
 import { store } from './ui/progress.js';
 import { renderMachine } from './ui/thumbnails.js';
 import { emptyProgram } from './sim/program.js';
@@ -54,7 +56,9 @@ controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 controls.minDistance = 2;
 controls.maxDistance = 60;
-controls.maxPolarAngle = Math.PI * 0.495;
+// You can drop the camera under the build plate: parts are allowed on the
+// underside of a machine, and you have to be able to see what you are doing.
+controls.maxPolarAngle = Math.PI * 0.92;
 controls.mouseButtons = {
   LEFT: null,
   MIDDLE: THREE.MOUSE.PAN,
@@ -84,12 +88,43 @@ let hud;
 let world;
 let editor;
 let frontEnd;
+const survey = new Survey({
+  onCaption: (caption, step, of) => hud.setSurvey(caption, step, of),
+  onEnd: () => endCourse(),
+});
 
 const settings = store.settings({
   camera: 'chase',
   shadows: 'on',
   scanlines: 'on',
+  volume: 'full',
 });
+
+const audio = new GameAudio({ volume: settings.volume });
+// Browsers keep audio silent until the person has done something, so the
+// first click or keypress anywhere is what actually starts it.
+for (const event of ['pointerdown', 'keydown']) {
+  addEventListener(event, () => audio.start(), { once: true });
+}
+
+/**
+ * Every button in the game sounds the same way, wired once here rather than
+ * at each of the hundred places a button is built. What it sounds like
+ * depends on what kind of control it is, not on which screen it is on.
+ */
+addEventListener('pointerdown', (event) => {
+  const button = event.target.closest?.('button');
+  if (!button || button.disabled) return;
+  if (button.classList.contains('fe-back') || button.id === 'survey-skip') audio.back();
+  else if (button.classList.contains('mode')
+    || button.classList.contains('tool')
+    || button.closest('.fe-choice')) audio.toggle();
+  else audio.click();
+}, true);
+
+addEventListener('pointerover', (event) => {
+  if (event.target.closest?.('.fe-item, .fe-card, .part-btn')) audio.hover();
+}, true);
 
 // ---------------------------------------------------------------- persistence
 
@@ -148,9 +183,11 @@ function buildRun() {
 function enterTest() {
   const check = validateBuild();
   if (!check.ok) {
+    audio.deny();
     hud.toast(check.reason, true);
     return;
   }
+  audio.runStart();
   const orphans = studio.grouping?.disconnected ?? [];
   const seized = studio.grouping?.seized ?? [];
   if (orphans.length > 0) {
@@ -169,6 +206,78 @@ function enterTest() {
     ? { ...getPart('controller').flight.defaultKeys, ...(controller.config.keys ?? {}) }
     : null);
   controls.enabled = state.cameraMode === 'orbit';
+}
+
+// ------------------------------------------------------------- course tour
+
+/**
+ * A look round the course before building for it. The arena goes up with no
+ * machine in it and the camera visits the start, whatever has to move and
+ * where it has to end up. The first question every one of these problems asks
+ * is how it could be done at all, and an empty build plate does not answer it.
+ */
+function buildCourse() {
+  disposeRun();
+  state.arena = new Arena({ RAPIER, world, scene, level: state.level });
+  state.arena.step(0.1);
+  state.arena.sync();
+  studio.setVisible(false);
+}
+
+function showCourse(back = 'studio') {
+  if (state.mode === 'test' || survey.isRunning) return;
+  state.tourBack = back;
+  buildCourse();
+  controls.enabled = false;
+  hud.setChromeVisible(false);
+  survey.start(state.level, camera);
+}
+
+function endCourse() {
+  hud.hideSurvey();
+  if (frontEnd?.isOpen) {
+    disposeRun();
+    return;
+  }
+  hud.setChromeVisible(true);
+  if (state.tourBack === 'view') enterView();
+  else {
+    disposeRun();
+    enterStudio();
+  }
+}
+
+/**
+ * The course with no machine in it and the camera in your hands. The tour
+ * shows you round on rails; this is for going back and looking properly at
+ * the bit you are stuck on.
+ */
+function enterView() {
+  saveDesign(true);
+  state.mode = 'view';
+  buildCourse();
+  state.tracker = new ObjectiveTracker(state.level);
+  hud.buildObjectives(state.tracker.report());
+  hud.renderObjectives(state.tracker.report(), state.level);
+  hud.setMode('view');
+  hud.hideWin();
+  input.enabled = false;
+  controls.enabled = true;
+  frameCourse();
+}
+
+/**
+ * Opens on the same shot the tour opens on: standing at the start, looking
+ * down the course. A bounding-box overview sounds more useful and is not —
+ * on a course with a roof over it, it puts the camera outside the building.
+ */
+function frameCourse() {
+  const stops = stopsFor(state.level);
+  if (stops.length === 0) return;
+  camera.position.copy(shotFor(stops, 0));
+  controls.target.copy(lookFor(stops, 0));
+  camera.lookAt(controls.target);
+  controls.update();
 }
 
 function enterStudio() {
@@ -238,6 +347,7 @@ function applySetting(key, value) {
   if (key === 'camera') state.cameraMode = value;
   if (key === 'shadows') renderer.shadowMap.enabled = value === 'on';
   if (key === 'scanlines') frontEnd.setScanlines(value === 'on');
+  if (key === 'volume') audio.setVolume(value);
   if (key === 'shadows') scene.traverse((o) => { if (o.isMesh) o.material.needsUpdate = true; });
 }
 
@@ -340,13 +450,20 @@ canvas.addEventListener('pointerup', (event) => {
   setPointerFromEvent(event);
   studio.update();
   const result = studio.click();
-  if (result && result.ok === false && result.reason) hud.toast(result.reason, true);
+  if (result && result.ok === false) {
+    audio.deny();
+    if (result.reason) hud.toast(result.reason, true);
+  }
 });
 
 canvas.addEventListener('pointerleave', () => studio?.clearPointer());
 canvas.addEventListener('contextmenu', (event) => event.preventDefault());
 
 function handleShortcuts() {
+  if (survey.isRunning) {
+    if (input.wasPressed('Escape') || input.wasPressed('Space')) survey.skip();
+    return;
+  }
   if (editor?.isOpen || frontEnd?.isOpen || hud?.modalIsOpen) return;
   // Escape drops out of the game and back to the menu.
   if (input.wasPressed('Escape')) {
@@ -403,13 +520,21 @@ function simulateStep() {
   // Some courses have to be flown without touching anything at all.
   if (state.level.noContact && !state.won && !state.crashed && state.machine.contact()) {
     state.crashed = true;
+    audio.crash();
     hud.showFailure(state.level, report, 'You touched something');
     return;
   }
   if (report.complete && !state.won) {
     state.won = true;
+    audio.win();
     store.recordWin(state.level.id, report.elapsed, state.blueprint.cost());
-    hud.showWin(state.level, report, state.blueprint.cost());
+    hud.showWin(
+      state.level,
+      report,
+      state.blueprint.cost(),
+      state.blueprint,
+      nextLevel(state.level.id),
+    );
   }
 }
 
@@ -432,7 +557,8 @@ function frame(now) {
   handleShortcuts();
 
   if (state.mode === 'studio') {
-    if (!state.idling) studio.update();
+    if (!state.idling && !survey.isRunning) studio.update();
+    audio.silenceMachine();
     input.endFrame();
   } else if (state.machine) {
     accumulator += dt;
@@ -448,15 +574,25 @@ function frame(now) {
     if (steps === 0) input.endFrame();
     state.machine.syncMeshes();
     state.arena.sync();
+    audio.update(state.machine.audioState());
     hud.renderObjectives(state.tracker.report(), state.level);
     if (state.machine.corePosition().y < -40) respawn();
   } else {
+    // No machine, but the obstacles still move — standing still is what
+    // makes a course look easy, and it is the thing you came to look at.
+    if (state.arena) {
+      state.arena.step(dt);
+      world.step();
+      state.arena.sync();
+    }
+    audio.silenceMachine();
     input.endFrame();
   }
 
-  if (state.idling) idleCamera(dt);
+  if (survey.isRunning) survey.update(dt, camera);
+  else if (state.idling) idleCamera(dt);
   else updateCamera(dt);
-  if (controls.enabled && !state.idling) controls.update();
+  if (controls.enabled && !state.idling && !survey.isRunning) controls.update();
   const focus = state.mode === 'test' && state.machine
     ? state.machine.corePosition()
     : new THREE.Vector3(0, 0, 0);
@@ -479,7 +615,10 @@ async function boot() {
     scene,
     camera,
     blueprint: state.blueprint,
-    onChange: () => {
+    onChange: ({ reason } = {}) => {
+      if (reason === 'place') audio.place();
+      else if (reason === 'delete') audio.remove();
+      else if (reason === 'undo' || reason === 'redo') audio.click();
       refreshReadouts();
       refreshInspector();
       scheduleAutosave();
@@ -493,8 +632,24 @@ async function boot() {
       selectTool('place');
     },
     onSelectTool: selectTool,
-    onModeChange: (mode) => (mode === 'test' ? enterTest() : enterStudio()),
+    onModeChange: (mode) => {
+      if (mode === 'test') enterTest();
+      else if (mode === 'view') enterView();
+      else enterStudio();
+    },
     onLeaveChallenge: () => openMenu('challenges'),
+    onShowCourse: () => showCourse('view'),
+    onSkipCourse: () => survey.skip(),
+    onNextChallenge: () => {
+      const next = nextLevel(state.level.id);
+      if (!next) {
+        openMenu('challenges');
+        return;
+      }
+      changeLevel(next.id);
+      enterStudio();
+      showCourse();
+    },
     onSave: () => saveDesign(),
     onLoad: () => {
       const design = loadDesign(state.level.id);
@@ -577,6 +732,9 @@ async function boot() {
       onPlay: (levelId) => {
         if (levelId !== state.level.id) changeLevel(levelId);
         leaveMenu();
+        // A problem you have not solved opens with a look round it; one you
+        // have, you already know, so it drops you straight on the plate.
+        if (state.level.objectives.length > 0 && !store.solved(levelId)) showCourse();
       },
       onExit: () => { saveDesign(true); location.reload(); },
       onSaveMachine: (name) => {

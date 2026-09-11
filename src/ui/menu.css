@@ -310,6 +310,26 @@
   flex-wrap: wrap;
 }
 
+/* Skill level, bottom right of the shot so it never fights the rule tags on
+   the left. The ramp runs green to red, which is the one place in the game
+   red does not mean failure — so it is the only colour on the badge. */
+.fe-skill {
+  position: absolute;
+  right: 10px; bottom: 10px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  background: rgba(7, 10, 15, .85);
+  border: 1px solid;
+}
+.fe-skill.easy { color: var(--green); border-color: rgba(62, 207, 142, .5); }
+.fe-skill.medium { color: var(--cyan); border-color: rgba(53, 208, 224, .5); }
+.fe-skill.hard { color: var(--amber); border-color: rgba(240, 168, 37, .55); }
+.fe-skill.expert { color: var(--red); border-color: rgba(240, 106, 93, .55); }
+
 .fe-tag {
   font-family: var(--mono);
   font-size: 9.5px;

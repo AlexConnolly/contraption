@@ -2,6 +2,7 @@ import { CATEGORIES, partsInCategory, getPart, pistonStroke } from '../parts/reg
 import { BINDING_MODES, bindingLabel, keyLabel, defaultBinding } from '../sim/signals.js';
 import { estimateGains, firstController, controllerOf } from '../sim/flight.js';
 import { renderPart } from './thumbnails.js';
+import { store } from './progress.js';
 
 const HELP = {
   studio: [
@@ -13,6 +14,12 @@ const HELP = {
     ['X', 'delete hovered'],
     ['Ctrl+Z / Ctrl+Y', 'undo / redo'],
     ['Tab', 'test'],
+  ],
+  view: [
+    ['Left drag', 'orbit the course'],
+    ['Middle drag', 'pan'],
+    ['Wheel', 'zoom'],
+    ['Tab', 'back to studio'],
   ],
   test: [
     ['Your bindings', 'drive the machine'],
@@ -42,7 +49,10 @@ export class Hud {
       modalCancel: document.getElementById('modal-cancel'),
       presetSelect: document.getElementById('preset-select'),
       modeStudio: document.getElementById('mode-studio'),
+      modeView: document.getElementById('mode-view'),
       modeTest: document.getElementById('mode-test'),
+      viewbar: document.getElementById('viewbar'),
+      viewGoal: document.getElementById('view-goal'),
       budget: document.getElementById('budget'),
       paletteList: document.getElementById('palette-list'),
       palette: document.getElementById('palette'),
@@ -54,13 +64,21 @@ export class Hud {
       objectives: document.getElementById('objectives'),
       objectiveList: document.getElementById('objective-list'),
       clock: document.getElementById('run-clock'),
+      testControls: document.querySelector('.test-controls'),
       help: document.getElementById('help'),
       toast: document.getElementById('toast'),
       win: document.getElementById('win'),
       winKicker: document.getElementById('win-kicker'),
       winTitle: document.getElementById('win-title'),
       winStats: document.getElementById('win-stats'),
+      winClock: document.getElementById('win-clock'),
+      winRig: document.getElementById('win-rig'),
+      winParts: document.getElementById('win-parts'),
+      winNext: document.getElementById('win-next'),
       loading: document.getElementById('loading'),
+      survey: document.getElementById('survey'),
+      surveyStep: document.getElementById('survey-step'),
+      surveyCaption: document.getElementById('survey-caption'),
     };
     this.wire();
     this.buildPalette();
@@ -84,10 +102,14 @@ export class Hud {
       e.target.value = '';
     });
     dom.modeStudio.addEventListener('click', () => h.onModeChange('studio'));
+    dom.modeView.addEventListener('click', () => h.onModeChange('view'));
     dom.modeTest.addEventListener('click', () => h.onModeChange('test'));
     document.getElementById('btn-save').addEventListener('click', () => h.onSave());
     document.getElementById('btn-load').addEventListener('click', () => h.onLoad());
     document.getElementById('btn-clear').addEventListener('click', () => h.onClear());
+    document.getElementById('survey-skip').addEventListener('click', () => h.onSkipCourse());
+    document.getElementById('view-tour').addEventListener('click', () => h.onShowCourse());
+    document.getElementById('view-build').addEventListener('click', () => h.onModeChange('studio'));
     document.getElementById('btn-respawn').addEventListener('click', () => h.onRespawn());
     document.getElementById('btn-back').addEventListener('click', () => h.onModeChange('studio'));
     document.getElementById('win-again').addEventListener('click', () => {
@@ -97,6 +119,10 @@ export class Hud {
     document.getElementById('win-studio').addEventListener('click', () => {
       this.hideWin();
       h.onModeChange('studio');
+    });
+    dom.winNext.addEventListener('click', () => {
+      this.hideWin();
+      h.onNextChallenge();
     });
     for (const button of document.querySelectorAll('.tool')) {
       button.addEventListener('click', () => h.onSelectTool(button.dataset.tool));
@@ -158,13 +184,23 @@ export class Hud {
   }
 
   setMode(mode, flightKeys = null) {
-    const test = mode === 'test';
     this.flightKeys = flightKeys;
-    this.dom.modeStudio.classList.toggle('active', !test);
-    this.dom.modeTest.classList.toggle('active', test);
-    this.dom.palette.hidden = test;
-    this.dom.inspector.hidden = test;
-    this.dom.objectives.hidden = !test;
+    for (const [name, node] of [
+      ['studio', this.dom.modeStudio],
+      ['view', this.dom.modeView],
+      ['test', this.dom.modeTest],
+    ]) {
+      node.classList.toggle('active', mode === name);
+    }
+    // Building tools in the studio, the run panel in test, and in view just
+    // the course and what it is asking of you.
+    this.dom.palette.hidden = mode !== 'studio';
+    this.dom.inspector.hidden = mode !== 'studio';
+    this.dom.objectives.hidden = mode === 'studio';
+    this.dom.viewbar.hidden = mode !== 'view';
+    // In view there is no run, so no clock and nothing to respawn.
+    this.dom.clock.hidden = mode !== 'test';
+    this.dom.testControls.hidden = mode !== 'test';
     this.setHelp(mode);
   }
 
@@ -194,6 +230,7 @@ export class Hud {
 
   setLevel(level) {
     this.dom.crumbLevel.textContent = level.name;
+    this.dom.viewGoal.textContent = level.brief;
     this.dom.briefTitle.textContent = level.name;
     this.dom.briefText.textContent = level.brief;
     this.dom.briefHint.textContent = level.hint ?? '';
@@ -521,25 +558,61 @@ export class Hud {
       `Run time <strong>${report.elapsed.toFixed(1)}s</strong>${par}${rule}`;
   }
 
-  // The same facts, in the same order, as the card the challenge was started
-  // from: time, par, cost.
-  showWin(level, report, cost) {
-    this.dom.winTitle.textContent = level.name;
+  /**
+   * The time is the headline, because that is the bragging right; under it,
+   * the machine that set it. A run is only worth anything next to what it was
+   * done with, so the card names every part you spent.
+   */
+  showWin(level, report, cost, blueprint, next) {
+    const dom = this.dom;
+    dom.winTitle.textContent = level.name;
+
     const beatPar = level.par && report.elapsed <= level.par;
-    this.dom.winStats.innerHTML = [
-      `<span${beatPar ? ' class="beat"' : ''}>Time <strong>${report.elapsed.toFixed(1)}s</strong></span>`,
-      level.par ? `<span>Par <strong>${level.par}s</strong></span>` : '',
+    dom.winClock.textContent = `${report.elapsed.toFixed(1)}s`;
+    dom.winClock.classList.toggle('beat', Boolean(beatPar));
+
+    const best = store.result(level.id)?.best;
+    const record = best !== undefined && report.elapsed <= best + 1e-6;
+    dom.winStats.innerHTML = [
+      level.par ? `<span${beatPar ? ' class="beat"' : ''}>Par <strong>${level.par}s</strong></span>` : '',
       `<span>Cost <strong>${cost}</strong></span>`,
+      `<span>Parts <strong>${blueprint?.size ?? 0}</strong></span>`,
+      record ? '<span class="beat"><strong>Personal best</strong></span>'
+        : (best !== undefined ? `<span>Best <strong>${best.toFixed(1)}s</strong></span>` : ''),
     ].filter(Boolean).join('');
-    this.dom.win.hidden = false;
+
+    this.renderRig(blueprint);
+
+    dom.winNext.textContent = next ? 'Play next challenge' : 'Back to challenges';
+    dom.win.hidden = false;
+    dom.winNext.focus();
+  }
+
+  // Every part that went into the winning machine, most-used first.
+  renderRig(blueprint) {
+    const list = this.dom.winParts;
+    list.innerHTML = '';
+    const counts = new Map();
+    for (const placed of blueprint?.list() ?? []) {
+      counts.set(placed.type, (counts.get(placed.type) ?? 0) + 1);
+    }
+    this.dom.winRig.hidden = counts.size === 0;
+    const ordered = [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+    for (const [type, count] of ordered) {
+      const part = getPart(type);
+      list.append(el('li', null, `${count} x ${part.name}`));
+    }
   }
 
   showFailure(level, report, reason) {
     this.dom.win.classList.add('failed');
     this.dom.winKicker.textContent = 'Run failed';
     this.dom.winTitle.textContent = reason;
-    this.dom.winStats.innerHTML =
-      `<span>${level.name}</span><span>Lasted <strong>${report.elapsed.toFixed(1)}s</strong></span>`;
+    this.dom.winClock.textContent = `${report.elapsed.toFixed(1)}s`;
+    this.dom.winClock.classList.remove('beat');
+    this.dom.winStats.innerHTML = `<span>${level.name}</span>`;
+    this.dom.winRig.hidden = true;
+    this.dom.winNext.textContent = 'Back to challenges';
     this.dom.win.hidden = false;
   }
 
@@ -547,6 +620,22 @@ export class Hud {
     this.dom.win.hidden = true;
     this.dom.win.classList.remove('failed');
     this.dom.winKicker.textContent = 'Challenge complete';
+  }
+
+  get winIsOpen() {
+    return !this.dom.win.hidden;
+  }
+
+  // --------------------------------------------------------- course tour
+
+  setSurvey(caption, step, of) {
+    this.dom.survey.hidden = false;
+    this.dom.surveyStep.textContent = `${step} / ${of}`;
+    this.dom.surveyCaption.textContent = caption;
+  }
+
+  hideSurvey() {
+    this.dom.survey.hidden = true;
   }
 
   /**

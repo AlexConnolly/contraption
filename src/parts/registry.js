@@ -11,6 +11,24 @@ export function partDensity(part) {
 }
 
 /**
+ * The direction a part works in, and what that direction means. A part you
+ * have to aim is useless if you cannot tell which way it is facing, and on a
+ * cube that is most of them: which face the magnet grabs on, which way the
+ * thruster pushes, where the sensor is looking.
+ *
+ * `act` is something the part does to the world, `read` something it takes
+ * from it, which is the same split as amber and cyan everywhere else.
+ */
+export function workingAxis(part) {
+  if (part.thruster) return { axis: part.thruster.axis, kind: 'act' };
+  if (part.sensor) return { axis: part.sensor.axis, kind: 'read' };
+  if (part.flight) return { axis: [0, 0, 1], kind: 'read' };
+  if (part.grabber) return { axis: [0, 1, 0], kind: 'act' };
+  if (part.joint === 'prismatic') return { axis: [0, 1, 0], kind: 'act' };
+  return null;
+}
+
+/**
  * How far a piston is set to push, in metres. Each one carries its own, so a
  * short jab and a long reach can sit on the same machine; anything outside
  * what the part can do is pulled back to the nearest end of its range.

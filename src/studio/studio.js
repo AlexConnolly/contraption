@@ -54,6 +54,8 @@ export class Studio {
   }
 
   buildPlate() {
+    // Visible from underneath, because you are allowed to go under it and
+    // build there. Thin enough from below not to hide what you are doing.
     const plate = new THREE.Mesh(
       new THREE.PlaneGeometry(30, 30),
       new THREE.MeshStandardMaterial({
@@ -61,6 +63,7 @@ export class Studio {
         roughness: 0.95,
         transparent: true,
         opacity: 0.9,
+        side: THREE.DoubleSide,
       }),
     );
     plate.rotation.x = -Math.PI / 2;
@@ -161,6 +164,9 @@ export class Studio {
         normal: [normal.x, normal.y, normal.z],
       };
     }
+    // From underneath, the plate is something you are looking through rather
+    // than a surface you can drop a part on, so it stops catching the cursor.
+    if (this.camera.position.y < PLATE_Y) return null;
     const plateHit = this.raycaster.intersectObject(this.plate, false)[0];
     if (!plateHit) return null;
     return {
@@ -168,6 +174,16 @@ export class Studio {
       cell: [Math.round(plateHit.point.x / CELL), 0, Math.round(plateHit.point.z / CELL)],
       normal: [0, 0, 0],
     };
+  }
+
+  // Fades the plate out as the camera drops under it, so what is bolted to the
+  // underside of a machine is actually visible while it is being built.
+  updatePlateFade() {
+    if (!this.plate.visible) return;
+    const under = PLATE_Y - this.camera.position.y;
+    const fade = Math.min(1, Math.max(0, under / 2.5));
+    this.plate.material.opacity = 0.9 - fade * 0.78;
+    if (this.grid) this.grid.material.opacity = 0.5 - fade * 0.38;
   }
 
   // A part wider than one cell has to step further off the face it sits on.
@@ -181,6 +197,7 @@ export class Studio {
   }
 
   update() {
+    this.updatePlateFade();
     const hit = this.pick();
     this.hoverId = hit?.partId ?? null;
 
