@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import RAPIER from '@dimforge/rapier3d-compat';
+import RAPIER from './sim/rapier.js';
 
 import { Blueprint } from './core/blueprint.js';
 import { Input } from './core/input.js';
@@ -392,7 +392,6 @@ function frame(now) {
 // ------------------------------------------------------------------------ boot
 
 async function boot() {
-  await RAPIER.init();
   world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
   world.timestep = STEP;
 

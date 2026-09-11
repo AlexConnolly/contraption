@@ -11,6 +11,7 @@ npm install
 npm run dev      # http://localhost:5173
 npm test         # 65 tests, including headless physics
 npm run build
+npm run preview  # serve the production build
 ```
 
 ## Playing
@@ -92,6 +93,22 @@ until they are cleared, and articulated parts welding themselves solid.
 
 Part masses are given in kilograms per cell and prop masses in kilograms, so
 the numbers in the registry and levels mean something when you tune them.
+
+## Build
+
+`npm run build` emits four assets: the game code, Three.js, the stylesheet, and
+Rapier's WebAssembly as its own `.wasm` file.
+
+Rapier ships two packages. `@dimforge/rapier3d-compat` inlines the same wasm as
+base64, which is convenient but pushed the JavaScript bundle to 1.25 MB gzipped
+on its own. The browser therefore uses the plain `@dimforge/rapier3d`, whose
+wasm is fetched separately and cached separately — 54 kB of game code and
+139 kB of Three.js, with the 774 kB wasm alongside. Tests keep the compat build
+because Node loads it without needing experimental flags.
+
+`vite.config.js` excludes Rapier from dependency pre-bundling. Without that the
+dev server makes a second copy of the wasm-bindgen glue, only one copy holds
+the wasm memory views, and every physics call through the other one throws.
 
 ## Adding to it
 
