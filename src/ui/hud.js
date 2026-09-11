@@ -1,6 +1,7 @@
 import { CATEGORIES, partsInCategory, getPart } from '../parts/registry.js';
 import { BINDING_MODES, bindingLabel, keyLabel, defaultBinding } from '../sim/signals.js';
 import { LEVELS } from '../challenges/levels.js';
+import { estimateGains, firstController, controllerOf } from '../sim/flight.js';
 
 const HELP = {
   studio: [
@@ -34,6 +35,7 @@ export class Hud {
     this.h = handlers;
     this.dom = {
       levelSelect: document.getElementById('level-select'),
+      presetSelect: document.getElementById('preset-select'),
       modeStudio: document.getElementById('mode-studio'),
       modeTest: document.getElementById('mode-test'),
       budget: document.getElementById('budget'),
@@ -62,6 +64,11 @@ export class Hud {
   wire() {
     const { h, dom } = this;
     dom.levelSelect.addEventListener('change', (e) => h.onLevelChange(e.target.value));
+    dom.presetSelect.addEventListener('change', (e) => {
+      if (!e.target.value) return;
+      h.onPreset(e.target.value);
+      e.target.value = '';
+    });
     dom.modeStudio.addEventListener('click', () => h.onModeChange('studio'));
     dom.modeTest.addEventListener('click', () => h.onModeChange('test'));
     document.getElementById('btn-save').addEventListener('click', () => h.onSave());
@@ -124,8 +131,9 @@ export class Hud {
     }
   }
 
-  setMode(mode) {
+  setMode(mode, flightKeys = null) {
     const test = mode === 'test';
+    this.flightKeys = flightKeys;
     this.dom.modeStudio.classList.toggle('active', !test);
     this.dom.modeTest.classList.toggle('active', test);
     this.dom.palette.hidden = test;
@@ -136,7 +144,15 @@ export class Hud {
 
   setHelp(mode) {
     this.dom.help.innerHTML = '';
-    for (const [keys, label] of HELP[mode]) {
+    const rows = [...HELP[mode]];
+    if (mode === 'test' && this.flightKeys) {
+      const k = this.flightKeys;
+      rows.splice(1, 0,
+        [`${keyLabel(k.forward)} ${keyLabel(k.left)} ${keyLabel(k.back)} ${keyLabel(k.right)}`, 'fly'],
+        [`${keyLabel(k.up)} ${keyLabel(k.down)}`, 'climb / descend'],
+      );
+    }
+    for (const [keys, label] of rows) {
       const span = el('span');
       for (const key of keys.split(' ')) {
         if (/^(click|drag)$/i.test(key)) {
@@ -185,6 +201,7 @@ export class Hud {
     head.append(swatch, el('h3', null, part.name));
     body.append(head, el('p', 'insp-blurb', part.blurb));
 
+    if (part.flight) this.renderController(body, placed, part, blueprint);
     if (part.actuator) this.renderBinding(body, placed, part, blueprint);
     if (part.sensor) this.renderSensor(body, placed, part);
     if (part.actuator && (part.actuator.kind === 'motor' || part.actuator.kind === 'thrust')) {
@@ -234,6 +251,16 @@ export class Hud {
       body.append(row);
     }
 
+    if (binding.mode === 'flight') {
+      const controllers = blueprint.list().filter((p) => getPart(p.type).flight);
+      if (controllers.length === 0) {
+        body.append(el('p', 'insp-blurb', 'No flight controller on this machine yet.'));
+      } else {
+        this.renderSource(body, placed, binding, controllers, 'Controller', 'Controller');
+        this.renderGains(body, placed, blueprint);
+      }
+    }
+
     if (binding.mode === 'sensor') {
       const sensors = blueprint.list().filter((p) => getPart(p.type).sensor);
       const row = el('div', 'row');
@@ -270,6 +297,97 @@ export class Hud {
     }
 
     body.append(el('p', 'insp-blurb', `Currently: ${bindingLabel(binding)}`));
+  }
+
+  renderSource(body, placed, binding, sources, label, prefix) {
+    const row = el('div', 'row');
+    row.append(el('label', null, label));
+    const select = document.createElement('select');
+    sources.forEach((source, index) => {
+      const option = el('option', null, `${prefix} ${index + 1}`);
+      option.value = source.id;
+      select.append(option);
+    });
+    select.value = binding.source ?? sources[0].id;
+    select.addEventListener('change', () => {
+      this.h.onBindingChange(placed.id, { ...binding, source: select.value });
+    });
+    row.append(select);
+    body.append(row);
+  }
+
+  // How much of each control channel this thruster is asked to provide. The
+  // derived figures come from where it sits and which way it points; anything
+  // the player drags here overrides that one channel and leaves the rest.
+  renderGains(body, placed, blueprint) {
+    const controllerId = controllerOf(blueprint, placed);
+    const derived = estimateGains(blueprint, controllerId).get(placed.id)
+      ?? { climb: 0, pitch: 0, yaw: 0, roll: 0 };
+    const custom = placed.config.gains ?? {};
+    const overridden = Object.keys(custom).length > 0;
+
+    body.append(el('div', 'panel-title', overridden ? 'Influence (edited)' : 'Influence (auto)'));
+    for (const channel of ['climb', 'pitch', 'yaw', 'roll']) {
+      const value = custom[channel] ?? derived[channel];
+      const min = channel === 'climb' ? 0 : -1;
+      this.renderSlider(body, channel, value, min, 1, 0.05, (next) => {
+        this.h.onConfigChange(placed.id, {
+          gains: { ...(placed.config.gains ?? {}), [channel]: next },
+        });
+      });
+    }
+    if (overridden) {
+      const reset = el('button', null, 'Back to derived values');
+      reset.style.width = '100%';
+      reset.addEventListener('click', () => {
+        this.h.onConfigChange(placed.id, { gains: null });
+        this.h.onReselect();
+      });
+      body.append(reset);
+    }
+  }
+
+  renderController(body, placed, part, blueprint) {
+    const keys = { ...part.flight.defaultKeys, ...(placed.config.keys ?? {}) };
+    const linked = blueprint.list().filter(
+      (p) => getPart(p.type).thruster && controllerOf(blueprint, p) === placed.id,
+    ).length;
+    const total = blueprint.list().filter((p) => getPart(p.type).thruster).length;
+
+    body.append(el('p', 'insp-blurb',
+      `Flying ${linked} of ${total} thruster${total === 1 ? '' : 's'}. `
+      + 'Forward is the way its arrow points.'));
+
+    if (linked < total) {
+      const link = el('button', 'primary', `Link the other ${total - linked}`);
+      link.style.width = '100%';
+      link.style.marginBottom = '10px';
+      link.addEventListener('click', () => this.h.onLinkThrusters(placed.id));
+      body.append(link);
+    }
+
+    body.append(el('div', 'panel-title', 'Flight keys'));
+    const rows = [
+      ['forward', 'back'],
+      ['left', 'right'],
+      ['up', 'down'],
+    ];
+    for (const pair of rows) {
+      const row = el('div', 'keybind');
+      for (const slot of pair) {
+        const button = el('button', null, `${slot} ${keyLabel(keys[slot])}`);
+        button.addEventListener('click', () => {
+          button.classList.add('listening');
+          button.textContent = 'press a key…';
+          this.h.onCaptureKey((code) => {
+            this.h.onConfigChange(placed.id, { keys: { ...keys, [slot]: code } });
+          });
+        });
+        row.append(button);
+      }
+      body.append(row);
+    }
+    body.append(el('p', 'insp-blurb', 'Let go of everything and it holds the height it is at.'));
   }
 
   renderSensor(body, placed, part) {

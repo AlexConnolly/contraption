@@ -3,6 +3,10 @@ import { getPart, partDensity, CELL } from '../parts/registry.js';
 import { orientationQuaternion, applyOrientation } from '../core/orientation.js';
 import { groupBlueprint } from './grouping.js';
 import { driveSide } from './signals.js';
+import {
+  FlightController, deriveGains, defaultSpin, frameFromAxes, attitudeOf,
+  readFlightKeys, controllerOf,
+} from './flight.js';
 import { createPartMesh } from '../parts/geometry.js';
 
 export const GROUP_WORLD = 0x00010003;
@@ -34,6 +38,7 @@ export class Machine {
     this.joints = [];
     this.actuators = [];
     this.sensors = [];
+    this.controllers = [];
     this.grabs = new Map();
     this.partMeshes = new Map();
     this.grouping = groupBlueprint(blueprint);
@@ -73,6 +78,7 @@ export class Machine {
     }
     this.buildJoints();
     this.collectActuators();
+    this.buildControllers();
     this.syncMeshes();
   }
 
@@ -143,6 +149,7 @@ export class Machine {
       const part = getPart(placed.type);
       const bodyIndex = this.grouping.bodyOfPart.get(placed.id);
       if (part.sensor) this.sensors.push({ placed, part });
+      if (part.flight) this.controllers.push({ placed, part, bodyIndex });
       if (!part.actuator) continue;
       const jointEntry = this.joints.find((j) => j.partId === placed.id);
       this.actuators.push({
@@ -152,6 +159,96 @@ export class Machine {
         joint: jointEntry?.joint ?? null,
         signal: 0,
       });
+    }
+  }
+
+  /**
+   * Sets each controller up with the thrusters bound to it, working out what
+   * every one of them can do for each control channel from where it sits on
+   * the machine and which way it points.
+   */
+  buildControllers() {
+    for (const entry of this.controllers) {
+      const frame = frameFromAxes(
+        applyOrientation(entry.placed.rot, [0, 0, 1]),
+        applyOrientation(entry.placed.rot, [0, 1, 0]),
+      );
+      const body = this.bodies[entry.bodyIndex];
+      const com = body.localCom();
+      const members = this.actuators.filter((a) => a.part.thruster
+        && controllerOf(this.blueprint, a.placed) === entry.placed.id);
+
+      const specs = members.map((a) => {
+        const offset = this.localOf(a.placed.cell)
+          .sub(new THREE.Vector3(com.x, com.y, com.z));
+        const dir = applyOrientation(a.placed.rot, a.part.thruster.axis);
+        const spin = a.placed.config.spin
+          ?? defaultSpin(offset.toArray(), frame);
+        a.spin = spin;
+        return {
+          id: a.placed.id,
+          offset: offset.toArray(),
+          dir,
+          maxThrust: a.part.thruster.maxThrust * (a.placed.config.power ?? 1),
+          reaction: a.part.thruster.reaction ?? 0,
+          spin,
+        };
+      });
+
+      const derived = deriveGains(specs, frame);
+      // A player-set gain wins; anything they have not touched stays derived.
+      for (const a of members) {
+        const custom = a.placed.config.gains;
+        if (custom) derived.set(a.placed.id, { ...derived.get(a.placed.id), ...custom });
+      }
+
+      entry.frame = frame;
+      entry.members = members;
+      entry.gains = derived;
+      entry.liftAuthority = specs.reduce(
+        (sum, spec) => sum + spec.maxThrust * (derived.get(spec.id)?.climb ?? 0),
+        0,
+      );
+      entry.runtime = new FlightController(entry.part.flight);
+      entry.keys = { ...entry.part.flight.defaultKeys, ...(entry.placed.config.keys ?? {}) };
+    }
+  }
+
+  // Runs before the actuators resolve, so every linked thruster reads the
+  // throttle its controller just worked out.
+  updateControllers(dt, bus) {
+    for (const entry of this.controllers) {
+      if (!entry.members?.length) continue;
+      const body = this.bodies[entry.bodyIndex];
+      const pose = this.worldPose(entry.bodyIndex);
+      const frameWorld = {
+        forward: entry.frame.forward.clone().applyQuaternion(pose.quaternion),
+        up: entry.frame.up.clone().applyQuaternion(pose.quaternion),
+        right: entry.frame.right.clone().applyQuaternion(pose.quaternion),
+      };
+      const com = body.worldCom();
+      const linvel = body.linvel();
+      const velocity = new THREE.Vector3(linvel.x, 0, linvel.z);
+      const flat = (axis) => {
+        const v = axis.clone();
+        v.y = 0;
+        return v.lengthSq() > 1e-6 ? velocity.dot(v.normalize()) : 0;
+      };
+      const command = readFlightKeys(bus.input, entry.keys);
+      entry.runtime.update(dt, command, {
+        mass: body.mass(),
+        gravity: -this.world.gravity.y,
+        liftAuthority: entry.liftAuthority,
+        altitude: com.y,
+        verticalSpeed: linvel.y,
+        forwardSpeed: flat(frameWorld.forward),
+        rightSpeed: flat(frameWorld.right),
+        ...attitudeOf(frameWorld, body.angvel()),
+      });
+      for (const [id, throttle] of entry.runtime.mix(entry.gains)) {
+        bus.setChannel(id, throttle);
+      }
+      entry.command = command;
     }
   }
 
@@ -213,6 +310,7 @@ export class Machine {
   }
 
   update(dt, bus) {
+    this.updateControllers(dt, bus);
     // Rapier keeps applied forces until they are cleared, so thrust has to be
     // wiped and re-applied every step or it accumulates. Force and torque are
     // cleared separately, and addForceAtPoint sets both: an off-centre
@@ -268,8 +366,21 @@ export class Machine {
     if (signal <= 0.001) return;
     const dir = this.partWorldAxis(placed, part.thruster.axis);
     const point = this.partWorldPoint(placed);
-    const force = dir.multiplyScalar(part.thruster.maxThrust * signal);
-    this.bodies[bodyIndex].addForceAtPoint(vec(force), vec(point), true);
+    const body = this.bodies[bodyIndex];
+    body.addForceAtPoint(
+      vec(dir.clone().multiplyScalar(part.thruster.maxThrust * signal)),
+      vec(point),
+      true,
+    );
+    // A rotor pushing air one way is pushed back the other: the reaction
+    // torque about its own axis is what a drone yaws with.
+    if (part.thruster.reaction) {
+      const spin = actuator.spin ?? placed.config.spin ?? 1;
+      body.addTorque(
+        vec(dir.clone().multiplyScalar(-spin * part.thruster.reaction * signal)),
+        true,
+      );
+    }
   }
 
   updateGrab(actuator, signal) {

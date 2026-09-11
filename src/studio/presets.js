@@ -15,3 +15,16 @@ export function starterRover() {
   bp.place('wheel', [-2, 0, -1], facingLeft);
   return bp;
 }
+
+// A four-rotor drone wired to a flight controller. The rotors carry no key
+// binding of their own: the controller works out each one's share.
+export function quadcopter() {
+  const bp = new Blueprint({ name: 'Quadcopter' });
+  bp.place('panel', [0, 0, 0]);
+  bp.place('core', [0, 1, 0]);
+  bp.place('controller', [0, 1, -1]);
+  for (const cell of [[-1, 1, -1], [1, 1, -1], [-1, 1, 1], [1, 1, 1]]) {
+    bp.place('propeller', cell, IDENTITY_ORIENTATION, { binding: { mode: 'flight' } });
+  }
+  return bp;
+}

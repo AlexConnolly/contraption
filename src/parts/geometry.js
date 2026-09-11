@@ -165,6 +165,24 @@ const BUILDERS = {
     return group;
   },
 
+  controller(part) {
+    const group = new THREE.Group();
+    group.add(shell(part));
+    const board = new THREE.Mesh(
+      new THREE.BoxGeometry(CELL * 0.62, CELL * 0.08, CELL * 0.62),
+      material(0x123b3a, { metalness: 0.4, roughness: 0.5 }),
+    );
+    board.position.y = CELL * 0.28;
+    group.add(board);
+    const led = new THREE.Mesh(
+      new THREE.SphereGeometry(CELL * 0.09, 12, 10),
+      material(0xd8fff8, { emissive: 0x2ce0cf, roughness: 0.2 }),
+    );
+    led.position.set(CELL * 0.18, CELL * 0.36, CELL * 0.18);
+    group.add(led);
+    return group;
+  },
+
   sensor(part) {
     const group = new THREE.Group();
     group.add(shell(part));
@@ -182,13 +200,13 @@ const BUILDERS = {
 
 // A thrust axis is invisible until it fires, and yawing a part does not change
 // which way it points, so the studio draws the direction on it.
-function thrustArrow(part) {
+function directionArrow(axis, colour = 0xffd166) {
   const group = new THREE.Group();
   // Drawn without depth testing and last, so an arrow pointing into the middle
   // of the machine is still visible instead of being swallowed by the part in
   // front of it.
   const skin = () => new THREE.MeshBasicMaterial({
-    color: 0xffd166,
+    color: colour,
     depthTest: false,
     transparent: true,
     opacity: 0.95,
@@ -203,8 +221,10 @@ function thrustArrow(part) {
   group.add(shaft, head);
   group.renderOrder = 999;
   group.traverse((child) => { child.renderOrder = 999; });
-  const axis = new THREE.Vector3(...part.thruster.axis);
-  group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis);
+  group.quaternion.setFromUnitVectors(
+    new THREE.Vector3(0, 1, 0),
+    new THREE.Vector3(...axis).normalize(),
+  );
   return group;
 }
 
@@ -216,7 +236,14 @@ export function createPartMesh(part, options = {}) {
     child.castShadow = true;
     child.receiveShadow = true;
   });
-  if (options.hints && part.thruster) object.add(thrustArrow(part));
+  if (options.hints && part.thruster) {
+    object.add(directionArrow(part.thruster.axis));
+  }
+  // The controller's own orientation is the machine's flight frame, so the
+  // studio shows which way it thinks forward is.
+  if (options.hints && part.flight) {
+    object.add(directionArrow([0, 0, 1], 0x37d4c8));
+  }
   return object;
 }
 

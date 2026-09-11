@@ -5,10 +5,12 @@ import RAPIER from './sim/rapier.js';
 import { Blueprint } from './core/blueprint.js';
 import { Input } from './core/input.js';
 import { Studio } from './studio/studio.js';
-import { starterRover } from './studio/presets.js';
+import { starterRover, quadcopter } from './studio/presets.js';
 import { Machine } from './sim/machine.js';
 import { Arena } from './sim/arena.js';
 import { SignalBus } from './sim/signals.js';
+import { controllerOf, firstController } from './sim/flight.js';
+import { getPart } from './parts/registry.js';
 import { ObjectiveTracker, withinBudget } from './challenges/objectives.js';
 import { getLevel, LEVELS } from './challenges/levels.js';
 import { Hud } from './ui/hud.js';
@@ -167,7 +169,10 @@ function enterTest() {
   studio.setVisible(false);
   disposeRun();
   buildRun();
-  hud.setMode('test');
+  const controller = firstController(state.blueprint);
+  hud.setMode('test', controller
+    ? { ...getPart('controller').flight.defaultKeys, ...(controller.config.keys ?? {}) }
+    : null);
   controls.enabled = state.cameraMode === 'orbit';
 }
 
@@ -441,6 +446,26 @@ async function boot() {
     },
     onConfigChange: (id, config) => state.blueprint.setConfig(id, config),
     onDeleteSelected: () => studio.deleteSelected(),
+    onLinkThrusters: (controllerId) => {
+      let linked = 0;
+      for (const placed of state.blueprint.list()) {
+        if (!getPart(placed.type).thruster) continue;
+        if (controllerOf(state.blueprint, placed) === controllerId) continue;
+        state.blueprint.setConfig(placed.id, {
+          binding: { mode: 'flight', source: controllerId },
+        });
+        linked += 1;
+      }
+      refreshInspector();
+      scheduleAutosave();
+      hud.toast(`Linked ${linked} thruster${linked === 1 ? '' : 's'} to the controller`);
+    },
+    onReselect: refreshInspector,
+    onPreset: (id) => {
+      const presets = { rover: starterRover, quadcopter, empty: () => new Blueprint() };
+      studio.replaceBlueprint(presets[id]());
+      hud.toast(`Loaded the ${id} to start from`);
+    },
     onCaptureKey: (handler) => input.capture((code) => {
       handler(code);
       refreshInspector();

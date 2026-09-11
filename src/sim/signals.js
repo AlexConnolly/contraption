@@ -7,6 +7,7 @@ export const BINDING_MODES = [
   { id: 'axis', name: 'Axis (two keys)', keys: ['pos', 'neg'] },
   { id: 'hold', name: 'Hold', keys: ['pos'] },
   { id: 'toggle', name: 'Toggle', keys: ['pos'] },
+  { id: 'flight', name: 'Flight controller', keys: [] },
   { id: 'sensor', name: 'Driven by sensor', keys: [] },
   { id: 'always', name: 'Always on', keys: [] },
 ];
@@ -22,10 +23,19 @@ export class SignalBus {
     this.input = input;
     this.toggles = new Map();
     this.sensors = new Map();
+    this.channels = new Map();
   }
 
   setSensor(partId, value) {
     this.sensors.set(partId, value);
+  }
+
+  setChannel(partId, value) {
+    this.channels.set(partId, value);
+  }
+
+  channel(partId) {
+    return this.channels.get(partId) ?? 0;
   }
 
   sensor(partId) {
@@ -35,6 +45,7 @@ export class SignalBus {
   reset() {
     this.toggles.clear();
     this.sensors.clear();
+    this.channels.clear();
   }
 
   resolve(partId, binding) {
@@ -60,6 +71,9 @@ export class SignalBus {
         }
         return this.toggles.get(partId) ? 1 : 0;
       }
+      // The controller writes a throttle per thruster before anything resolves.
+      case 'flight':
+        return this.channel(partId);
       case 'sensor': {
         const raw = this.sensor(binding.source);
         return binding.invert ? 1 - raw : raw;
@@ -83,6 +97,8 @@ export function bindingLabel(binding) {
       return `hold ${keyLabel(binding.pos)}`;
     case 'toggle':
       return `toggle ${keyLabel(binding.pos)}`;
+    case 'flight':
+      return 'flight controller';
     case 'sensor':
       return binding.invert ? 'sensor (inverted)' : 'sensor';
     case 'always':

@@ -104,7 +104,7 @@ export const LEVELS = [
     id: 'airlift',
     name: '4 — Airlift',
     brief: 'Get the payload onto the high platform. It is too tall to drive up.',
-    hint: 'Lift rotors are strong but heavy. Put them above the centre of mass, or it will tip.',
+    hint: 'Wire the rotors to a Flight Controller and it will hold height by itself: WASD to fly, Space and Shift to climb and drop. Hang a grabber underneath to pick the payload up.',
     spawn: [0, 1.2, -8],
     groundSize: 140,
     budget: { cost: 150 },
