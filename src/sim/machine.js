@@ -50,6 +50,10 @@ function worldDirectionOf(body, local) {
     .applyQuaternion(new THREE.Quaternion(r.x, r.y, r.z, r.w));
 }
 
+// Joints driven by a motor you can hear: they share one voice, the way the
+// wheels do.
+const SERVO_KINDS = new Set(['servo', 'spin', 'linear']);
+
 export class Machine {
   constructor({ RAPIER, world, scene, blueprint, spawn, level }) {
     this.level = level ?? null;
@@ -68,6 +72,7 @@ export class Machine {
     this.computers = [];
     this.sensorReadings = new Map();
     this.grabs = new Map();
+    this.events = [];
     this.partMeshes = new Map();
     this.grouping = groupBlueprint(blueprint);
     this.origin = {
@@ -479,6 +484,10 @@ export class Machine {
   }
 
   update(dt, bus) {
+    // Things that happened this step rather than things that are happening:
+    // a state snapshot cannot say "it just let go", which is why the parts
+    // that do something once had nothing to make a noise about.
+    this.events.length = 0;
     // Rapier keeps applied forces until they are cleared, so thrust has to be
     // wiped and re-applied every step or it accumulates. Force and torque are
     // cleared separately, and addForceAtPoint sets both: an off-centre
@@ -558,6 +567,7 @@ export class Machine {
     if (!entry || entry.released) return;
     entry.released = true;
     this.world.removeImpulseJoint(entry.joint, true);
+    this.events.push('separate');
 
     const push = separationPush(actuator.placed, actuator.part);
     if (push <= 0) return;
@@ -611,6 +621,7 @@ export class Machine {
       if (held) {
         this.world.removeImpulseJoint(held, true);
         this.grabs.delete(placed.id);
+        this.events.push('unlatch');
       }
       return;
     }
@@ -641,6 +652,7 @@ export class Machine {
       vec(anchor2), { x: frame2.x, y: frame2.y, z: frame2.z, w: frame2.w },
     );
     this.grabs.set(placed.id, this.world.createImpulseJoint(params, selfBody, target, true));
+    this.events.push('latch');
   }
 
   toLocal(body, worldPoint) {
@@ -705,12 +717,17 @@ export class Machine {
       // A strut squashes its coil instead of growing a rod, so you can see
       // which corner is taking the weight.
       if (entry.part.spring) {
+        const half = springTravel(entry.placed, entry.part) / 2;
+        const travel = this.pistonExtension(entry);
+        const moved = Math.max(-half, Math.min(half, travel));
         const coil = this.partMeshes.get(entry.partId)?.getObjectByName('coil');
-        if (coil) {
-          const half = springTravel(entry.placed, entry.part) / 2;
-          const moved = Math.max(-half, Math.min(half, this.pistonExtension(entry)));
-          coil.scale.y = Math.max(0.25, 1 + moved / Math.max(half, 0.01) * 0.45);
-        }
+        if (coil) coil.scale.y = Math.max(0.25, 1 + moved / Math.max(half, 0.01) * 0.45);
+        // A strut run out of travel is taking the landing through the chassis
+        // instead of soaking it up, which is worth hearing once rather than
+        // every frame it stays there.
+        const onStop = travel <= -half * 0.97;
+        if (onStop && !entry.onStop) this.events.push('bottom');
+        entry.onStop = onStop;
         continue;
       }
       const mesh = this.partMeshes.get(entry.partId);
@@ -742,8 +759,10 @@ export class Machine {
     const wheels = [];
     const rotors = [];
     const jets = [];
+    const servos = [];
     let wheelSpeed = 0;
     let rotorSpin = 0;
+    let servoRate = 0;
 
     for (const actuator of this.actuators) {
       const { part, signal, bodyIndex } = actuator;
@@ -759,6 +778,14 @@ export class Machine {
         } else {
           jets.push(level);
         }
+      } else if (SERVO_KINDS.has(part.actuator.kind)) {
+        // A servo is heard when it is moving, not when it is merely holding a
+        // load, so this is measured off the joint rather than off the key.
+        const rate = Math.abs(this.jointRate(actuator));
+        if (rate > 0.02) {
+          servos.push(Math.min(1, rate / 4));
+          servoRate = Math.max(servoRate, rate);
+        }
       }
     }
 
@@ -770,9 +797,35 @@ export class Machine {
       jets,
       wheelSpeed,
       rotorSpin,
+      servos,
+      servoRate,
       groundSpeed: Math.hypot(v.x, v.z),
       grounded: this.contact() !== null,
+      events: this.events,
     };
+  }
+
+  /**
+   * How fast a jointed part is actually moving, in radians or metres a second.
+   * Taken from the two bodies the joint holds together rather than from the
+   * command, so a servo straining against a load it cannot shift stays quiet
+   * instead of screaming at full throttle.
+   */
+  jointRate(actuator) {
+    const spec = this.grouping.joints.find((j) => j.partId === actuator.placed.id);
+    if (!spec) return 0;
+    const child = this.bodies[spec.childBody];
+    const host = this.bodies[spec.hostBody];
+    if (!child || !host) return 0;
+    const axis = this.partWorldAxis(actuator.placed, actuator.part.axis ?? [0, 1, 0]);
+    if (actuator.part.joint === 'prismatic') {
+      const a = child.linvel();
+      const b = host.linvel();
+      return new THREE.Vector3(a.x - b.x, a.y - b.y, a.z - b.z).dot(axis);
+    }
+    const a = child.angvel();
+    const b = host.angvel();
+    return new THREE.Vector3(a.x - b.x, a.y - b.y, a.z - b.z).dot(axis);
   }
 
   core() {

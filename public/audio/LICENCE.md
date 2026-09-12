@@ -12,7 +12,7 @@ worth pointing at.
 | Files | Pack | Author | Licence |
 |---|---|---|---|
 | `ui-*.ogg`, `part-*.ogg`, `deny.ogg`, `confirm.ogg` | [Interface Sounds](https://kenney.nl/assets/interface-sounds) | Kenney | CC0 1.0 |
-| `loop-*.ogg`, `grab-latch.ogg`, `crash.ogg`, `win.ogg`, `fail.ogg` | [Sci-fi Sounds](https://kenney.nl/assets/sci-fi-sounds) | Kenney | CC0 1.0 |
+| `loop-*.ogg`, `grab-latch.ogg`, `separate.ogg`, `thunk.ogg`, `crash.ogg`, `win.ogg`, `fail.ogg` | [Sci-fi Sounds](https://kenney.nl/assets/sci-fi-sounds) | Kenney | CC0 1.0 |
 
 Both packs state, in their own `License.txt`:
 
@@ -35,7 +35,10 @@ Both packs state, in their own `License.txt`:
 | `loop-drive.ogg` | `engineCircular_000` | Wheel motors — looped, rate follows shaft speed |
 | `loop-rotor.ogg` | `spaceEngineSmall_000` | Lift rotors — looped, rate follows rotor speed |
 | `loop-jet.ogg` | `thrusterFire_001` | Jet thrusters — looped, level follows throttle |
-| `grab-latch.ogg` | `forceField_002` | Magnet grabber latching on |
+| `loop-servo.ogg` | `engineCircular_003` | Hinges, pistons and turntables — looped, rate follows joint speed |
+| `grab-latch.ogg` | `forceField_002` | Magnet grabber latching on and letting go |
+| `separate.ogg` | `doorClose_001` | A coupling firing |
+| `thunk.ogg` | `impactMetal_004` | A suspension strut hitting the end of its travel |
 | `crash.ogg` | `impactMetal_002` | Touching something on a no-contact run |
 | `win.ogg` | `doorOpen_001` | Challenge complete |
 | `fail.ogg` | `lowFrequency_explosion_000` | Run failed |

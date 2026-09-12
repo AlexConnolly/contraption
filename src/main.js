@@ -138,7 +138,9 @@ addEventListener('pointerover', (event) => {
 
 function saveDesign(quiet = false) {
   const ok = store.saveDesign(state.level.id, state.blueprint.toJSON());
-  if (!quiet) hud.toast(ok ? 'Design saved' : 'Could not save — storage blocked', !ok);
+  if (quiet) return;
+  if (ok) audio.confirm(); else audio.deny();
+  hud.toast(ok ? 'Design saved' : 'Could not save — storage blocked', !ok);
 }
 
 function loadDesign(levelId) {
@@ -681,6 +683,8 @@ function simulateStep() {
   // Some courses have to be flown without touching anything at all.
   if (state.level.noContact && !state.won && !state.crashed && state.machine.contact()) {
     state.crashed = true;
+    // Touching something on a no-contact run is an impact; the other two ways
+    // to lose a run are not, and they have their own clip.
     audio.crash();
     hud.showFailure(state.level, report, 'You touched something');
     return;
@@ -688,7 +692,7 @@ function simulateStep() {
   // A hard clock. Par is a target you can miss; this one ends the run.
   if (!state.won && !state.crashed && outOfTime(state.level, report.elapsed)) {
     state.crashed = true;
-    audio.crash();
+    audio.fail();
     hud.showFailure(state.level, report, 'Out of time');
     return;
   }
@@ -698,7 +702,7 @@ function simulateStep() {
     const zone = breachedBy(state.level, state.machine);
     if (zone) {
       state.crashed = true;
-      audio.crash();
+      audio.fail();
       hud.showFailure(state.level, report, 'You went where you should not');
       return;
     }

@@ -31,6 +31,16 @@ export const ROTOR = {
   gain: 0.40,
 };
 
+// Hinges, pistons and turntables are all the same thing to listen to: a small
+// electric motor through a reduction. They share one voice, so a machine with
+// six of them sounds like a machine rather than like six of them.
+export const SERVO = {
+  base: 60,
+  perRate: 240,
+  top: 1100,
+  gain: 0.30,
+};
+
 export const JET = {
   // A thruster is mostly noise, so what changes with throttle is how bright
   // it is rather than what note it is.
@@ -74,10 +84,12 @@ export function voicesFor(state = {}) {
   const wheels = state.wheels ?? [];
   const rotors = state.rotors ?? [];
   const jets = state.jets ?? [];
+  const servos = state.servos ?? [];
 
   const drive = blend(wheels);
   const rotor = blend(rotors);
   const jet = blend(jets);
+  const servo = blend(servos);
 
   return {
     drive: {
@@ -95,6 +107,14 @@ export function voicesFor(state = {}) {
     jet: {
       gain: jet.level * JET.gain,
       cut: JET.base + jet.drive * JET.perThrottle,
+    },
+    servo: {
+      gain: servo.level * SERVO.gain,
+      freq: clamp(
+        SERVO.base + Math.abs(state.servoRate ?? 0) * SERVO.perRate,
+        SERVO.base,
+        SERVO.top,
+      ),
     },
   };
 }

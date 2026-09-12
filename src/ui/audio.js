@@ -1,4 +1,4 @@
-import { voicesFor, DRIVE, ROTOR } from '../sim/audio-mix.js';
+import { voicesFor, DRIVE, ROTOR, SERVO } from '../sim/audio-mix.js';
 
 /**
  * Sound. Every file is CC0 — see public/audio/LICENCE.md for what came from
@@ -23,6 +23,8 @@ const CLIPS = {
   deny: 'deny.ogg',
   confirm: 'confirm.ogg',
   latch: 'grab-latch.ogg',
+  separate: 'separate.ogg',
+  thunk: 'thunk.ogg',
   crash: 'crash.ogg',
   win: 'win.ogg',
   fail: 'fail.ogg',
@@ -32,6 +34,9 @@ const LOOPS = {
   drive: 'loop-drive.ogg',
   rotor: 'loop-rotor.ogg',
   jet: 'loop-jet.ogg',
+  // Hinges, pistons and turntables share this one. They were the three parts
+  // you hold a key down on and the three that made no noise at all.
+  servo: 'loop-servo.ogg',
 };
 
 // The pitch each engine clip was recorded at, so the playback rate can be
@@ -40,6 +45,9 @@ const LOOPS = {
 const RECORDED = {
   drive: DRIVE.base + 3 * DRIVE.perSpeed,
   rotor: ROTOR.base + 12 * ROTOR.perSpin * ROTOR.blades,
+  // The servo clip reads as a joint sweeping at about two radians a second,
+  // which is an ordinary hinge stroke.
+  servo: SERVO.base + 2 * SERVO.perRate,
 };
 
 // Well outside this and a stretched clip stops sounding like a motor and
@@ -153,6 +161,18 @@ export class GameAudio {
     this.drive(v.rotor.gain, v.rotor.freq / RECORDED.rotor, 'rotor');
     // A thruster has no shaft, so it stays at pitch and only opens up.
     this.drive(v.jet.gain, 1, 'jet');
+    this.drive(v.servo.gain, v.servo.freq / RECORDED.servo, 'servo');
+
+    // Things that happened this step rather than things that are happening.
+    for (const event of state.events ?? []) this.fire(event);
+  }
+
+  /** Plays the one-shot for something the machine just did. */
+  fire(event) {
+    if (event === 'latch') this.latch();
+    else if (event === 'unlatch') this.release();
+    else if (event === 'separate') this.separate();
+    else if (event === 'bottom') this.thunk();
   }
 
   drive(gain, rate, id) {
@@ -197,6 +217,10 @@ export class GameAudio {
   confirm() { this.play('confirm', { gain: 0.7 }); }
   latch() { this.play('latch', { gain: 0.6 }); }
   release() { this.play('latch', { gain: 0.45, rate: 0.8 }); }
+  separate() { this.play('separate', { gain: 0.85 }); }
+  // Quiet and dull: a strut hitting its stop is a thud through the chassis,
+  // not a crash.
+  thunk() { this.play('thunk', { gain: 0.4, rate: 0.85 }); }
   crash() { this.play('crash', { gain: 0.9 }); }
   win() { this.play('win', { gain: 0.8 }); }
   fail() { this.play('fail', { gain: 0.8 }); }
