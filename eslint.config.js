@@ -28,6 +28,7 @@ export default [
         webkitAudioContext: 'readonly',
         performance: 'readonly',
         requestAnimationFrame: 'readonly',
+        IntersectionObserver: 'readonly',
         cancelAnimationFrame: 'readonly',
         setTimeout: 'readonly',
         clearTimeout: 'readonly',

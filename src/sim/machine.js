@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {
   getPart, partDensity, pistonStroke, separationPush, jointTension, jointFlip,
+  springTravel, springStiffness, springDamping,
   turntableSpin, turntableTorque, CELL,
 } from '../parts/registry.js';
 import { PISTON_ROD_TOP, PISTON_REST, wedgeCorners } from '../parts/geometry.js';
@@ -171,7 +172,14 @@ export class Machine {
       } else if (spec.type === 'prismatic') {
         params = RAPIER.JointData.prismatic(anchor, anchor, axis);
         params.limitsEnabled = true;
-        params.limits = [0, pistonStroke(placed, part)];
+        if (part.spring) {
+          // A strut moves either way from where it was built, so an unloaded
+          // machine sits where you drew it and settles from there.
+          const half = springTravel(placed, part) / 2;
+          params.limits = [-half, half];
+        } else {
+          params.limits = [0, pistonStroke(placed, part)];
+        }
       } else {
         params = RAPIER.JointData.revolute(anchor, anchor, axis);
         if (part.limits) {
@@ -180,9 +188,16 @@ export class Machine {
         }
       }
       const joint = world.createImpulseJoint(params, host, child, true);
+      // Nothing drives a spring, so it is set once and left: hold the built
+      // position, give under load, and come back.
+      if (part.spring) {
+        joint.configureMotorPosition(
+          0, springStiffness(placed, part), springDamping(placed, part),
+        );
+      }
       // The anchor and axis are kept so a piston can measure how far it has
       // actually pushed, and draw its rod that long.
-      this.joints.push({ partId: placed.id, joint, part, host, child, anchor, axis });
+      this.joints.push({ partId: placed.id, placed, joint, part, host, child, anchor, axis });
     }
   }
 
@@ -672,11 +687,32 @@ export class Machine {
     return there.sub(here).dot(axis);
   }
 
+  /**
+   * How far a strut has moved from where it was built, in metres. Negative is
+   * compressed. This is the joint itself rather than any two points on the
+   * machine, so a body that is leaning or tipping does not read as travel.
+   */
+  strutTravel(partId) {
+    const entry = this.joints.find((j) => j.partId === partId);
+    return entry ? this.pistonExtension(entry) : 0;
+  }
+
   // Stretches each piston's rod to span the gap it has opened. Without this
   // the rod stays its built length and the part hangs over open air.
   syncPistons() {
     for (const entry of this.joints) {
       if (entry.part.joint !== 'prismatic') continue;
+      // A strut squashes its coil instead of growing a rod, so you can see
+      // which corner is taking the weight.
+      if (entry.part.spring) {
+        const coil = this.partMeshes.get(entry.partId)?.getObjectByName('coil');
+        if (coil) {
+          const half = springTravel(entry.placed, entry.part) / 2;
+          const moved = Math.max(-half, Math.min(half, this.pistonExtension(entry)));
+          coil.scale.y = Math.max(0.25, 1 + moved / Math.max(half, 0.01) * 0.45);
+        }
+        continue;
+      }
       const mesh = this.partMeshes.get(entry.partId);
       const rod = mesh?.getObjectByName('rod');
       const foot = mesh?.getObjectByName('foot');

@@ -43,6 +43,23 @@ export class FrontEnd {
     this.h = handlers;
     this.screen = null;
 
+    // Drawing a course costs about 60 ms, nearly all of it the render and the
+    // encode to an image. Fifty-odd of those before the grid is shown is four
+    // to five seconds of a dead page, so they are drawn only when the card
+    // they belong to is actually on screen, one per frame.
+    this.thumbQueue = [];
+    this.thumbDraining = false;
+    this.thumbWatcher = typeof IntersectionObserver === 'undefined' ? null
+      : new IntersectionObserver((entries, observer) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          observer.unobserve(entry.target);
+          const draw = entry.target.__drawThumb;
+          if (draw) this.thumbQueue.push(draw);
+        }
+        this.drainThumbs();
+      }, { rootMargin: '400px' });
+
     this.root = el('div', 'fe');
     this.root.hidden = true;
     this.scan = el('div', 'fe-scan');
@@ -204,6 +221,45 @@ export class FrontEnd {
     this.body.append(sheet);
   }
 
+  /**
+   * One picture per frame. Enough of them land in a few hundred milliseconds
+   * that the grid never looks empty, and no single frame is long enough to
+   * feel like a stall.
+   */
+  drainThumbs() {
+    if (this.thumbDraining) return;
+    this.thumbDraining = true;
+    const step = () => {
+      const job = this.thumbQueue.shift();
+      if (!job) { this.thumbDraining = false; return; }
+      job();
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+
+  /**
+   * Gives a card its picture when it comes into view. Without a watcher to
+   * hang it on — an old browser, or a test — it is drawn straight away, which
+   * is what used to happen to all of them at once.
+   */
+  lazyThumb(shot, level) {
+    const image = new Image();
+    image.alt = '';
+    image.decoding = 'async';
+    shot.append(image);
+    const draw = () => {
+      try {
+        image.src = levelThumb(this.RAPIER, level);
+      } catch {
+        shot.style.background = 'linear-gradient(135deg,#101823,#0b1018)';
+      }
+    };
+    if (!this.thumbWatcher) { draw(); return; }
+    shot.__drawThumb = draw;
+    this.thumbWatcher.observe(shot);
+  }
+
   challengeCard(level, number) {
     const result = store.result(level.id);
     const done = Boolean(result?.best);
@@ -213,15 +269,7 @@ export class FrontEnd {
     const shot = el('div', 'fe-shot');
 
     // Drawn from the level itself, so it can never show the wrong course.
-    const image = new Image();
-    image.alt = '';
-    image.decoding = 'async';
-    try {
-      image.src = levelThumb(this.RAPIER, level);
-    } catch {
-      shot.style.background = 'linear-gradient(135deg,#101823,#0b1018)';
-    }
-    shot.append(image);
+    this.lazyThumb(shot, level);
 
     if (number) shot.append(el('span', 'num', number));
     if (done) shot.append(el('span', 'tick', icon('tick', 15)));
@@ -380,14 +428,7 @@ export class FrontEnd {
   customCard(level) {
     const card = el('button', 'fe-card');
     const shot = el('div', 'fe-shot');
-    const image = new Image();
-    image.alt = '';
-    try {
-      image.src = levelThumb(this.RAPIER, level);
-    } catch {
-      shot.style.background = 'linear-gradient(135deg,#101823,#0b1018)';
-    }
-    shot.append(image);
+    this.lazyThumb(shot, level);
 
     const skill = tierOf(level);
     if (skill) {

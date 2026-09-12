@@ -199,6 +199,43 @@ const BUILDERS = {
     return group;
   },
 
+  // A coil round a shaft. The coil is named so the machine can squash it as
+  // the strut moves: a spring drawn at a fixed length while the wheel goes up
+  // and down is the sort of thing you notice immediately.
+  suspension(part) {
+    const group = new THREE.Group();
+    const shaft = new THREE.Mesh(
+      new THREE.CylinderGeometry(CELL * 0.12, CELL * 0.12, CELL * 0.9, 12),
+      material(0xdfe6ec, { metalness: 0.7, roughness: 0.25 }),
+    );
+    group.add(shaft);
+
+    const coil = new THREE.Group();
+    coil.name = 'coil';
+    const turns = 5;
+    for (let i = 0; i < turns; i += 1) {
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(CELL * 0.3, CELL * 0.055, 6, 14),
+        material(part.colour, { metalness: 0.4, roughness: 0.5 }),
+      );
+      ring.rotation.x = Math.PI / 2;
+      // Spread over the middle of the cell, leaving the mounts clear.
+      ring.position.y = (i / (turns - 1) - 0.5) * CELL * 0.62;
+      coil.add(ring);
+    }
+    group.add(coil);
+
+    for (const y of [-CELL * 0.42, CELL * 0.42]) {
+      const mount = new THREE.Mesh(
+        new THREE.BoxGeometry(CELL - INSET, CELL * 0.14, CELL - INSET),
+        material(0x6c7686),
+      );
+      mount.position.y = y;
+      group.add(mount);
+    }
+    return group;
+  },
+
   piston(part) {
     const group = new THREE.Group();
     const barrel = new THREE.Mesh(

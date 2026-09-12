@@ -129,6 +129,23 @@ export function separationPush(placed, part = getPart('coupling')) {
 }
 
 /**
+ * How much a suspension strut can move, in metres, and how hard it resists
+ * being moved. A strut is a spring rather than a motor: nothing drives it, it
+ * just carries what is above it and gives when the ground pushes back.
+ */
+export function springTravel(placed, part = getPart('suspension')) {
+  return clampTo(placed?.config?.travel, part.travelRange, part.travel);
+}
+
+export function springStiffness(placed, part = getPart('suspension')) {
+  return clampTo(placed?.config?.stiffness, part.stiffnessRange, part.stiffness);
+}
+
+export function springDamping(placed, part = getPart('suspension')) {
+  return clampTo(placed?.config?.damping, part.dampingRange, part.damping);
+}
+
+/**
  * How far a piston is set to push, in metres. Each one carries its own, so a
  * short jab and a long reach can sit on the same machine; anything outside
  * what the part can do is pulled back to the nearest end of its range.
@@ -254,6 +271,37 @@ const PARTS = [
       defaultBinding: { mode: 'drive', pos: 'KeyW', neg: 'KeyS', left: 'KeyA', right: 'KeyD' },
     },
     blurb: 'Drives on its axle. Bind two sets to opposite keys to steer.',
+  },
+  {
+    id: 'suspension',
+    ports: {
+      out: [{ id: 'compression', name: 'Compression', kind: 'number' }],
+    },
+    name: 'Suspension Strut',
+    category: 'drive',
+    size: [1, 1, 1],
+    mass: 1.6,
+    colour: 0xb06a9c,
+    cost: 3,
+    articulated: true,
+    joint: 'prismatic',
+    axis: [0, 1, 0],
+    // Hangs under what it carries: the chassis above, the wheel below.
+    attach: [[0, 1, 0]],
+    carry: [[0, -1, 0]],
+    spring: true,
+    // How far the wheel can move relative to the chassis, either way from
+    // where you built it.
+    travel: 0.36,
+    travelRange: [0.12, 0.9],
+    // Soft enough to soak up a kerb, stiff enough that a light machine does
+    // not sit on its bump stops. Both ends of the range are useful.
+    stiffness: 1400,
+    stiffnessRange: [200, 6000],
+    // With none of this it pogos; with too much it may as well be a block.
+    damping: 90,
+    dampingRange: [0, 500],
+    blurb: 'A spring between the wheel and the chassis. Set how stiff and how far.',
   },
   {
     id: 'castor',

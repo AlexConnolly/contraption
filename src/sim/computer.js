@@ -187,6 +187,12 @@ const READERS = {
     },
   },
 
+  suspension: {
+    // Negative when the strut is squashed, which is what a program watching
+    // for a heavy landing wants to see.
+    compression: (machine, placed) => machine.strutTravel(placed.id),
+  },
+
   grabber: {
     holding: (machine, placed) => machine.grabs.has(placed.id),
   },

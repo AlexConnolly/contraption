@@ -1,6 +1,6 @@
 import {
   CATEGORIES, partsInCategory, getPart, pistonStroke, separationPush, workingAxis,
-  jointTension,
+  jointTension, springStiffness, springDamping, springTravel,
   turntableSpin, turntableTorque, CELL, CELL_VOLUME,
 } from '../parts/registry.js';
 import { BINDING_MODES, bindingLabel, keyLabel, defaultBinding } from '../sim/signals.js';
@@ -350,6 +350,7 @@ export class Hud {
     if (part.tensionRange) this.renderTension(body, placed, part);
     if (part.strokeRange) this.renderStroke(body, placed, part);
     if (part.separationRange) this.renderSeparation(body, placed, part);
+    if (part.spring) this.renderSpring(body, placed, part);
     if (part.spinRange) this.renderTurntable(body, placed, part);
 
     const remove = el('button', 'danger', 'Delete part');
@@ -686,6 +687,55 @@ export class Hud {
     });
     sayTorque(turntableTorque(placed, part));
     body.append(torqueNote);
+  }
+
+  /**
+   * A strut is set up three ways: how hard it pushes back, how quickly it
+   * stops moving afterwards, and how far it is allowed to move at all. Stiff
+   * and short is a go-kart, soft and long is something that climbs.
+   */
+  renderSpring(body, placed, part) {
+    const stiffNote = el('p', 'insp-blurb');
+    const sayStiff = (v) => {
+      const feel = v < 600 ? 'Soft — sinks onto its load'
+        : v < 1800 ? 'Road springs — gives over a kerb'
+          : v < 3600 ? 'Firm — stays level under weight'
+            : 'Race stiff — barely moves at all';
+      stiffNote.textContent = `${Math.round(v)} N/m — ${feel}.`;
+    };
+    this.renderSlider(
+      body, 'Stiffness', springStiffness(placed, part),
+      part.stiffnessRange[0], part.stiffnessRange[1], 50,
+      (value) => { this.h.onConfigChange(placed.id, { stiffness: value }); sayStiff(value); },
+    );
+    sayStiff(springStiffness(placed, part));
+    body.append(stiffNote);
+
+    const dampNote = el('p', 'insp-blurb');
+    const sayDamp = (v) => {
+      dampNote.textContent = v < 20
+        ? 'No damping at all. It will pogo.'
+        : `${Math.round(v)} — settles ${v < 120 ? 'slowly' : v < 320 ? 'in a bounce or two' : 'almost at once'}.`;
+    };
+    this.renderSlider(
+      body, 'Damping', springDamping(placed, part),
+      part.dampingRange[0], part.dampingRange[1], 10,
+      (value) => { this.h.onConfigChange(placed.id, { damping: value }); sayDamp(value); },
+    );
+    sayDamp(springDamping(placed, part));
+    body.append(dampNote);
+
+    const travelNote = el('p', 'insp-blurb');
+    const sayTravel = (v) => {
+      travelNote.textContent = `${v.toFixed(2)} m of movement, ${(v / 2).toFixed(2)} m either way from where you built it.`;
+    };
+    this.renderSlider(
+      body, 'Travel', springTravel(placed, part),
+      part.travelRange[0], part.travelRange[1], 0.02,
+      (value) => { this.h.onConfigChange(placed.id, { travel: value }); sayTravel(value); },
+    );
+    sayTravel(springTravel(placed, part));
+    body.append(travelNote);
   }
 
   // How hard the coupling throws, including not at all — somebody with their
