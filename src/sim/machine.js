@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {
   getPart, partDensity, pistonStroke, separationPush, jointTension, jointFlip,
-  servoAngleA, servoAngleB, servoSpeed, shortestTurn,
+  servoAngleA, servoAngleB, servoSpeed, shortestTurn, turntableRecentres,
   springTravel, springStiffness, springDamping,
   turntableSpin, turntableTorque, CELL,
 } from '../parts/registry.js';
@@ -559,12 +559,21 @@ export class Machine {
         }
         // Its own speed and torque, and no handedness: a turntable is not on
         // one side of the machine the way a wheel is.
-        case 'spin':
-          joint?.configureMotorVelocity(
-            signal * jointFlip(placed) * turntableSpin(placed, part) * power,
-            turntableTorque(placed, part),
-          );
+        case 'spin': {
+          const top = turntableSpin(placed, part);
+          const asked = signal * jointFlip(placed) * top * power;
+          // Let go of one set to recentre and it winds itself back to where it
+          // was built, the short way round, at the speed it is set to turn.
+          // Otherwise it stops where it was left, which is what a crane wants.
+          if (asked === 0 && turntableRecentres(placed, part)) {
+            const off = shortestTurn(this.jointAngle(placed), 0);
+            const back = Math.max(-top, Math.min(top, (off * Math.PI) / 180 * POSITION_GAIN));
+            joint?.configureMotorVelocity(back, turntableTorque(placed, part));
+            break;
+          }
+          joint?.configureMotorVelocity(asked, turntableTorque(placed, part));
           break;
+        }
         case 'linear':
           this.driveMotor(joint, placed, part, Math.max(0, signal) * pistonStroke(placed, part));
           break;

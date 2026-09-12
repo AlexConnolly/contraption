@@ -129,6 +129,15 @@ export function separationPush(placed, part = getPart('coupling')) {
 }
 
 /**
+ * Whether a turntable finds its way back to centre when you let go of it.
+ * A velocity motor stops where it is left, which is right for a crane and
+ * wrong for anything that has to point forwards again afterwards.
+ */
+export function turntableRecentres(placed, part = getPart('turntable')) {
+  return placed?.config?.recentre ?? part.recentre ?? false;
+}
+
+/**
  * The two angles a position servo sits at, in degrees, and how fast it moves
  * between them. Unlike a hinge, which is held at an angle for as long as you
  * hold the key, these are places it goes to and stays.
@@ -450,6 +459,9 @@ const PARTS = [
     // makes it the thing you build a launcher on.
     spin: 6,
     spinRange: [0.5, 14],
+    // Off by default: a turntable that crept back to centre on its own would
+    // be a surprise to every machine already built with one.
+    recentre: false,
     torque: 240,
     torqueRange: [12, 1800],
     actuator: {

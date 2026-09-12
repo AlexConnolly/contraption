@@ -1,7 +1,7 @@
 import {
   CATEGORIES, partsInCategory, getPart, pistonStroke, separationPush, workingAxis,
   jointTension, springStiffness, springDamping, springTravel,
-  servoAngleA, servoAngleB, servoSpeed,
+  servoAngleA, servoAngleB, servoSpeed, turntableRecentres,
   turntableSpin, turntableTorque, CELL, CELL_VOLUME,
 } from '../parts/registry.js';
 import { BINDING_MODES, bindingLabel, keyLabel, defaultBinding } from '../sim/signals.js';
@@ -689,6 +689,29 @@ export class Hud {
     });
     sayTorque(turntableTorque(placed, part));
     body.append(torqueNote);
+
+    // A velocity motor stops where it is left. That is right for a crane and
+    // wrong for a steering head or a turret that has to face front again.
+    const row = el('div', 'row');
+    row.append(el('label', null, 'On release'));
+    const button = el('button');
+    button.style.width = '100%';
+    const note = el('p', 'insp-blurb');
+    const say = (on) => {
+      button.textContent = on ? 'Back to centre' : 'Stay put';
+      button.classList.toggle('on', on);
+      note.textContent = on
+        ? 'Winds back to where it was built, the short way round.'
+        : 'Holds wherever you stopped turning it.';
+    };
+    button.addEventListener('click', () => {
+      const on = !turntableRecentres(placed, part);
+      this.h.onConfigChange(placed.id, { recentre: on });
+      say(on);
+    });
+    say(turntableRecentres(placed, part));
+    row.append(button);
+    body.append(row, note);
   }
 
   /**
