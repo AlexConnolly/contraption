@@ -196,7 +196,11 @@ flap to throwing something.
 
 A **coupling** holds like a weld until you fire it, and then is not there at
 all. It is the two-stage rocket part: build a booster, a coupling, and an upper
-stage, and `B` throws the halves apart. One shot per run — once the joint is
+stage, and `B` throws the halves apart. How hard it throws is set on the coupling,
+and the bottom of that range is **nothing at all** — if you have built your own
+push, a thruster on the stage or a piston underneath, the coupling should do
+nothing but let go and a floor above zero would only fight you. One shot per
+run — once the joint is
 gone there is nothing left to re-make it from, which is what makes it a
 coupling rather than a clamp. It reports whether it has gone yet, so a program
 can wait for the stage to clear before lighting the next motor instead of

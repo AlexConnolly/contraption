@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {
-  getPart, partDensity, pistonStroke, turntableSpin, turntableTorque, CELL,
+  getPart, partDensity, pistonStroke, separationPush,
+  turntableSpin, turntableTorque, CELL,
 } from '../parts/registry.js';
 import { PISTON_ROD_TOP, PISTON_REST, wedgeCorners } from '../parts/geometry.js';
 import { orientationQuaternion, applyOrientation } from '../core/orientation.js';
@@ -527,7 +528,7 @@ export class Machine {
     entry.released = true;
     this.world.removeImpulseJoint(entry.joint, true);
 
-    const push = actuator.part.separation ?? 0;
+    const push = separationPush(actuator.placed, actuator.part);
     if (push <= 0) return;
     const dir = this.partWorldAxis(actuator.placed, actuator.part.axis).normalize();
     const up = entry.child;

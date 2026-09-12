@@ -1,5 +1,5 @@
 import {
-  CATEGORIES, partsInCategory, getPart, pistonStroke, workingAxis,
+  CATEGORIES, partsInCategory, getPart, pistonStroke, separationPush, workingAxis,
   turntableSpin, turntableTorque, CELL, CELL_VOLUME,
 } from '../parts/registry.js';
 import { BINDING_MODES, bindingLabel, keyLabel, defaultBinding } from '../sim/signals.js';
@@ -346,6 +346,7 @@ export class Hud {
       });
     }
     if (part.strokeRange) this.renderStroke(body, placed, part);
+    if (part.separationRange) this.renderSeparation(body, placed, part);
     if (part.spinRange) this.renderTurntable(body, placed, part);
 
     const remove = el('button', 'danger', 'Delete part');
@@ -621,6 +622,24 @@ export class Hud {
     });
     sayTorque(turntableTorque(placed, part));
     body.append(torqueNote);
+  }
+
+  // How hard the coupling throws, including not at all — somebody with their
+  // own thruster or piston on the stage wants it to do nothing but let go.
+  renderSeparation(body, placed, part) {
+    const [min, max] = part.separationRange;
+    const note = el('p', 'insp-blurb');
+    const say = (value) => {
+      note.textContent = value <= 0
+        ? 'Lets go and nothing more. Push it apart yourself.'
+        : `Throws the halves apart at ${value.toFixed(1)} m/s.`;
+    };
+    this.renderSlider(body, 'Push', separationPush(placed, part), min, max, 0.2, (value) => {
+      this.h.onConfigChange(placed.id, { separation: value });
+      say(value);
+    });
+    say(separationPush(placed, part));
+    body.append(note);
   }
 
   renderSlider(body, label, value, min, max, step, onInput) {

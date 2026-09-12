@@ -174,3 +174,63 @@ describe('a program firing the coupling', () => {
     expect(read()).toBe(true);
   });
 });
+
+/**
+ * How hard it throws is the author's business. Some people want a bang; some
+ * have built their own push — a thruster on the stage, a piston underneath,
+ * springs made of anything — and want the coupling to do nothing but let go.
+ * Zero has to mean exactly that, not "a little bit".
+ */
+describe('how hard it spits', () => {
+  function stage(separation) {
+    const world = createWorld(RAPIER);
+    world.createCollider(
+      RAPIER.ColliderDesc.cuboid(120, 1, 120).setTranslation(0, -1, 0)
+        .setFriction(1).setCollisionGroups(GROUP_WORLD),
+      world.createRigidBody(RAPIER.RigidBodyDesc.fixed()),
+    );
+    const bp = new Blueprint({ name: 'two stage' });
+    bp.place('block', [0, 0, 0]);
+    bp.place('coupling', [0, 1, 0], IDENTITY_ORIENTATION, {
+      binding: { mode: 'hold', pos: 'KeyB' },
+      ...(separation === undefined ? {} : { separation }),
+    });
+    bp.place('core', [0, 2, 0]);
+    const machine = new Machine({
+      RAPIER, world, scene: new THREE.Scene(), blueprint: bp,
+      spawn: new THREE.Vector3(0, 40, 0),
+    });
+    const bus = new SignalBus(keyboard());
+    run(machine, bus, 0.4);
+    bus.input.down.add('KeyB');
+    run(machine, bus, 3 / 60);
+    const upper = machine.bodyOf(bp.list().find((p) => p.type === 'core').id).linvel();
+    const lower = machine.bodyOf(bp.list().find((p) => p.type === 'block').id).linvel();
+    return upper.y - lower.y;
+  }
+
+  it('throws harder when it is set to', () => {
+    expect(stage(6)).toBeGreaterThan(stage(2) + 1);
+  });
+
+  it('only lets go when it is set to nothing, so you can push it yourself', () => {
+    expect(Math.abs(stage(0))).toBeLessThan(0.3);
+  });
+
+  it('still comes apart with no push at all', async () => {
+    const { separationPush } = await import('../src/parts/registry.js');
+    expect(separationPush({ config: { separation: 0 } })).toBe(0);
+  });
+
+  it('refuses a push outside what the part can do', async () => {
+    const { separationPush } = await import('../src/parts/registry.js');
+    const [min, max] = getPart('coupling').separationRange;
+    expect(separationPush({ config: { separation: 999 } })).toBe(max);
+    expect(separationPush({ config: { separation: -50 } })).toBe(min);
+    expect(separationPush({ config: {} })).toBe(getPart('coupling').separation);
+  });
+
+  it('lets nothing be the lowest setting, not a floor above it', () => {
+    expect(getPart('coupling').separationRange[0]).toBe(0);
+  });
+});

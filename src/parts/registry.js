@@ -91,6 +91,17 @@ export function turntableTorque(placed, part = getPart('turntable')) {
 }
 
 /**
+ * How hard a coupling throws the two halves apart, in relative metres per
+ * second. Zero means it only lets go.
+ */
+export function separationPush(placed, part = getPart('coupling')) {
+  const [min, max] = part.separationRange;
+  const asked = placed?.config?.separation;
+  if (typeof asked !== 'number' || Number.isNaN(asked)) return part.separation;
+  return Math.min(max, Math.max(min, asked));
+}
+
+/**
  * How far a piston is set to push, in metres. Each one carries its own, so a
  * short jab and a long reach can sit on the same machine; anything outside
  * what the part can do is pulled back to the nearest end of its range.
@@ -318,9 +329,15 @@ const PARTS = [
     axis: [0, 1, 0],
     attach: [[0, -1, 0]],
     carry: [[0, 1, 0]],
-    // Letting go is not enough. A stage that is merely released settles back
-    // onto the one below it and rides along; a real separation is pushed.
+    // Letting go is not enough on its own. A stage that is merely released
+    // settles back onto the one below and rides along, so it is pushed.
+    //
+    // Set per coupling, and the bottom of the range is nothing at all —
+    // somebody who has built their own push, a thruster on the stage or a
+    // piston underneath, wants the coupling to do nothing but let go, and a
+    // floor above zero would fight them.
     separation: 2.6,
+    separationRange: [0, 8],
     actuator: {
       kind: 'release',
       port: 'release',
