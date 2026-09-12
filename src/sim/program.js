@@ -347,38 +347,48 @@ export class ProgramRunner {
   }
 
   reset() {
-    this.stateId = this.program.start ?? this.program.states[0]?.id ?? null;
+    const first = this.program.states.find((s) => !s.main);
+    const asked = this.program.states.find(
+      (s) => s.id === this.program.start && !s.main,
+    );
+    this.stateId = (asked ?? first)?.id ?? null;
     this.elapsed = 0;
     this.values = new Map();
     this.errors = [];
   }
 
-  state() {
-    return this.program.states.find((s) => s.id === this.stateId)
-      ?? this.program.states[0]
-      ?? null;
+  /** The state that runs every tick to decide, if the program has one. */
+  main() {
+    return this.program.states.find((s) => s.main) ?? null;
   }
 
-  tick(dt, ctx) {
-    const state = this.state();
-    this.errors = [];
-    if (!state) return { state: null, errors: ['No states in the program'] };
-    this.elapsed += dt;
+  /** The states you can actually be in. The decider is not one of them. */
+  ordinary() {
+    return this.program.states.filter((s) => !s.main);
+  }
 
-    let requested = null;
+  state() {
+    const here = this.program.states.find((s) => s.id === this.stateId);
+    if (here && !here.main) return here;
+    return this.ordinary()[0] ?? null;
+  }
+
+  /**
+   * Runs one state's nodes and hands back what they produced.
+   *
+   * Pulled out of `tick` because a program now runs two states a tick rather
+   * than one: the decider, and then whichever state it decided on.
+   */
+  runState(state, ctx, requestState) {
     const inner = {
       ...ctx,
       stateSeconds: () => this.elapsed,
-      requestState: (id) => {
-        if (requested === null && id && id !== this.stateId) requested = id;
-      },
+      requestState,
     };
-
     const { order, cyclic } = sortNodes(state);
     if (cyclic.length > 0) {
-      this.errors.push(`${cyclic.length} node(s) are wired in a loop and were skipped`);
+      this.errors.push(`${state.name}: ${cyclic.length} node(s) wired in a loop, skipped`);
     }
-
     const values = new Map();
     for (const node of order) {
       const type = NODE_TYPES[node.type];
@@ -397,8 +407,49 @@ export class ProgramRunner {
         values.set(`${node.id}:${port}`, value);
       }
     }
-    this.values = values;
+    return values;
+  }
 
+  /**
+   * The decider first, then the state it decided on.
+   *
+   * Without this, anything that has to be watched all the time has to be
+   * copied into every state, and every state added later has to remember to
+   * carry it. The decider is where "if a sensor is clear, stop driving" lives
+   * once; the ordinary states are for the work.
+   *
+   * It runs before the state so its reading of the world is the same one the
+   * state then acts on, and its Go to wins: deciding is what it is for. The
+   * state writes afterwards and so has the last word on any part they both
+   * drive, which is what lets a state override a default the decider set.
+   */
+  tick(dt, ctx) {
+    const state = this.state();
+    this.errors = [];
+    if (!state) return { state: null, errors: ['No states in the program'] };
+    this.elapsed += dt;
+
+    // The decider is final when it says anything at all, including when what
+    // it says is "stay where you are". Treating that as silence would let a
+    // state argue its way out of a hold the decider is still asking for.
+    let decided = null;
+    let asked = null;
+    const values = new Map();
+
+    const decider = this.main();
+    if (decider) {
+      for (const [key, value] of this.runState(decider, ctx, (id) => {
+        if (decided === null && id) decided = id;
+      })) values.set(key, value);
+    }
+
+    for (const [key, value] of this.runState(state, ctx, (id) => {
+      if (asked === null && id) asked = id;
+    })) values.set(key, value);
+
+    this.values = values;
+    const wanted = decided ?? asked;
+    const requested = wanted && wanted !== this.stateId ? wanted : null;
     if (requested) {
       this.stateId = requested;
       this.elapsed = 0;
@@ -460,9 +511,27 @@ export function validateProgram(program, ctx) {
     }
   }
 
+  // Only one state can be the decider, or which of them runs first is a
+  // question with no answer.
+  const deciders = program.states.filter((s) => s.main);
+  if (deciders.length > 1) {
+    problems.push(`${deciders.length} states are set to run every loop; only one can`);
+  }
+
   // States nothing can ever reach. Adding a state and never wiring a Go to it
   // leaves it sitting there looking like part of the program.
-  const reached = new Set([program.start ?? program.states[0]?.id]);
+  const decider = program.states.find((s) => s.main);
+  const startsAt = program.states.find((s) => s.id === program.start && !s.main)
+    ?? program.states.find((s) => !s.main);
+  const reached = new Set([startsAt?.id]);
+  // The decider runs every loop whatever state you are in, so it is reached by
+  // definition, and so is anything it can send you to.
+  if (decider) {
+    reached.add(decider.id);
+    for (const node of decider.nodes) {
+      if (node.type === 'goto' && stateIds.has(node.config.state)) reached.add(node.config.state);
+    }
+  }
   let growing = true;
   while (growing) {
     growing = false;

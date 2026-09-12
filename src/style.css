@@ -945,6 +945,9 @@ input[type="range"] { accent-color: var(--amber); }
   color: var(--text);
 }
 .graph-state.start .graph-state-name::before { content: "▶ "; color: var(--green); }
+/* The one state that runs every loop, whatever state you are in. */
+.graph-state.decider .graph-state-name::before { content: "↻ "; color: var(--amber); }
+.graph-state.decider .graph-state-name { border-color: var(--amber); }
 .graph-icon { padding: 7px 8px; font-size: 11px; background: var(--raised); }
 
 .graph-group {

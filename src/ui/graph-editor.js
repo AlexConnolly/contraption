@@ -289,6 +289,7 @@ export class GraphEditor {
       const row = el('div', 'graph-state');
       if (state.id === this.stateId) row.classList.add('active');
       if (state.id === this.program.start) row.classList.add('start');
+      if (state.main) row.classList.add('decider');
 
       const open = el('button', 'graph-state-name', state.name);
       open.addEventListener('click', () => {
@@ -311,11 +312,33 @@ export class GraphEditor {
         this.changed();
       });
 
+      // The decider: one state that runs every loop before whichever state you
+      // are in, so a check that has to happen all the time is written once
+      // rather than copied into every state.
+      const decide = el('button', 'graph-icon', '↻');
+      decide.title = state.main
+        ? 'Runs every loop — click to make it an ordinary state'
+        : 'Run this one every loop, to decide which state to be in';
+      decide.addEventListener('click', () => {
+        const on = !state.main;
+        for (const other of this.program.states) delete other.main;
+        if (on) {
+          state.main = true;
+          if (this.program.start === state.id) {
+            this.program.start = this.program.states.find((x) => !x.main)?.id;
+          }
+          if (this.stateId === state.id) {
+            this.stateId = this.program.states.find((x) => !x.main)?.id ?? state.id;
+          }
+        }
+        this.changed();
+      });
+
       const remove = el('button', 'graph-icon', '✕');
       remove.title = 'Delete state';
       remove.addEventListener('click', () => this.deleteState(state.id));
 
-      row.append(open, start, remove);
+      row.append(open, start, decide, remove);
       this.stateList.append(row);
     }
 
