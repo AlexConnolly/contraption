@@ -24,7 +24,7 @@ export const QUESTIONS = [
     name: 'Time Trial',
     brief: 'No cargo and nothing to pick up. Through all four gates and onto the pad, against the clock.',
     hint: 'Everything bolted on is weight you are carrying round the course. This is the one level where the answer is to take parts off rather than add them.',
-    spawn: [0, 1.2, -22],
+    spawn: [0, 1.2, -27.5],
     groundSize: 140,
     budget: { cost: 70 },
     pieces: [
@@ -56,9 +56,10 @@ export const QUESTIONS = [
     demands: { steps: 1, flies: false },
     bans: ['flight'],
     name: 'Parallel Park',
-    brief: 'Back into the bay between the two parked blocks and hold still there for three seconds.',
-    hint: 'Power is no use here. What matters is how tightly the machine turns, which is mostly about how far apart the wheels are — a short wheelbase turns in its own length.',
-    spawn: [0, 1.2, -6],
+    brief: 'Back into the bay between the two parked blocks and hold still there for three seconds. Touch either of them and the run is over.',
+    hint: 'Power is no use here. What matters is how tightly the machine turns, which is mostly about how far apart the wheels are — a short wheelbase turns in its own length. Take it slowly: the kerb counts as a bump too.',
+    noBumps: true,
+    spawn: [0, 1.2, -17.0],
     groundSize: 90,
     budget: { cost: 90 },
     pieces: [
@@ -163,7 +164,7 @@ export const QUESTIONS = [
     name: 'Timed Gate',
     brief: 'The shutter across the doorway never stops moving. Get through, fetch the crate, and get back through with it.',
     hint: 'The gap comes round on a fixed beat, so you can wait for it. Either be quick enough to take it in one, or build something that can stop dead and sit still until the next one.',
-    spawn: [0, 1.2, -10],
+    spawn: [0, 1.2, -15.5],
     groundSize: 110,
     budget: { cost: 100 },
     pieces: [
@@ -199,7 +200,7 @@ export const QUESTIONS = [
     name: 'One Shot',
     brief: 'A long haul over bad ground, and no respawn. Tip it over and the run is finished.',
     hint: 'Everything you would normally chance, do not. Wide, low and slow gets there; quick and clever ends up on its roof with nothing to show for it.',
-    spawn: [0, 1.2, -18],
+    spawn: [0, 1.2, -18.5],
     groundSize: 150,
     budget: { cost: 130 },
     pieces: [
@@ -233,14 +234,23 @@ export const QUESTIONS = [
     hint: 'This is what the distance sensor is for. Keep one beam pointed at the wall on your left and steer to hold it at a fixed reading, and you will walk the whole maze without ever needing a map — dead ends included, because following a wall backs you out of them.',
     // Off the back wall, so the size of what you bring is decided by the
     // corridors rather than by where you are put down.
-    spawn: [0, 1.2, -11.5],
-    groundSize: 90,
+    spawn: [0, 1.2, -32],
+    groundSize: 110,
     budget: { cost: 110 },
     pieces: [
       // Outer box. Everything inside runs on the same measure: corridors at
       // least four metres across and walls a metre thick, so nothing comes
       // down to threading a slot.
-      { pos: [0, 1.5, -15], size: [26, 3, 1], colour: DARK },
+      // The south wall, opened in the middle so the yard beyond it leads in.
+      { pos: [-8.5, 1.5, -15], size: [9, 3, 1], colour: DARK },
+      { pos: [8.5, 1.5, -15], size: [9, 3, 1], colour: DARK },
+      // The yard itself: thirty metres across, walled, so the maze is still
+      // the only way to the middle.
+      { pos: [-16.5, 1.5, -32], size: [1, 3, 34], colour: DARK },
+      { pos: [16.5, 1.5, -32], size: [1, 3, 34], colour: DARK },
+      { pos: [0, 1.5, -48.5], size: [34, 3, 1], colour: DARK },
+      { pos: [-14.75, 1.5, -15], size: [3.5, 3, 1], colour: DARK },
+      { pos: [14.75, 1.5, -15], size: [3.5, 3, 1], colour: DARK },
       { pos: [0, 1.5, 15], size: [26, 3, 1], colour: DARK },
       { pos: [-12.5, 1.5, 0], size: [1, 3, 31], colour: DARK },
       { pos: [12.5, 1.5, 0], size: [1, 3, 31], colour: DARK },
@@ -280,7 +290,7 @@ export const QUESTIONS = [
     name: 'Blackout',
     brief: 'An ordinary fetch and carry, in fog you can see about two metres through.',
     hint: 'You have been steering by eye all game. Now the sensor readouts are all you have, so put them where you can watch them and trust the numbers over the picture.',
-    spawn: [0, 1.2, -14],
+    spawn: [0, 1.2, -19.5],
     groundSize: 110,
     fog: { near: 1, far: 13, colour: 0x0a0e13 },
     budget: { cost: 130 },
@@ -340,7 +350,7 @@ export const QUESTIONS = [
     name: 'Tall Order',
     brief: 'A yard of loose blocks and nothing to win. Get as many of them above the line as you can and leave them there.',
     hint: 'Nothing here completes. The run goes to the end of the clock and tells you a number, and the only reason to play it again is to beat that number.',
-    spawn: [0, 1.2, -9],
+    spawn: [0, 1.2, -15.5],
     groundSize: 100,
     budget: { cost: 140 },
     scored: { label: 'Blocks above the line', seconds: 120 },
@@ -437,7 +447,7 @@ export const QUESTIONS = [
     name: 'Escort',
     brief: 'The hauler sets off on its own and shoves the pallet along in front of it. Rubble blocks the road in three places, and it will not wait for you.',
     hint: 'You are working to somebody else’s clock. Get ahead of it and clear the next heap before it arrives, rather than tidying up behind it.',
-    spawn: [-7, 1.2, -16],
+    spawn: [-7, 1.2, -37.0],
     groundSize: 150,
     budget: { cost: 140 },
     pieces: [
@@ -480,7 +490,7 @@ export const QUESTIONS = [
     name: 'Doll’s House',
     brief: 'The same machine you always build, on a course laid out at ten times the usual size. A kerb here is a cliff.',
     hint: 'Nothing about the machine has changed and everything about the problem has. What was a bump is now a climb, and what was a short hop is now a long way round.',
-    spawn: [0, 1.2, -26],
+    spawn: [0, 1.2, -42.0],
     groundSize: 220,
     budget: { cost: 120 },
     pieces: [

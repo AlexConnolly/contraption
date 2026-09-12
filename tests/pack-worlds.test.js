@@ -174,25 +174,52 @@ describe('ice really does stop it steering', () => {
    * way you were already headed. That is the thing worth pinning, and it is
    * the opposite of what you would guess.
    */
+  // Which way the machine is pointing, in the world.
+  function pointing(rig) {
+    const r = rig.machine.bodies[0].rotation();
+    const ahead = new THREE.Vector3(0, 0, 1)
+      .applyQuaternion(new THREE.Quaternion(r.x, r.y, r.z, r.w));
+    return Math.atan2(ahead.x, ahead.z);
+  }
+
   function swing(level) {
     const rig = rove(level);
     run(rig, 0.8);
     rig.bus.input.down.add('KeyW');
     run(rig, 2.5);
 
+    // Where it is going, taken from where it actually travels rather than from
+    // the velocity vector: on ice the machine is barely moving, and the
+    // direction of a very small velocity is mostly noise.
     const before = rig.machine.bodies[0].linvel();
     const wasGoing = Math.atan2(before.x, before.z);
+    const wasPointing = pointing(rig);
+    const from = rig.machine.corePosition().clone();
 
     rig.bus.input.down.add('KeyD');
     run(rig, 2);
-    const after = rig.machine.bodies[0].linvel();
+    const to = rig.machine.corePosition();
 
-    let moved = Math.atan2(after.x, after.z) - wasGoing;
-    while (moved > Math.PI) moved -= 2 * Math.PI;
-    while (moved < -Math.PI) moved += 2 * Math.PI;
-    return { course: Math.abs((moved * 180) / Math.PI), spin: turnOver(rig, 0.5) };
+    const wrap = (radians) => {
+      const deg = ((((radians * 180) / Math.PI) % 360) + 540) % 360 - 180;
+      return Math.abs(deg);
+    };
+    const course = wrap(Math.atan2(to.x - from.x, to.z - from.z) - wasGoing);
+    const heading = wrap(pointing(rig) - wasPointing);
+    return { course, heading, apart: Math.abs(heading - course), spin: turnOver(rig, 0.5) };
   }
 
+  /**
+   * The property is the gap between where the machine points and where it is
+   * going. Measured over two seconds of holding a turn:
+   *
+   *             heading   course   apart
+   *     ice          88       13      76
+   *     grip         69       11      58
+   *
+   * On grip the two track each other; on ice the body comes round while the
+   * machine carries on much as it was.
+   */
   it('spins the machine but not its course', () => {
     const level = byId('ice-rink');
     expect(level.friction).toBeLessThan(ICY);
@@ -200,10 +227,9 @@ describe('ice really does stop it steering', () => {
     const ice = swing(level);
     const grippy = swing({ ...level, friction: undefined });
 
-    // On grip, pointing somewhere new takes you somewhere new. On ice it does
-    // not: the machine comes round and keeps going the way it was.
-    expect(ice.course).toBeLessThan(grippy.course);
+    expect(ice.apart).toBeGreaterThan(grippy.apart);
     // And it is not that the ice machine refuses to rotate — it rotates more.
+    expect(ice.heading).toBeGreaterThan(grippy.heading);
     expect(ice.spin).toBeGreaterThan(0);
   });
 

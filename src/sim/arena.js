@@ -124,6 +124,9 @@ export class Arena {
     groundMesh.receiveShadow = true;
     scene.add(groundMesh);
     this.objects.push({ body: groundBody, mesh: groundMesh });
+    // Kept, so a rule can say "touch nothing" and still mean "except the
+    // floor you are driving on".
+    this.ground = groundBody;
 
     const grid = new THREE.GridHelper(half * 2, half, 0x5a6470, 0x4a515b);
     grid.position.y = groundY + 0.01;
@@ -578,9 +581,14 @@ export class Arena {
     if (!this.motions.has(key)) {
       const rng = makeRng(this.seed + [...key].reduce((a, c) => a + c.charCodeAt(0), 0) * 7919);
       const [slow, fast] = spec.speed ?? [0.8, 1.9];
+      // Which way it sets off varies, but it always sets off from where the
+      // level drew it. A free phase put a moving tray anywhere along its run
+      // at the instant the level loaded, while whatever was riding on it was
+      // placed where the level said — so the load could start beside its tray
+      // rather than on it, and be gone before the player touched anything.
       this.motions.set(key, {
         rate: between(rng, slow, fast),
-        offset: between(rng, 0, Math.PI * 2),
+        offset: rng() < 0.5 ? 0 : Math.PI,
       });
     }
     return this.motions.get(key);

@@ -79,19 +79,28 @@ function kickProgram(parts, wheels) {
    * goal, so there is nothing to steer round and nothing clever to do: drive at
    * the goal and the ball gets there first.
    *
-   * Slowly, though. A rover that arrives at the ball at three metres a second
-   * pitches over its own front axle and spends the rest of the run upside down
-   * driving backwards — it reads its heading as due north the whole time and is
-   * quite sure it is doing the right thing. Walking pace keeps the wheels down
-   * and the blade in contact, and a ball that is being leant on the whole way
-   * beats one that is struck once.
+   * Not too fast, though. A rover that arrives at the ball at three metres a
+   * second pitches over its own front axle and spends the rest of the run
+   * upside down driving backwards — it reads its heading as due north the whole
+   * time and is quite sure it is doing the right thing. What keeps the wheels
+   * down is leaning on the ball the whole way rather than striking it once.
+   *
+   * But not too slow either. At 1.8 this scored from the middle spot and fell
+   * four metres short from the outer two, which is nearly two metres further to
+   * push — so it only ever passed by a hair, and any small change to where the
+   * machine started decided it. Swept over all six deals:
+   *
+   *     topSpeed   1.8   2.2   2.6   3.0
+   *     scores     3/6   3/6   6/6   6/6
+   *
+   * 2.6 clears every deal and still keeps the machine on its wheels.
    */
   const shoot = graph();
   {
     const { add } = shoot;
     const goal = add('waypoint', { zone: 'goal' });
     const { left, right } = driveTowards(shoot, { gps }, { node: goal, port: 'position' }, {
-      topSpeed: 1.8,
+      topSpeed: 2.6,
       keenness: 0.35,
       urgency: 0.4,
     });

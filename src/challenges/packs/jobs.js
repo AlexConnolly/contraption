@@ -28,14 +28,20 @@ export const JOBS = [
     // Inside the building, not on the grass outside it. Everything here is
     // sealed: the way through is the only way there is, or the answer to a
     // corridor puzzle is to leave the corridor.
-    spawn: [0, 1.2, -14],
-    groundSize: 90,
+    spawn: [0, 1.2, -32],
+    groundSize: 110,
     budget: { cost: 110 },
     pieces: [
       // The approach: a 2.4 m corridor running north, capped behind you.
       { pos: [-1.6, 1.3, -8], size: [0.8, 2.6, 16], colour: DARK },
       { pos: [1.6, 1.3, -8], size: [0.8, 2.6, 16], colour: DARK },
-      { pos: [0, 1.3, -15.8], size: [4, 2.6, 0.8], colour: DARK },
+      // The loading yard you set off from: thirty metres across, and walled,
+      // so the corridor is still the only way on.
+      { pos: [-16.4, 1.3, -32], size: [0.8, 2.6, 33], colour: DARK },
+      { pos: [16.4, 1.3, -32], size: [0.8, 2.6, 33], colour: DARK },
+      { pos: [0, 1.3, -48.4], size: [33.6, 2.6, 0.8], colour: DARK },
+      { pos: [-9.2, 1.3, -15.8], size: [14.4, 2.6, 0.8], colour: DARK },
+      { pos: [9.2, 1.3, -15.8], size: [14.4, 2.6, 0.8], colour: DARK },
       // The turning room. Six metres square, which is just enough.
       { pos: [-2.1, 1.3, -0.4], size: [1.8, 2.6, 0.8], colour: DARK },
       { pos: [2.1, 1.3, -0.4], size: [1.8, 2.6, 0.8], colour: DARK },
@@ -162,8 +168,8 @@ export const JOBS = [
     name: 'Roadworks',
     brief: 'Forty loose blocks have come down across the only road. The crate still has to get to the far end.',
     hint: 'Lifting them out one at a time takes all day. Build something wide and low at the front and shove the whole heap aside in one pass.',
-    spawn: [0, 1.2, -9],
-    groundSize: 80,
+    spawn: [0, 1.2, -26],
+    groundSize: 100,
     budget: { cost: 110 },
     pieces: [
       { pos: [-3.2, 1.2, 3], size: [0.6, 2.4, 26], colour: DARK },
@@ -171,8 +177,15 @@ export const JOBS = [
       // Both ends closed. An open-ended road is not the only road: you would
       // shove the crate out the back, round the outside and in the far end,
       // and never touch the rubble the level is about.
-      { pos: [0, 1.2, -10.3], size: [7, 2.4, 0.6], colour: DARK },
       { pos: [0, 1.2, 16.3], size: [7, 2.4, 0.6], colour: DARK },
+      // A yard to build in before the road starts, walled so the road is still
+      // the only way through. Thirty metres across, which is the width of the
+      // build plate: whatever you can draw, you can put down here.
+      { pos: [-16.3, 1.2, -26], size: [0.6, 2.4, 32], colour: DARK },
+      { pos: [16.3, 1.2, -26], size: [0.6, 2.4, 32], colour: DARK },
+      { pos: [0, 1.2, -42.3], size: [33.2, 2.4, 0.6], colour: DARK },
+      { pos: [-9.9, 1.2, -10.3], size: [12.8, 2.4, 0.6], colour: DARK },
+      { pos: [9.9, 1.2, -10.3], size: [12.8, 2.4, 0.6], colour: DARK },
     ],
     stacks: [
       { id: 'rubble', count: 40, pos: [0, 0.5, 4], spread: [5.2, 1.6, 2.4], size: [0.55, 0.55, 0.55], mass: 1.6, colour: GRIT },
@@ -225,7 +238,7 @@ export const JOBS = [
     name: 'Loading Bay',
     brief: 'Four crates into the bay, over a lip a metre high. All four, one run.',
     hint: 'A machine that handles one crate beautifully does this four times over. Something flat and wide that takes the lot in one lift does it once.',
-    spawn: [0, 1.2, -5],
+    spawn: [0, 1.2, -9.5],
     groundSize: 60,
     budget: { cost: 130 },
     pieces: [

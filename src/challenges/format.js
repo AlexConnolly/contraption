@@ -186,6 +186,9 @@ export function sanitiseLevel(input, { id } = {}) {
   if (raw.hint) level.hint = text(raw.hint, LIMITS.hint);
   if (raw.handsOff) level.handsOff = true;
   if (raw.noContact) level.noContact = true;
+  // Touch nothing but the ground. A driving level cannot use noContact,
+  // because a machine with wheels on it is touching something by definition.
+  if (raw.noBumps) level.noBumps = true;
   if (raw.noRespawn) level.noRespawn = true;
   // A hard clock, as against par, which is only a target. Run out of it and
   // the run is failed, so the answer has to be quick as well as correct.

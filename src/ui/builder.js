@@ -529,6 +529,7 @@ export class Builder {
     for (const [flag, label] of [
       ['handsOff', 'No input'],
       ['noContact', 'No touching'],
+      ['noBumps', 'No bumps'],
       ['noRespawn', 'One go'],
     ]) {
       const on = Boolean(this.draft[flag]);

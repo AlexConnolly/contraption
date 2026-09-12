@@ -841,7 +841,8 @@ export class Hud {
       row.dot.classList.toggle('done', objective.done);
       row.fill.style.width = `${Math.round(objective.progress * 100)}%`;
     });
-    const rule = level.noContact ? ' · <strong>no contact</strong>' : '';
+    const rule = level.noContact ? ' · <strong>no contact</strong>'
+      : level.noBumps ? ' · <strong>no bumps</strong>' : '';
     // On a level with a hard clock the number that matters is what is left,
     // not what has gone.
     if (level.deadline) {

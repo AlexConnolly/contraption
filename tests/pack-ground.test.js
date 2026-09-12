@@ -194,11 +194,21 @@ describe('Deadweight really does defeat the starter rover', () => {
     expect(shove(starterRover())).toBeLessThan(2);
   });
 
+  /**
+   * Eight ballast, which is what it measurably takes — see heavy-push.test.js
+   * for the curve. This used to add four and pass, which it did by a hair: at
+   * five ballast the crate shifts about a metre, and a few centimetres either
+   * way in where the machine was put down decided whether that read as three.
+   */
   it('moves for a machine that has been ballasted over the driven axle', () => {
     const bp = starterRover();
-    // Four more ballast blocks, sat over the wheels rather than out on the nose.
-    for (const cell of [[1, 1, 1], [-1, 1, 1], [1, 1, -1], [-1, 1, -1]]) {
-      bp.place('ballast', cell);
+    // Every free cell over the wheels, rather than out on the nose.
+    for (const cell of [
+      [1, 1, 1], [-1, 1, 1], [1, 1, -1], [-1, 1, -1],
+      [1, 1, 0], [-1, 1, 0], [0, 1, -1],
+    ]) {
+      const out = bp.place('ballast', cell);
+      expect(out.ok, `ballast at ${cell}`).toBe(true);
     }
     expect(shove(bp)).toBeGreaterThan(3);
   });
@@ -402,9 +412,14 @@ describe('the crossings can actually be crossed', () => {
     expect(flipped).toBe(false);
   });
 
+  /**
+   * The far pad starts at z=3, so anything past it is across. Asserting a
+   * particular distance along the pad instead measured how briskly the planks
+   * happened to settle, which is not what this test is for.
+   */
   it('gets a stock rover over the planks without dropping it in the gap', () => {
     const { at, lowest, flipped } = driveAcross('jenga');
-    expect(at.z).toBeGreaterThan(5);
+    expect(at.z, 'still short of the far pad').toBeGreaterThan(3.5);
     expect(lowest).toBeGreaterThan(1.5);
     expect(flipped).toBe(false);
   });

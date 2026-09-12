@@ -55,7 +55,7 @@ export const GROUND = [
     name: 'Kerb Crawl',
     brief: 'The crate is on the floor and the square is on the ledge. There is no ramp anywhere on this course.',
     hint: 'Nothing here will lift it for you. Either bring a slope of your own and push it up, or stop pushing and pick it up.',
-    spawn: [0, 1.2, -7],
+    spawn: [0, 1.2, -9.5],
     groundSize: 110,
     budget: { cost: 70 },
     pieces: [
@@ -82,20 +82,22 @@ export const GROUND = [
     name: 'Letterbox',
     brief: 'An ordinary haul. The only way through the wall is a slot the starter rover will not fit through.',
     hint: 'Measure before you build. The gap is 1.6 m and the rover is wider than that — the answer is a smaller machine, not a stronger one.',
-    spawn: [0, 1.2, -6],
+    spawn: [0, 1.2, -11],
     groundSize: 110,
     budget: { cost: 60 },
     pieces: [
       // A walled yard, because a wall you can drive round the end of is not a
-      // wall. The slot is the only way from this half to the other.
-      { pos: [0, 2, -10.5], size: [27, 4, 1], colour: DARK },
-      { pos: [0, 2, 16.5], size: [27, 4, 1], colour: DARK },
-      { pos: [-13.5, 2, 3], size: [1, 4, 28], colour: DARK },
-      { pos: [13.5, 2, 3], size: [1, 4, 28], colour: DARK },
+      // wall. The slot is the only way from this half to the other, and the
+      // near half is thirty metres square so there is room to put anything you
+      // can build down in it.
+      { pos: [0, 2, -26.5], size: [34, 4, 1], colour: DARK },
+      { pos: [0, 2, 16.5], size: [34, 4, 1], colour: DARK },
+      { pos: [-16.5, 2, -5], size: [1, 4, 44], colour: DARK },
+      { pos: [16.5, 2, -5], size: [1, 4, 44], colour: DARK },
       // The divider, holding a 1.6 m gap, with a lintel over it so climbing
       // through the top is not an answer either.
-      { pos: [-6.9, 2, 7], size: [12.2, 4, 1], colour: DARK },
-      { pos: [6.9, 2, 7], size: [12.2, 4, 1], colour: DARK },
+      { pos: [-8.4, 2, 7], size: [15.2, 4, 1], colour: DARK },
+      { pos: [8.4, 2, 7], size: [15.2, 4, 1], colour: DARK },
       { pos: [0, 3, 7], size: [1.6, 2, 1], colour: DARK },
     ],
     props: [
@@ -284,7 +286,7 @@ export const GROUND = [
     name: 'The Lift',
     brief: 'The payload goes on the platform five metres up. Sheer sides, no ramp, nothing to climb.',
     hint: 'This is the first one that wants a machine with a reach. Stacked pistons will get there, and so will a boom on a turntable — wind its torque up until it can actually swing the weight.',
-    spawn: [0, 1.2, -9],
+    spawn: [0, 1.2, -10.5],
     groundSize: 120,
     budget: { cost: 120 },
     pieces: [

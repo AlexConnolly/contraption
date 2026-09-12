@@ -12,7 +12,7 @@ export const CORE = [
     name: 'Sandbox',
     brief: 'No objective. Build whatever you like and see how it behaves.',
     hint: 'Everything unlocked, no budget. Good for testing a mechanism.',
-    spawn: [0, 1.2, -6],
+    spawn: [0, 1.2, -25.5],
     groundSize: 160,
     pieces: [
       { pos: [10, 0.4, 6], size: [8, 0.8, 8], colour: GREY },
@@ -85,7 +85,7 @@ export const CORE = [
     name: 'Pick and Place',
     brief: 'Lift the payload off its pedestal and set it on the far one. Pushing will not work.',
     hint: 'A grabber on a servo hinge. Toggle G to latch, toggle again to let go.',
-    spawn: [0, 1.2, -7],
+    spawn: [0, 1.2, -12.5],
     groundSize: 120,
     budget: { cost: 110 },
     pieces: [
@@ -239,7 +239,7 @@ export const CORE = [
     name: 'Airlift',
     brief: 'Get the payload onto the high platform. It is too tall to drive up.',
     hint: 'Wire the rotors to a Flight Controller and it will hold height by itself: WASD to fly, Space and Shift to climb and drop. Hang a grabber underneath to pick the payload up.',
-    spawn: [0, 1.2, -8],
+    spawn: [0, 1.2, -10.5],
     groundSize: 140,
     budget: { cost: 150 },
     pieces: [
@@ -290,7 +290,7 @@ export const CORE = [
     hint: 'They run at a different speed and start somewhere else every time, so there is no timetable to learn. Point a sensor forwards and aim one out to each side, and go where the readings say there is room. The Dodger preset does exactly that.',
     handsOff: true,
     noContact: true,
-    spawn: [0, 5, -24],
+    spawn: [0, 5, -40.0],
     groundSize: 180,
     budget: { cost: 170 },
     pieces: [

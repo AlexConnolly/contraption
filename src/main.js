@@ -689,6 +689,15 @@ function simulateStep() {
     hud.showFailure(state.level, report, 'You touched something');
     return;
   }
+  // Touch anything but the floor and the run is over. Separate from noContact
+  // because this one is for machines that drive.
+  if (state.level.noBumps && !state.won && !state.crashed
+    && state.machine.contact(state.arena.ground)) {
+    state.crashed = true;
+    audio.crash();
+    hud.showFailure(state.level, report, 'You hit something');
+    return;
+  }
   // A hard clock. Par is a target you can miss; this one ends the run.
   if (!state.won && !state.crashed && outOfTime(state.level, report.elapsed)) {
     state.crashed = true;

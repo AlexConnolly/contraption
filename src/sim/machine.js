@@ -89,8 +89,11 @@ export class Machine {
     this.events = [];
     this.partMeshes = new Map();
     this.grouping = groupBlueprint(blueprint);
+    // Put down by the middle of what it occupies rather than by the average of
+    // where its parts are, so a machine with a long arm on one side lands on
+    // the spawn instead of beside it.
     this.origin = {
-      centre: blueprint.centre(),
+      centre: blueprint.extentCentre(),
       low: blueprint.lowestCell(),
     };
     this.build();
@@ -348,12 +351,13 @@ export class Machine {
    * Broad-phase pairs include things that are merely near, so each pair is
    * checked for a contact point that has actually closed.
    */
-  contact() {
+  contact(ignore = null) {
     let found = null;
     for (const collider of this.colliders) {
       if (found) break;
       this.world.contactPairsWith(collider, (other) => {
         if (found || other.collisionGroups() === GROUP_MACHINE) return;
+        if (ignore && other.parent()?.handle === ignore.handle) return;
         this.world.contactPair(collider, other, (manifold) => {
           for (let i = 0; i < manifold.numContacts(); i += 1) {
             if (manifold.contactDist(i) <= 0) {

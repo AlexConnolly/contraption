@@ -26,7 +26,7 @@ export const WORLDS = [
     name: 'Uphill Struggle',
     brief: 'The only way up to the pad is a belt running down it, and it does not get tired.',
     hint: 'Driving straight at it is a tug of war you are losing by default. Go at it with weight over the driven wheels, or take it in stages and stop dead between them — a machine that can hold still on a moving floor has already solved most of this.',
-    spawn: [0, 1.2, -17],
+    spawn: [0, 1.2, -22.0],
     groundSize: 120,
     budget: { cost: 120 },
     pieces: [

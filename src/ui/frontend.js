@@ -284,6 +284,7 @@ export class FrontEnd {
     const rules = el('div', 'rules');
     if (level.handsOff) rules.append(el('span', 'fe-tag rule', 'No input'));
     if (level.noContact) rules.append(el('span', 'fe-tag rule', 'No collisions'));
+    if (level.noBumps) rules.append(el('span', 'fe-tag rule', 'No bumps'));
     if (level.deadline) rules.append(el('span', 'fe-tag rule', `${level.deadline}s limit`));
     // In red, because a ban takes something away rather than asking for
     // something extra — and because it is the thing that decides what you

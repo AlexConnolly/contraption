@@ -171,6 +171,28 @@ export class Blueprint {
     return true;
   }
 
+  /**
+   * The middle of the space the machine occupies, in cells. Not the same as
+   * the average of where its parts are: a crane with a heavy body and a long
+   * thin arm has most of its parts in the body, so the average sits down at
+   * that end and putting the machine down on it lands the whole thing off to
+   * one side.
+   */
+  extentCentre() {
+    if (this.parts.size === 0) return [0, 0, 0];
+    const min = [Infinity, Infinity, Infinity];
+    const max = [-Infinity, -Infinity, -Infinity];
+    for (const placed of this.parts.values()) {
+      for (const cell of occupiedCells(placed.type, placed.cell, placed.rot)) {
+        for (let axis = 0; axis < 3; axis += 1) {
+          min[axis] = Math.min(min[axis], cell[axis]);
+          max[axis] = Math.max(max[axis], cell[axis]);
+        }
+      }
+    }
+    return [0, 1, 2].map((axis) => (min[axis] + max[axis]) / 2);
+  }
+
   centre() {
     if (this.parts.size === 0) return [0, 0, 0];
     let sx = 0; let sy = 0; let sz = 0;

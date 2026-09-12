@@ -30,11 +30,12 @@ function plan(level, kind) {
   return open;
 }
 
-function survey(level, zoneId, kind) {
+function survey(level, zoneId, kind, from = null) {
   const goal = level.zones.find((z) => z.id === zoneId);
   const open = plan(level, kind);
-  const sx = Math.round((level.spawn[0] + HALF) / STEP);
-  const sz = Math.round((level.spawn[2] + HALF) / STEP);
+  const start = from ?? [level.spawn[0], level.spawn[2]];
+  const sx = Math.round((start[0] + HALF) / STEP);
+  const sz = Math.round((start[1] + HALF) / STEP);
 
   const dist = new Float64Array(CELLS * CELLS).fill(Infinity);
   dist[sx * CELLS + sz] = 0;
@@ -62,7 +63,7 @@ function survey(level, zoneId, kind) {
   return {
     roam: reached * STEP * STEP,
     route,
-    line: Math.hypot(level.spawn[0] - goal.pos[0], level.spawn[2] - goal.pos[2]),
+    line: Math.hypot(start[0] - goal.pos[0], start[1] - goal.pos[2]),
   };
 }
 
@@ -129,8 +130,11 @@ describe('a course you cannot simply drive round', () => {
   for (const [id, zone, what] of enclosed) {
     it(`keeps you inside ${what}`, () => {
       const out = survey(getLevel(id), zone, 'walls');
+      // Generous enough to cover the thirty-metre yard each of these now opens
+      // with, and still nowhere near the six to twelve thousand square metres
+      // these covered when their walls were scenery you drove round.
       expect(out.roam, `${id} lets the machine roam ${Math.round(out.roam)} m²`)
-        .toBeLessThan(1200);
+        .toBeLessThan(2500);
     });
   }
 });
@@ -140,8 +144,13 @@ describe('the maze', () => {
     expect(widest(getLevel('maze'), 'centre', 'walls')).toBeGreaterThanOrEqual(3);
   });
 
+  /**
+   * Measured from the maze door rather than from the spawn: the yard in front
+   * of it is somewhere to build, not part of the puzzle, and counting it would
+   * let a longer approach disguise a maze that had gone straight.
+   */
   it('is a long way round rather than a short way through', () => {
-    const out = survey(getLevel('maze'), 'centre', 'walls');
+    const out = survey(getLevel('maze'), 'centre', 'walls', [0, -14]);
     expect(out.route / out.line).toBeGreaterThan(1.5);
   });
 
