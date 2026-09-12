@@ -129,6 +129,32 @@ export function separationPush(placed, part = getPart('coupling')) {
 }
 
 /**
+ * The two angles a position servo sits at, in degrees, and how fast it moves
+ * between them. Unlike a hinge, which is held at an angle for as long as you
+ * hold the key, these are places it goes to and stays.
+ */
+export function servoAngleA(placed, part = getPart('positioner')) {
+  return clampTo(placed?.config?.angleA, part.angleRange, part.angleA);
+}
+
+export function servoAngleB(placed, part = getPart('positioner')) {
+  return clampTo(placed?.config?.angleB, part.angleRange, part.angleB);
+}
+
+export function servoSpeed(placed, part = getPart('positioner')) {
+  return clampTo(placed?.config?.speed, part.speedRange, part.speed);
+}
+
+/**
+ * The shortest way round from one angle to another, in degrees. A servo told
+ * to go from 170 to -170 should travel twenty degrees, not three hundred and
+ * forty, and without this it takes the long way every time.
+ */
+export function shortestTurn(from, to) {
+  return ((((to - from) % 360) + 540) % 360) - 180;
+}
+
+/**
  * How much a suspension strut can move, in metres, and how hard it resists
  * being moved. A strut is a spring rather than a motor: nothing drives it, it
  * just carries what is above it and gives when the ground pushes back.
@@ -356,6 +382,46 @@ const PARTS = [
       defaultBinding: { mode: 'axis', pos: 'KeyR', neg: 'KeyF' },
     },
     blurb: 'Holds an angle. Build arms and steering knuckles from these.',
+  },
+  {
+    id: 'positioner',
+    ports: {
+      in: [{ id: 'pick', name: 'Angle B', kind: 'bool' }],
+      out: [{ id: 'angle', name: 'Angle', kind: 'number' }],
+    },
+    name: 'Position Servo',
+    category: 'manipulator',
+    size: [1, 1, 1],
+    mass: 1.5,
+    colour: 0x7d6cff,
+    cost: 5,
+    articulated: true,
+    joint: 'revolute',
+    axis: [1, 0, 0],
+    attach: [[0, -1, 0]],
+    carry: [[0, 1, 0]],
+    // No limits, deliberately. A servo that can only reach part of the circle
+    // cannot take the short way round, and taking the short way round is the
+    // whole difference between this and a hinge.
+    positions: true,
+    // Same mirror problem as the hinge: a facing pair wants to go to mirrored
+    // angles off one key.
+    flippable: true,
+    angleA: -60,
+    angleB: 60,
+    angleRange: [-180, 180],
+    // Degrees a second. Slow enough to place something down gently, fast
+    // enough to flick.
+    speed: 180,
+    speedRange: [20, 720],
+    actuator: {
+      kind: 'position',
+      port: 'pick',
+      signal: 'toggle',
+      maxForce: 90,
+      defaultBinding: { mode: 'toggle', pos: 'KeyC' },
+    },
+    blurb: 'Snaps between two set angles and stays there. Set both angles and how fast it moves.',
   },
   {
     id: 'turntable',

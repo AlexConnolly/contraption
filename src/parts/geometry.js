@@ -199,6 +199,33 @@ const BUILDERS = {
     return group;
   },
 
+  // A drum with a splined horn on the face of it, turned side on: it reads as
+  // a thing that points somewhere, which is what separates it from a hinge.
+  positioner(part) {
+    const group = new THREE.Group();
+    const body = new THREE.Mesh(
+      new THREE.BoxGeometry(CELL * 0.62, CELL - INSET, CELL - INSET),
+      material(part.colour),
+    );
+    group.add(body);
+
+    const drum = new THREE.Mesh(
+      new THREE.CylinderGeometry(CELL * 0.34, CELL * 0.34, CELL * 0.26, 18),
+      material(0x2b2f36, { metalness: 0.6, roughness: 0.35 }),
+    );
+    drum.rotation.z = Math.PI / 2;
+    drum.position.x = CELL * 0.38;
+    group.add(drum);
+
+    const horn = new THREE.Mesh(
+      new THREE.BoxGeometry(CELL * 0.12, CELL * 0.62, CELL * 0.12),
+      material(0xdfe6ec, { metalness: 0.7, roughness: 0.2 }),
+    );
+    horn.position.set(CELL * 0.46, CELL * 0.2, 0);
+    group.add(horn);
+    return group;
+  },
+
   // A coil round a shaft. The coil is named so the machine can squash it as
   // the strut moves: a spring drawn at a fixed length while the wheel goes up
   // and down is the sort of thing you notice immediately.

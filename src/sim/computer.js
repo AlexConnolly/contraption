@@ -150,6 +150,12 @@ const READERS = {
     },
   },
 
+  positioner: {
+    // Where it is now, not where it was told to go: a program watching an arm
+    // wants to know when it has actually arrived.
+    angle: (machine, placed) => machine.jointAngle(placed),
+  },
+
   turntable: {
     // Which way it is pointing, and how fast it is going round, both measured
     // against the thing it is bolted to rather than against the world.

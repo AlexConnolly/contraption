@@ -1,6 +1,7 @@
 import {
   CATEGORIES, partsInCategory, getPart, pistonStroke, separationPush, workingAxis,
   jointTension, springStiffness, springDamping, springTravel,
+  servoAngleA, servoAngleB, servoSpeed,
   turntableSpin, turntableTorque, CELL, CELL_VOLUME,
 } from '../parts/registry.js';
 import { BINDING_MODES, bindingLabel, keyLabel, defaultBinding } from '../sim/signals.js';
@@ -350,6 +351,7 @@ export class Hud {
     if (part.tensionRange) this.renderTension(body, placed, part);
     if (part.strokeRange) this.renderStroke(body, placed, part);
     if (part.separationRange) this.renderSeparation(body, placed, part);
+    if (part.positions) this.renderPositions(body, placed, part);
     if (part.spring) this.renderSpring(body, placed, part);
     if (part.spinRange) this.renderTurntable(body, placed, part);
 
@@ -687,6 +689,38 @@ export class Hud {
     });
     sayTorque(turntableTorque(placed, part));
     body.append(torqueNote);
+  }
+
+  /**
+   * The two places a servo goes and how fast it gets between them. Shown in
+   * degrees because that is how anyone thinks about an angle, and with the
+   * shorter of the two ways round spelled out, since that is the one it takes.
+   */
+  renderPositions(body, placed, part) {
+    const [lo, hi] = part.angleRange;
+    const note = el('p', 'insp-blurb');
+    const say = () => {
+      const a = servoAngleA(placed, part);
+      const b = servoAngleB(placed, part);
+      const turn = Math.abs(((((b - a) % 360) + 540) % 360) - 180);
+      note.textContent = `${Math.round(turn)}° apart, the short way round`
+        + ` — about ${(turn / servoSpeed(placed, part)).toFixed(2)}s to swap.`;
+    };
+    this.renderSlider(body, 'Angle A', servoAngleA(placed, part), lo, hi, 5, (value) => {
+      this.h.onConfigChange(placed.id, { angleA: value });
+      say();
+    });
+    this.renderSlider(body, 'Angle B', servoAngleB(placed, part), lo, hi, 5, (value) => {
+      this.h.onConfigChange(placed.id, { angleB: value });
+      say();
+    });
+    this.renderSlider(
+      body, 'Speed', servoSpeed(placed, part),
+      part.speedRange[0], part.speedRange[1], 10,
+      (value) => { this.h.onConfigChange(placed.id, { speed: value }); say(); },
+    );
+    say();
+    body.append(note);
   }
 
   /**

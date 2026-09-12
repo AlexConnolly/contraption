@@ -32,6 +32,7 @@ const VOICE = {
   propeller: 'rotor',
   thruster: 'jet',
   hinge: 'servo',
+  positioner: 'servo',
   turntable: 'servo',
   piston: 'servo',
   grabber: 'latch',

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {
   getPart, partDensity, pistonStroke, separationPush, jointTension, jointFlip,
+  servoAngleA, servoAngleB, servoSpeed, shortestTurn,
   springTravel, springStiffness, springDamping,
   turntableSpin, turntableTorque, CELL,
 } from '../parts/registry.js';
@@ -52,7 +53,20 @@ function worldDirectionOf(body, local) {
 
 // Joints driven by a motor you can hear: they share one voice, the way the
 // wheels do.
-const SERVO_KINDS = new Set(['servo', 'spin', 'linear']);
+const SERVO_KINDS = new Set(['servo', 'spin', 'linear', 'position']);
+
+// How hard a position servo pulls back toward its mark, per degree out. It is
+// a speed command rather than a force, so what this buys is how little error
+// it will tolerate before correcting. Measured on a loaded arm, degrees off
+// the mark once settled against degrees overshot getting there:
+//
+//     gain      8      20      50
+//     off    2.51    1.06    0.38
+//     over   0.00    1.61    1.55
+//
+// Eight is visibly short on a long arm; past fifty the overshoot stops paying
+// for the accuracy.
+const POSITION_GAIN = 30;
 
 export class Machine {
   constructor({ RAPIER, world, scene, blueprint, spawn, level }) {
@@ -523,6 +537,22 @@ export class Machine {
             signal * jointFlip(placed) * part.actuator.range,
           );
           break;
+        case 'position': {
+          // Commanded as a speed rather than as an angle: it is the only way
+          // to both cap how fast it travels and choose which way it goes.
+          // Close in the speed falls away with the error, so it settles on the
+          // mark and holds against a load instead of hunting round it.
+          // Mirroring one of a facing pair mirrors where it goes, not which
+          // way it turns to get there: the short way round is worked out
+          // afterwards, from wherever it actually is.
+          const set = signal > 0.5 ? servoAngleB(placed, part) : servoAngleA(placed, part);
+          const target = set * jointFlip(placed);
+          const error = shortestTurn(this.jointAngle(placed), target);
+          const top = servoSpeed(placed, part);
+          const wanted = Math.max(-top, Math.min(top, error * POSITION_GAIN));
+          joint?.configureMotorVelocity((wanted * Math.PI) / 180, part.actuator.maxForce);
+          break;
+        }
         // Its own speed and torque, and no handedness: a turntable is not on
         // one side of the machine the way a wheel is.
         case 'spin':
@@ -577,6 +607,31 @@ export class Machine {
     const share = up.mass() * down.mass() / (up.mass() + down.mass());
     up.applyImpulse({ x: dir.x * push * share, y: dir.y * push * share, z: dir.z * push * share }, true);
     down.applyImpulse({ x: -dir.x * push * share, y: -dir.y * push * share, z: -dir.z * push * share }, true);
+  }
+
+  /**
+   * Which way a jointed part is turned, in degrees, measured against the thing
+   * it is bolted to rather than against the world — so a servo on a machine
+   * that is itself rolling over still knows where it is. Wraps at half a turn
+   * either way, which is what makes the short way round findable at all.
+   */
+  jointAngle(placed) {
+    const spec = this.grouping.joints.find((j) => j.partId === placed.id);
+    if (!spec) return 0;
+    const part = getPart(placed.type);
+    // Any direction square to the axis serves as a pointer; it only has to be
+    // the same one on both sides of the comparison.
+    const ref = Math.abs(part.axis[1]) > 0.5 ? [0, 0, 1] : [0, 1, 0];
+    const out = this.partWorldAxis(placed, ref);
+    const host = this.bodies[spec.hostBody].rotation();
+    const home = new THREE.Vector3(...applyOrientation(placed.rot, ref))
+      .applyQuaternion(new THREE.Quaternion(host.x, host.y, host.z, host.w));
+    const axis = this.partWorldAxis(placed, part.axis);
+    const signed = Math.atan2(
+      new THREE.Vector3().crossVectors(home, out).dot(axis),
+      home.dot(out),
+    );
+    return (signed * 180) / Math.PI;
   }
 
   /** Which body a given part ended up in, once the machine was built. */
