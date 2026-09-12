@@ -1,5 +1,6 @@
 import {
   CATEGORIES, partsInCategory, getPart, pistonStroke, separationPush, workingAxis,
+  jointTension,
   turntableSpin, turntableTorque, CELL, CELL_VOLUME,
 } from '../parts/registry.js';
 import { BINDING_MODES, bindingLabel, keyLabel, defaultBinding } from '../sim/signals.js';
@@ -345,6 +346,7 @@ export class Hud {
         this.h.onConfigChange(placed.id, { power: value });
       });
     }
+    if (part.tensionRange) this.renderTension(body, placed, part);
     if (part.strokeRange) this.renderStroke(body, placed, part);
     if (part.separationRange) this.renderSeparation(body, placed, part);
     if (part.spinRange) this.renderTurntable(body, placed, part);
@@ -580,6 +582,36 @@ export class Hud {
     );
     const metres = (1 - (placed.config.threshold ?? part.config.threshold)) * part.sensor.range;
     body.append(el('p', 'insp-blurb', `Trips within ${metres.toFixed(1)} m.`));
+  }
+
+  /**
+   * How hard a joint fights to keep the angle it was given. Slack lets it give
+   * under load, which is sometimes what you want; tight holds its line. All
+   * the way down switches the motor off and leaves a free pivot, which is the
+   * only way to build a swing, a pendulum or a trailing arm.
+   */
+  renderTension(body, placed, part) {
+    const [min, max] = part.tensionRange;
+    const note = el('p', 'insp-blurb');
+    const say = (value) => {
+      if (value <= 0) {
+        note.textContent = 'Free to turn. No drive at all — this is how a swing is made.';
+      } else if (value < 0.5) {
+        note.textContent = 'Slack. Gives under load and settles slowly.';
+      } else if (value <= 1.5) {
+        note.textContent = 'Normal. Holds a fair load without fighting itself.';
+      } else if (value < 5) {
+        note.textContent = 'Firm. Keeps its line under a heavy arm.';
+      } else {
+        note.textContent = 'Rigid. Takes about all you can hang on it.';
+      }
+    };
+    this.renderSlider(body, 'Tension', jointTension(placed, part), min, max, 0.25, (value) => {
+      this.h.onConfigChange(placed.id, { tension: value });
+      say(value);
+    });
+    say(jointTension(placed, part));
+    body.append(note);
   }
 
   // How far this piston reaches. Set per part, so a short jab and a long lift

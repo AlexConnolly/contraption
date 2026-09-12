@@ -15,6 +15,9 @@ import { wouldConnect } from '../sim/connectivity.js';
 const OK_COLOUR = 0x4ade80;
 const BAD_COLOUR = 0xff5a5a;
 const PLATE_Y = -CELL / 2;
+// Out in front of the machine but well inside the default view: the camera
+// starts on the +Z side looking back, so forwards comes towards you.
+const FORWARD_MARK_Z = 3.2;
 
 export const TOOLS = ['place', 'select', 'delete'];
 
@@ -50,6 +53,7 @@ export class Studio {
     this.pointer = new THREE.Vector2(-2, -2);
 
     this.buildPlate();
+    this.buildForward();
     this.buildGhost();
     this.rebuild();
   }
@@ -79,6 +83,58 @@ export class Studio {
     grid.material.opacity = 0.5;
     this.grid = grid;
     this.root.add(grid);
+  }
+
+  /**
+   * Which way is forwards. Everything that faces anywhere — a wheel, a
+   * thruster, a piston — is set up against the machine's own front, and on an
+   * empty plate there is nothing to tell you where that is. The marker sits
+   * out at the front edge, clear of anything you would actually build, and is
+   * drawn on both faces of the plate because you are allowed to build under
+   * it and the question is the same down there.
+   */
+  buildForward() {
+    const shape = new THREE.Shape();
+    shape.moveTo(-0.26, 0);
+    shape.lineTo(-0.26, 1.05);
+    shape.lineTo(-0.72, 1.05);
+    shape.lineTo(0, 1.9);
+    shape.lineTo(0.72, 1.05);
+    shape.lineTo(0.26, 1.05);
+    shape.lineTo(0.26, 0);
+    shape.closePath();
+    const geometry = new THREE.ShapeGeometry(shape);
+
+    this.forward = new THREE.Group();
+    // Turned so the shape lies flat with its point down the +Z axis, which is
+    // the direction the whole machine calls forwards.
+    for (const offset of [0.03, -0.03]) {
+      const mark = new THREE.Mesh(
+        geometry,
+        new THREE.MeshBasicMaterial({
+          color: 0xf0a825,
+          transparent: true,
+          opacity: 0.5,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+        }),
+      );
+      mark.rotation.x = Math.PI / 2;
+      mark.position.set(0, PLATE_Y + offset, FORWARD_MARK_Z);
+      // The plate is drawn transparent as well, and a few millimetres is not
+      // enough to settle which of the two wins at this distance.
+      mark.renderOrder = 3;
+      this.forward.add(mark);
+    }
+    const outline = new THREE.LineLoop(
+      new THREE.BufferGeometry().setFromPoints(shape.getPoints()),
+      new THREE.LineBasicMaterial({ color: 0xf0a825 }),
+    );
+    outline.rotation.x = Math.PI / 2;
+    outline.position.set(0, PLATE_Y + 0.035, FORWARD_MARK_Z);
+    outline.renderOrder = 4;
+    this.forward.add(outline);
+    this.root.add(this.forward);
   }
 
   buildGhost() {

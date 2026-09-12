@@ -91,6 +91,23 @@ export function turntableTorque(placed, part = getPart('turntable')) {
 }
 
 /**
+ * How hard a powered joint fights to hold the position it was told.
+ *
+ * One is what every joint used to do. Higher holds a long loaded arm out level
+ * instead of letting it droop; zero stops it holding anything at all and
+ * leaves a free pivot, which is a swing — supported where it hangs from, loose
+ * where it turns. That was not buildable before, because a hinge always drove
+ * itself to an angle and so held whatever was on it rather than letting it
+ * hang.
+ */
+export function jointTension(placed, part) {
+  const [min, max] = part.tensionRange ?? [1, 1];
+  const asked = placed?.config?.tension;
+  if (typeof asked !== 'number' || Number.isNaN(asked)) return part.tension ?? 1;
+  return Math.min(max, Math.max(min, asked));
+}
+
+/**
  * How hard a coupling throws the two halves apart, in relative metres per
  * second. Zero means it only lets go.
  */
@@ -263,6 +280,11 @@ const PARTS = [
     attach: [[0, -1, 0]],
     carry: [[0, 1, 0]],
     limits: [-1.55, 1.55],
+    // How hard it fights to keep the angle it was told. All the way down is a
+    // free pivot — which is how you build a swing, and there was no other way
+    // to build one.
+    tension: 1,
+    tensionRange: [0, 8],
     actuator: {
       kind: 'servo',
       port: 'target',
@@ -365,6 +387,8 @@ const PARTS = [
     carry: [[0, 1, 0]],
     stroke: 1.2,
     strokeRange: [0.4, 2.4],
+    tension: 1,
+    tensionRange: [0, 8],
     actuator: {
       kind: 'linear',
       port: 'target',

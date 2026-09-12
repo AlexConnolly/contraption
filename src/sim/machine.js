@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {
-  getPart, partDensity, pistonStroke, separationPush,
+  getPart, partDensity, pistonStroke, separationPush, jointTension,
   turntableSpin, turntableTorque, CELL,
 } from '../parts/registry.js';
 import { PISTON_ROD_TOP, PISTON_REST, wedgeCorners } from '../parts/geometry.js';
@@ -442,6 +442,27 @@ export class Machine {
     }
   }
 
+  /**
+   * Sends a jointed part to a target and sets how hard it holds there.
+   * Tension scales the stiffness, and damping goes as its root so a tight
+   * joint stays about as well damped as a loose one rather than ringing.
+   *
+   * At no tension the motor is switched off rather than told to hold nothing:
+   * a position motor with no gains still pins the axis, so asking for zero
+   * stiffness used to give the stiffest joint of all. Off means a free pivot,
+   * which is what a swing is made of.
+   */
+  driveMotor(joint, placed, part, target) {
+    if (!joint) return;
+    const tension = jointTension(placed, part);
+    if (tension <= 0) return;
+    joint.configureMotorPosition(
+      target,
+      part.actuator.stiffness * tension,
+      part.actuator.damping * Math.sqrt(tension),
+    );
+  }
+
   update(dt, bus) {
     // Rapier keeps applied forces until they are cleared, so thrust has to be
     // wiped and re-applied every step or it accumulates. Force and torque are
@@ -473,11 +494,7 @@ export class Machine {
           );
           break;
         case 'servo':
-          joint?.configureMotorPosition(
-            signal * part.actuator.range,
-            part.actuator.stiffness,
-            part.actuator.damping,
-          );
+          this.driveMotor(joint, placed, part, signal * part.actuator.range);
           break;
         // Its own speed and torque, and no handedness: a turntable is not on
         // one side of the machine the way a wheel is.
@@ -488,11 +505,7 @@ export class Machine {
           );
           break;
         case 'linear':
-          joint?.configureMotorPosition(
-            Math.max(0, signal) * pistonStroke(placed, part),
-            part.actuator.stiffness,
-            part.actuator.damping,
-          );
+          this.driveMotor(joint, placed, part, Math.max(0, signal) * pistonStroke(placed, part));
           break;
         case 'thrust':
           this.applyThrust(actuator, signal * power);
