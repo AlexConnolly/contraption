@@ -334,6 +334,32 @@ describe('Sunday League has a goal a ball can stay in', () => {
     expect(at.z).toBeLessThan(22);
   });
 
+  /**
+   * The level now runs on a ten second clock, which makes it worth proving
+   * that ten seconds is enough. It is, but only for a proper strike: the ball
+   * has to be hit hard and early, which is the point of the change. Anything
+   * gentler than this does not arrive at all.
+   */
+  it('can be won inside its deadline by a ball struck hard and early', () => {
+    const rig = stage(level);
+    const net = level.zones.find((z) => z.id === 'net');
+    run(rig, 2);
+    rig.arena.props.get('ball').body.setLinvel({ x: 1.2, y: 0.6, z: 10 }, true);
+
+    let scoredAt = null;
+    for (let i = 0; i < Math.round((level.deadline - 2) / STEP); i += 1) {
+      rig.arena.step(STEP);
+      rig.world.step();
+      const at = rig.arena.propPosition('ball');
+      if (scoredAt === null
+        && Math.abs(at.x - net.pos[0]) <= net.size[0] / 2
+        && Math.abs(at.y - net.pos[1]) <= net.size[1] / 2
+        && Math.abs(at.z - net.pos[2]) <= net.size[2] / 2) scoredAt = 2 + i * STEP;
+    }
+    expect(scoredAt, 'a hard early strike never reaches the net').not.toBeNull();
+    expect(scoredAt).toBeLessThan(level.deadline);
+  });
+
   it('has a keeper that actually moves across the mouth', () => {
     const rig = stage(level);
     const keeper = rig.arena.movers[0];

@@ -23,15 +23,19 @@ export const JOBS = [
     demands: { steps: 1, flies: false },
     bans: ['flight'],
     name: 'Removals',
-    brief: 'Take the long beam down the corridor, round the corner, and out the far end.',
+    brief: 'Take the long beam down the corridor, round the corner, and to the far end of the building.',
     hint: 'It is longer than the corner is wide, so it will not go round end-on however you push it. The room in the middle is the only place with the space to turn it — a turntable under it does that without letting go.',
-    spawn: [0, 1.2, -17],
+    // Inside the building, not on the grass outside it. Everything here is
+    // sealed: the way through is the only way there is, or the answer to a
+    // corridor puzzle is to leave the corridor.
+    spawn: [0, 1.2, -14],
     groundSize: 90,
     budget: { cost: 110 },
     pieces: [
-      // The approach: a 2.4 m corridor running north.
+      // The approach: a 2.4 m corridor running north, capped behind you.
       { pos: [-1.6, 1.3, -8], size: [0.8, 2.6, 16], colour: DARK },
       { pos: [1.6, 1.3, -8], size: [0.8, 2.6, 16], colour: DARK },
+      { pos: [0, 1.3, -15.8], size: [4, 2.6, 0.8], colour: DARK },
       // The turning room. Six metres square, which is just enough.
       { pos: [-2.1, 1.3, -0.4], size: [1.8, 2.6, 0.8], colour: DARK },
       { pos: [2.1, 1.3, -0.4], size: [1.8, 2.6, 0.8], colour: DARK },
@@ -39,9 +43,11 @@ export const JOBS = [
       { pos: [0, 1.3, 6.4], size: [7.6, 2.6, 0.8], colour: DARK },
       { pos: [3.4, 1.3, 0.9], size: [0.8, 2.6, 1.8], colour: DARK },
       { pos: [3.4, 1.3, 5.1], size: [0.8, 2.6, 1.8], colour: DARK },
-      // The way out, running east.
+      // The way out, running east, and the end wall that makes the far end a
+      // destination rather than a second entrance.
       { pos: [8.7, 1.3, 1.4], size: [11.4, 2.6, 0.8], colour: DARK },
       { pos: [8.7, 1.3, 4.6], size: [11.4, 2.6, 0.8], colour: DARK },
+      { pos: [14.8, 1.3, 3], size: [0.8, 2.6, 4.8], colour: DARK },
     ],
     props: [
       { id: 'beam', pos: [0, 0.35, -10], size: [0.5, 0.5, 5.5], mass: 8, colour: TAN },
@@ -162,6 +168,11 @@ export const JOBS = [
     pieces: [
       { pos: [-3.2, 1.2, 3], size: [0.6, 2.4, 26], colour: DARK },
       { pos: [3.2, 1.2, 3], size: [0.6, 2.4, 26], colour: DARK },
+      // Both ends closed. An open-ended road is not the only road: you would
+      // shove the crate out the back, round the outside and in the far end,
+      // and never touch the rubble the level is about.
+      { pos: [0, 1.2, -10.3], size: [7, 2.4, 0.6], colour: DARK },
+      { pos: [0, 1.2, 16.3], size: [7, 2.4, 0.6], colour: DARK },
     ],
     stacks: [
       { id: 'rubble', count: 40, pos: [0, 0.5, 4], spread: [5.2, 1.6, 2.4], size: [0.55, 0.55, 0.55], mass: 1.6, colour: GRIT },

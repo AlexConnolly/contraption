@@ -19,6 +19,7 @@ import {
 import { bannedParts, banFor, firstBanned } from './challenges/bans.js';
 import { LEVELS, nextLevel } from './challenges/levels.js';
 import { resolveLevel, saveCustomLevel, blankLevel } from './challenges/custom.js';
+import { outOfTime } from './challenges/format.js';
 import { Hud } from './ui/hud.js';
 import { GraphEditor } from './ui/graph-editor.js';
 import { Builder } from './ui/builder.js';
@@ -682,6 +683,13 @@ function simulateStep() {
     state.crashed = true;
     audio.crash();
     hud.showFailure(state.level, report, 'You touched something');
+    return;
+  }
+  // A hard clock. Par is a target you can miss; this one ends the run.
+  if (!state.won && !state.crashed && outOfTime(state.level, report.elapsed)) {
+    state.crashed = true;
+    audio.crash();
+    hud.showFailure(state.level, report, 'Out of time');
     return;
   }
   // A keep-out covers the airspace above it as well as the ground, which is

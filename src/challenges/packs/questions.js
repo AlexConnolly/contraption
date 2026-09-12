@@ -229,28 +229,43 @@ export const QUESTIONS = [
     demands: { steps: 1, flies: false },
     bans: ['flight'],
     name: 'The Maze',
-    brief: 'Walls higher than you can see over, and the pad somewhere in the middle of them.',
-    hint: 'This is what the distance sensor is for. Keep one beam pointed at the wall on your left and steer to hold it at a fixed reading, and you will walk the whole maze without ever needing a map.',
-    spawn: [0, 1.2, -13],
+    brief: 'Walls higher than you can see over, the pad somewhere inside them, and two ways on at every turn.',
+    hint: 'This is what the distance sensor is for. Keep one beam pointed at the wall on your left and steer to hold it at a fixed reading, and you will walk the whole maze without ever needing a map — dead ends included, because following a wall backs you out of them.',
+    // Off the back wall, so the size of what you bring is decided by the
+    // corridors rather than by where you are put down.
+    spawn: [0, 1.2, -11.5],
     groundSize: 90,
     budget: { cost: 110 },
     pieces: [
-      // Outer box.
-      { pos: [0, 1.5, -15], size: [24, 3, 1], colour: DARK },
-      { pos: [0, 1.5, 15], size: [24, 3, 1], colour: DARK },
-      { pos: [-12, 1.5, 0], size: [1, 3, 31], colour: DARK },
-      { pos: [12, 1.5, 0], size: [1, 3, 31], colour: DARK },
-      // Inner walls, leaving one route round to the middle.
-      { pos: [-4, 1.5, -9], size: [16, 3, 1], colour: GREY },
-      { pos: [6, 1.5, -4], size: [12, 3, 1], colour: GREY },
-      { pos: [-6, 1.5, 1], size: [12, 3, 1], colour: GREY },
-      { pos: [-1, 1.5, 6], size: [22, 3, 1], colour: GREY },
-      { pos: [-7, 1.5, 10], size: [1, 3, 8], colour: GREY },
-      { pos: [4, 1.5, 10], size: [1, 3, 8], colour: GREY },
+      // Outer box. Everything inside runs on the same measure: corridors at
+      // least four metres across and walls a metre thick, so nothing comes
+      // down to threading a slot.
+      { pos: [0, 1.5, -15], size: [26, 3, 1], colour: DARK },
+      { pos: [0, 1.5, 15], size: [26, 3, 1], colour: DARK },
+      { pos: [-12.5, 1.5, 0], size: [1, 3, 31], colour: DARK },
+      { pos: [12.5, 1.5, 0], size: [1, 3, 31], colour: DARK },
+
+      // First divider, with two ways through it. The left one is a room.
+      { pos: [-9.25, 1.5, -8], size: [6.5, 3, 1], colour: GREY },
+      { pos: [2.5, 1.5, -8], size: [7, 3, 1], colour: GREY },
+      { pos: [11.25, 1.5, -8], size: [2.5, 3, 1], colour: GREY },
+      // The wall that makes it a room rather than a way through.
+      { pos: [-0.5, 1.5, -4.5], size: [1, 3, 6], colour: GREY },
+
+      // Second divider: one way through, over on the right.
+      { pos: [-5.25, 1.5, -1], size: [14.5, 3, 1], colour: GREY },
+      { pos: [9.75, 1.5, -1], size: [5.5, 3, 1], colour: GREY },
+
+      // Third divider, two ways through again. This time the right is the
+      // dead end and the long way round to the left is the route.
+      { pos: [1, 1.5, 6], size: [12, 3, 1], colour: GREY },
+      { pos: [11.75, 1.5, 6], size: [1.5, 3, 1], colour: GREY },
+      { pos: [6.5, 1.5, 8.5], size: [1, 3, 5], colour: GREY },
+      { pos: [9.5, 1.5, 11], size: [7, 3, 1], colour: GREY },
     ],
     props: [],
     zones: [
-      { id: 'centre', pos: [-1.5, 0.9, 11.5], size: [4, 2.4, 4], colour: GOAL },
+      { id: 'centre', pos: [0, 0.9, 12], size: [4, 2.4, 4], colour: GOAL },
     ],
     objectives: [
       { type: 'coreInZone', zone: 'centre', hold: 2, label: 'Found the middle' },

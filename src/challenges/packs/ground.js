@@ -86,10 +86,16 @@ export const GROUND = [
     groundSize: 110,
     budget: { cost: 60 },
     pieces: [
-      // Two walls holding a 1.6 m gap between them, with a lintel over it so
-      // climbing through the top is not an answer either.
-      { pos: [-4.4, 2, 7], size: [7.2, 4, 1], colour: DARK },
-      { pos: [4.4, 2, 7], size: [7.2, 4, 1], colour: DARK },
+      // A walled yard, because a wall you can drive round the end of is not a
+      // wall. The slot is the only way from this half to the other.
+      { pos: [0, 2, -10.5], size: [27, 4, 1], colour: DARK },
+      { pos: [0, 2, 16.5], size: [27, 4, 1], colour: DARK },
+      { pos: [-13.5, 2, 3], size: [1, 4, 28], colour: DARK },
+      { pos: [13.5, 2, 3], size: [1, 4, 28], colour: DARK },
+      // The divider, holding a 1.6 m gap, with a lintel over it so climbing
+      // through the top is not an answer either.
+      { pos: [-6.9, 2, 7], size: [12.2, 4, 1], colour: DARK },
+      { pos: [6.9, 2, 7], size: [12.2, 4, 1], colour: DARK },
       { pos: [0, 3, 7], size: [1.6, 2, 1], colour: DARK },
     ],
     props: [
@@ -167,8 +173,8 @@ export const GROUND = [
     demands: { steps: 2, flies: false },
     bans: ['flight'],
     name: 'Sunday League',
-    brief: 'The ball again, but now there is a goal with a keeper sliding across its mouth.',
-    hint: 'Shoving it from where it sits sends it straight at him. Take it wide, line the shot up, then hit it with some pace on.',
+    brief: 'The ball again, a keeper sliding across the goal mouth, and ten seconds on the clock.',
+    hint: 'Ten seconds is not enough to drive round and line a shot up. Build something that strikes it the moment the run starts — a sprung arm, a piston, a thruster behind it — and aim where the keeper is not.',
     spawn: [0, 1.2, -10],
     groundSize: 140,
     budget: { cost: 100 },
@@ -203,7 +209,10 @@ export const GROUND = [
     objectives: [
       { type: 'propInZone', prop: 'ball', zone: 'net', hold: 1, label: 'Ball in the back of the net' },
     ],
-    par: 110,
+    // Short enough that driving up and nudging it cannot work: it has to be
+    // struck, and struck almost immediately.
+    deadline: 10,
+    par: 8,
   },
 
   {

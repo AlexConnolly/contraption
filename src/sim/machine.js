@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {
-  getPart, partDensity, pistonStroke, separationPush, jointTension,
+  getPart, partDensity, pistonStroke, separationPush, jointTension, jointFlip,
   turntableSpin, turntableTorque, CELL,
 } from '../parts/registry.js';
 import { PISTON_ROD_TOP, PISTON_REST, wedgeCorners } from '../parts/geometry.js';
@@ -494,13 +494,16 @@ export class Machine {
           );
           break;
         case 'servo':
-          this.driveMotor(joint, placed, part, signal * part.actuator.range);
+          this.driveMotor(
+            joint, placed, part,
+            signal * jointFlip(placed) * part.actuator.range,
+          );
           break;
         // Its own speed and torque, and no handedness: a turntable is not on
         // one side of the machine the way a wheel is.
         case 'spin':
           joint?.configureMotorVelocity(
-            signal * turntableSpin(placed, part) * power,
+            signal * jointFlip(placed) * turntableSpin(placed, part) * power,
             turntableTorque(placed, part),
           );
           break;

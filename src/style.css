@@ -215,6 +215,8 @@ input[type="range"] { accent-color: var(--amber); }
 }
 .readout strong { color: var(--text); font-weight: 500; }
 .readout.over strong { color: var(--red); }
+/* The last third of a hard clock, where the number is the whole story. */
+.readout.urgent strong { color: var(--red); }
 
 .actions { display: flex; gap: 6px; }
 .actions button {

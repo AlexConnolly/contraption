@@ -187,6 +187,9 @@ export function sanitiseLevel(input, { id } = {}) {
   if (raw.handsOff) level.handsOff = true;
   if (raw.noContact) level.noContact = true;
   if (raw.noRespawn) level.noRespawn = true;
+  // A hard clock, as against par, which is only a target. Run out of it and
+  // the run is failed, so the answer has to be quick as well as correct.
+  if (Number.isFinite(Number(raw.deadline))) level.deadline = clamp(raw.deadline, 1, 3600, 60);
   if (Number.isFinite(Number(raw.massCap))) level.massCap = clamp(raw.massCap, 1, 5000, 50);
   if (Number.isFinite(Number(raw.gravity))) level.gravity = clamp(raw.gravity, -40, 0, -9.81);
   if (Number.isFinite(Number(raw.friction))) level.friction = clamp(raw.friction, 0, 4, 1);
@@ -202,6 +205,14 @@ export function sanitiseLevel(input, { id } = {}) {
 }
 
 /** What a level is missing before it is worth playing. */
+/**
+ * Whether a run has used up a level's hard clock. Par is a target you can
+ * miss and still win; this one ends the run.
+ */
+export function outOfTime(level, elapsed) {
+  return Boolean(level?.deadline) && elapsed >= level.deadline;
+}
+
 export function levelProblems(level) {
   const problems = [];
   if (level.objectives.length === 0) problems.push('No objective — there is nothing to finish');

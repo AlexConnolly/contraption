@@ -498,6 +498,10 @@ export class Builder {
     const rules = el('div', 'build-fields');
     this.number(rules, 'Budget', this.draft.budget.cost, 1, 2000, (v) => { this.draft.budget.cost = v; });
     this.number(rules, 'Par (s)', this.draft.par, 5, 3600, (v) => { this.draft.par = v; });
+    // Zero for no hard clock at all, which is what most levels want.
+    this.number(rules, 'Time limit (s)', this.draft.deadline ?? 0, 0, 3600, (v) => {
+      if (v > 0) this.draft.deadline = v; else delete this.draft.deadline;
+    });
     this.number(rules, 'Gravity', this.draft.gravity ?? -9.81, -40, 0, (v) => { this.draft.gravity = v; }, 0.01);
     this.number(rules, 'Ground grip', this.draft.friction ?? 1, 0, 4, (v) => { this.draft.friction = v; }, 0.01);
     this.number(rules, 'Mass cap', this.draft.massCap ?? 0, 0, 5000, (v) => {

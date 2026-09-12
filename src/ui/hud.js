@@ -346,6 +346,7 @@ export class Hud {
         this.h.onConfigChange(placed.id, { power: value });
       });
     }
+    if (part.flippable) this.renderFlip(body, placed, part);
     if (part.tensionRange) this.renderTension(body, placed, part);
     if (part.strokeRange) this.renderStroke(body, placed, part);
     if (part.separationRange) this.renderSeparation(body, placed, part);
@@ -585,6 +586,37 @@ export class Hud {
   }
 
   /**
+   * Mirrors which way the joint turns. The jaws of a grabber are mirror
+   * images of one another, so one key has to close them both; before this the
+   * only way to get that was to mount one of the pair backwards, which threw
+   * away its sensible facing to buy a minus sign.
+   */
+  renderFlip(body, placed, part) {
+    const row = el('div', 'row');
+    row.append(el('label', null, 'Direction'));
+    const button = el('button');
+    button.style.width = '100%';
+    const note = el('p', 'insp-blurb');
+    // Setting a config does not rebuild the inspector, so the control says
+    // what it now is rather than waiting to be redrawn.
+    const say = (flipped) => {
+      button.textContent = flipped ? 'Mirrored' : 'Normal';
+      button.classList.toggle('on', flipped);
+      note.textContent = flipped
+        ? 'Turns the opposite way to an unmirrored one on the same key.'
+        : 'Mirror this to make a facing pair close together on one key.';
+    };
+    button.addEventListener('click', () => {
+      const flipped = !placed.config.flip;
+      this.h.onConfigChange(placed.id, { flip: flipped });
+      say(flipped);
+    });
+    say(Boolean(placed.config.flip));
+    row.append(button);
+    body.append(row, note);
+  }
+
+  /**
    * How hard a joint fights to keep the angle it was given. Slack lets it give
    * under load, which is sometimes what you want; tight holds its line. All
    * the way down switches the motor off and leaves a free pivot, which is the
@@ -725,8 +757,17 @@ export class Hud {
       row.dot.classList.toggle('done', objective.done);
       row.fill.style.width = `${Math.round(objective.progress * 100)}%`;
     });
-    const par = level.par ? ` · par ${level.par}s` : '';
     const rule = level.noContact ? ' · <strong>no contact</strong>' : '';
+    // On a level with a hard clock the number that matters is what is left,
+    // not what has gone.
+    if (level.deadline) {
+      const left = Math.max(0, level.deadline - report.elapsed);
+      this.dom.clock.classList.toggle('urgent', left <= level.deadline / 3);
+      this.dom.clock.innerHTML =
+        `<strong>${left.toFixed(1)}s</strong> left of ${level.deadline}s${rule}`;
+      return;
+    }
+    const par = level.par ? ` · par ${level.par}s` : '';
     this.dom.clock.innerHTML =
       `Run time <strong>${report.elapsed.toFixed(1)}s</strong>${par}${rule}`;
   }

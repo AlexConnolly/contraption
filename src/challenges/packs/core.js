@@ -109,26 +109,39 @@ export const CORE = [
     id: 'ledge-runner',
     demands: { steps: 2, flies: false },
     name: 'Ledge Runner',
-    brief: 'Park the machine itself on the pad at the end of the gantry, and hold it there for 4 seconds.',
-    hint: 'There is nothing past the pad. A distance sensor pointed forward, bound to your drive, will stop you on the mark.',
-    spawn: [0, 4.2, -14],
+    brief: 'Follow the gantry to the pad at the end of it and hold the machine there for 4 seconds. It narrows, and it turns.',
+    hint: 'Full speed in a straight line gets you as far as the first corner. Build something narrow enough for the thin sections and slow enough to turn on them, and use a forward beam to stop you on the mark.',
+    spawn: [0, 4.2, -12],
     groundSize: 160,
     groundY: -8,
     budget: { cost: 120 },
     pieces: [
-      { pos: [0, 3, -10], size: [8, 0.8, 10], colour: GREY },
-      { pos: [0, 3, 2], size: [3.4, 0.8, 15], colour: GREY },
-      { pos: [0, 3, 11], size: [4.5, 0.8, 4], colour: 0x5a6470 },
-      { pos: [0, 4.4, 14], size: [4.5, 2.6, 0.6], colour: DARK },
+      // An apron to set off from, then four legs and four corners. Nothing
+      // here is hard on its own; taken at the speed the straight invites, all
+      // of it is.
+      { pos: [0, 3, -12], size: [8, 0.8, 7], colour: GREY },
+      { pos: [0, 3, -5.5], size: [2.6, 0.8, 7], colour: GREY },
+      { pos: [0, 3, -2], size: [2.6, 0.8, 2.6], colour: 0x5a6470 },
+      { pos: [4.5, 3, -2], size: [9, 0.8, 2.4], colour: GREY },
+      { pos: [8.5, 3, -2], size: [2.4, 0.8, 2.4], colour: 0x5a6470 },
+      { pos: [8.5, 3, 2.5], size: [2.4, 0.8, 8], colour: GREY },
+      { pos: [8.5, 3, 7], size: [2.4, 0.8, 2.4], colour: 0x5a6470 },
+      { pos: [2.5, 3, 7], size: [12, 0.8, 2.2], colour: GREY },
+      { pos: [-3, 3, 7], size: [2.2, 0.8, 2.2], colour: 0x5a6470 },
+      // The last leg is the thinnest of them, and it is the one with the pad
+      // at the end, so the slowing down and the balancing come together.
+      { pos: [-3, 3, 11], size: [2, 0.8, 7], colour: GREY },
+      { pos: [-3, 3, 15.5], size: [3.4, 0.8, 3.4], colour: 0x5a6470 },
+      { pos: [-3, 4.4, 17.5], size: [3.4, 2.6, 0.6], colour: DARK },
     ],
     props: [],
     zones: [
-      { id: 'pad', pos: [0, 4.2, 11], size: [4, 3, 3.4], colour: 0x4ade80 },
+      { id: 'pad', pos: [-3, 4.2, 15.5], size: [3, 3, 3], colour: 0x4ade80 },
     ],
     objectives: [
       { type: 'coreInZone', zone: 'pad', hold: 4, label: 'Machine stopped and held on the pad' },
     ],
-    par: 200,
+    par: 220,
   },
 
   {

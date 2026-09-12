@@ -58,6 +58,16 @@ export function workingAxis(part, rot = IDENTITY_ORIENTATION) {
   return null;
 }
 
+/**
+ * Which way round a turning joint works. Two hinges facing each other — the
+ * jaws of a grabber, a pair of legs — are mirror images, so one key has to
+ * close them both, and without this the only way to get that was to mount one
+ * of them backwards and lose the sensible facing along with it.
+ */
+export function jointFlip(placed) {
+  return placed?.config?.flip ? -1 : 1;
+}
+
 function clampTo(value, [lo, hi], fallback) {
   if (typeof value !== 'number' || Number.isNaN(value)) return fallback;
   return Math.min(hi, Math.max(lo, value));
@@ -280,6 +290,9 @@ const PARTS = [
     attach: [[0, -1, 0]],
     carry: [[0, 1, 0]],
     limits: [-1.55, 1.55],
+    // Two of these facing each other are mirror images. Without a flip, the
+    // only way to make both jaws close on one key was to mount one backwards.
+    flippable: true,
     // How hard it fights to keep the angle it was told. All the way down is a
     // free pivot — which is how you build a swing, and there was no other way
     // to build one.
@@ -314,6 +327,9 @@ const PARTS = [
     articulated: true,
     joint: 'revolute',
     axis: [0, 1, 0],
+    // Same mirror problem as the hinge: a pair of these turning opposite
+    // ways off one key is an ordinary thing to want.
+    flippable: true,
     attach: [[0, -1, 0]],
     carry: [[0, 1, 0]],
     // No limits: unlike the hinge it goes round and round, which is what
