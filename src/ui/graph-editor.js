@@ -16,6 +16,17 @@ const GROUP_LABEL = {
   flow: 'Flow',
 };
 
+// What each operation is called when it is a thing you go looking for, as
+// against the symbol shown on a node once it is placed.
+const OP_NAME = {
+  add: 'Add', subtract: 'Subtract', multiply: 'Multiply', divide: 'Divide',
+  min: 'Smaller of', max: 'Larger of', abs: 'Size of', clamp: 'Keep between',
+  angleDelta: 'Angle between',
+  lt: 'Less than', lte: 'At most', gt: 'More than', gte: 'At least',
+  eq: 'Same as', neq: 'Different from',
+  and: 'And — both', or: 'Or — either', not: 'Not — the opposite',
+};
+
 const OP_LABEL = {
   add: '+', subtract: '−', multiply: '×', divide: '÷',
   min: 'min', max: 'max', abs: '|a|', clamp: 'clamp', angleDelta: 'angle to',
@@ -64,6 +75,7 @@ export class GraphEditor {
     const bar = el('div', 'graph-bar');
     this.title = el('div', 'graph-title', 'Program');
     this.problems = el('div', 'graph-problems');
+    this.sockets = [];
     const tidy = el('button', 'ghost', 'Tidy');
     tidy.title = 'Lay this state out in columns';
     tidy.addEventListener('click', () => {
@@ -192,29 +204,46 @@ export class GraphEditor {
 
   // ------------------------------------------------------------------ palette
 
+  /** Says why something did not work, where the problem count is shown. */
+  say(message) {
+    this.problems.textContent = message;
+    this.problems.classList.add('bad');
+    clearTimeout(this.sayTimer);
+    this.sayTimer = setTimeout(() => this.changed(), 4000);
+  }
+
+  /**
+   * One button per thing you can actually make, rather than one per node kind.
+   * A node with operations on it used to appear once under its own name with
+   * the operations hidden in a dropdown you only found after placing one — so
+   * a player looking for `not` had no way of knowing the editor had one.
+   */
   buildPalette() {
     this.paletteEl.innerHTML = '';
     const groups = new Map();
     for (const [id, type] of Object.entries(NODE_TYPES)) {
       if (!groups.has(type.group)) groups.set(type.group, []);
-      groups.get(type.group).push({ id, type });
+      const entries = type.ops
+        ? type.ops.map((op) => ({ id, op, name: OP_NAME[op] ?? OP_LABEL[op] ?? op }))
+        : [{ id, op: null, name: type.name }];
+      groups.get(type.group).push(...entries);
     }
     for (const [group, items] of groups) {
       this.paletteEl.append(el('div', 'graph-group', GROUP_LABEL[group] ?? group));
-      for (const { id, type } of items) {
-        const button = el('button', 'graph-add', type.name);
-        button.addEventListener('click', () => this.addNode(id));
+      for (const { id, op, name } of items) {
+        const button = el('button', 'graph-add', name);
+        button.addEventListener('click', () => this.addNode(id, op ? { op } : null));
         this.paletteEl.append(button);
       }
     }
   }
 
-  addNode(type) {
+  addNode(type, config = null) {
     const state = this.state();
     const node = {
       id: makeId('n'),
       type,
-      config: this.defaultsFor(type),
+      config: { ...this.defaultsFor(type), ...(config ?? {}) },
       x: Math.round((-this.view.x + 260) / this.view.scale),
       y: Math.round((-this.view.y + 140) / this.view.scale),
     };
@@ -347,6 +376,7 @@ export class GraphEditor {
     this.pruneLinks();
     this.renderStates();
     this.renderNodes();
+    this.markSockets();
     this.renderLinks();
     this.applyView();
     const problems = validateProgram(this.program, this.context());
@@ -359,6 +389,7 @@ export class GraphEditor {
   renderNodes() {
     const ctx = this.context();
     this.nodeLayer.innerHTML = '';
+    this.sockets = [];
     for (const node of this.state().nodes) {
       const type = NODE_TYPES[node.type];
       if (!type) continue;
@@ -409,7 +440,11 @@ export class GraphEditor {
     row.style.height = `${ROW}px`;
     const dot = el('span', 'graph-socket');
     dot.style.background = KIND_COLOUR[port.kind] ?? KIND_FALLBACK;
-    dot.title = port.kind;
+    dot.title = `${port.name} — ${port.kind}`;
+    // Kept so that dragging a wire can mark every socket that would take it.
+    dot.dataset.kind = port.kind;
+    dot.dataset.direction = direction;
+    this.sockets.push({ dot, kind: port.kind, direction });
     dot.addEventListener('pointerdown', (event) => {
       event.stopPropagation();
       this.startLink(event, node, port, direction);
@@ -554,6 +589,7 @@ export class GraphEditor {
 
   startLink(event, node, port, direction) {
     this.pending = { node, port, direction };
+    this.markSockets();
     const move = (e) => {
       this.pointer = this.toContent(e);
       this.renderLinks();
@@ -563,16 +599,43 @@ export class GraphEditor {
       window.removeEventListener('pointerup', up);
       this.pending = null;
       this.pointer = null;
+      this.markSockets();
       this.renderLinks();
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
   }
 
+  /**
+   * While a wire is in the air, every socket says whether it would take it.
+   * Without this a refused drop is indistinguishable from a missed one: the
+   * wire simply vanishes and the editor offers no reason.
+   */
+  markSockets() {
+    const start = this.pending;
+    for (const socket of this.sockets) {
+      socket.dot.classList.remove('takes', 'refuses');
+      if (!start) continue;
+      const ok = socket.direction !== start.direction && socket.kind === start.port.kind;
+      socket.dot.classList.add(ok ? 'takes' : 'refuses');
+    }
+  }
+
   finishLink(node, port, direction) {
     const start = this.pending;
-    if (!start || start.direction === direction) return;
-    if (start.port.kind !== port.kind) return;
+    if (!start) return;
+    if (start.direction === direction) {
+      this.say(direction === 'in'
+        ? 'Both ends are inputs. A wire runs from an output to an input.'
+        : 'Both ends are outputs. A wire runs from an output to an input.');
+      return;
+    }
+    if (start.port.kind !== port.kind) {
+      const [out, into] = start.direction === 'out'
+        ? [start.port, port] : [port, start.port];
+      this.say(`${out.name} is a ${out.kind} and ${into.name} takes a ${into.kind}.`);
+      return;
+    }
     const from = start.direction === 'out' ? start : { node, port };
     const to = start.direction === 'out' ? { node, port } : start;
     const state = this.state();

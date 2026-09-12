@@ -1035,6 +1035,14 @@ input[type="range"] { accent-color: var(--amber); }
 .graph-row.in .graph-socket { margin-left: -15px; }
 .graph-row.out .graph-socket { margin-right: -15px; }
 
+/* While a wire is in the air, every socket says whether it would take it.
+   A refused drop otherwise looks exactly like a missed one. */
+.graph-socket.takes {
+  box-shadow: 0 0 0 2px var(--solid), 0 0 0 5px rgb(62 207 142 / 55%);
+  transform: rotate(45deg) scale(1.35);
+}
+.graph-socket.refuses { opacity: 0.25; }
+
 .graph-config { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 10px 9px; }
 .graph-config select, .graph-config input { font-size: 11px; padding: 4px 6px; width: 100%; }
 .graph-config input.narrow { width: calc(33% - 3px); }
