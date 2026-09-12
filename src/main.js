@@ -19,7 +19,7 @@ import {
 import { bannedParts, banFor, firstBanned } from './challenges/bans.js';
 import { LEVELS, nextLevel } from './challenges/levels.js';
 import { resolveLevel, saveCustomLevel, blankLevel } from './challenges/custom.js';
-import { outOfTime } from './challenges/format.js';
+import { outOfTime, fallLine } from './challenges/format.js';
 import { Hud } from './ui/hud.js';
 import { GraphEditor } from './ui/graph-editor.js';
 import { Builder } from './ui/builder.js';
@@ -687,6 +687,17 @@ function simulateStep() {
     // to lose a run are not, and they have their own clip.
     audio.crash();
     hud.showFailure(state.level, report, 'You touched something');
+    return;
+  }
+  // Over the edge on a course built over a drop. Nothing was watching for this,
+  // so falling off left you sitting at the bottom of the hole with the clock
+  // still running and no way back but the menu.
+  const floor = fallLine(state.level);
+  if (floor !== null && !state.won && !state.crashed
+    && state.machine.corePosition().y < floor) {
+    state.crashed = true;
+    audio.fail();
+    hud.showFailure(state.level, report, 'You went over the edge');
     return;
   }
   // Touch anything but the floor and the run is over. Separate from noContact

@@ -189,6 +189,9 @@ export function sanitiseLevel(input, { id } = {}) {
   // Touch nothing but the ground. A driving level cannot use noContact,
   // because a machine with wheels on it is touching something by definition.
   if (raw.noBumps) level.noBumps = true;
+  // Worked out from the scenery when it is not given, so a course over a
+  // drop does not have to remember to say so.
+  if (Number.isFinite(Number(raw.fallBelow))) level.fallBelow = clamp(raw.fallBelow, -500, 500, 0);
   if (raw.noRespawn) level.noRespawn = true;
   // A hard clock, as against par, which is only a target. Run out of it and
   // the run is failed, so the answer has to be quick as well as correct.
@@ -208,6 +211,30 @@ export function sanitiseLevel(input, { id } = {}) {
 }
 
 /** What a level is missing before it is worth playing. */
+/**
+ * The height below which a machine has plainly gone over the edge, or null on
+ * a course where there is nowhere to fall.
+ *
+ * Six courses are built over a drop, and the floor of that drop is nine to
+ * thirteen metres down. Landing on it used to be no more than an inconvenience:
+ * the run carried on, the machine sat at the bottom of the hole, and nothing
+ * ever said so. The line is set just under the lowest thing you can stand on,
+ * rather than at the floor, so it reads as going over the edge rather than as
+ * hitting the bottom.
+ */
+export function fallLine(level) {
+  if (Number.isFinite(Number(level?.fallBelow))) return Number(level.fallBelow);
+  if (level?.groundY === undefined || level.groundY === null) return null;
+  let lowest = Infinity;
+  for (const piece of level.pieces ?? []) {
+    lowest = Math.min(lowest, piece.pos[1] - piece.size[1] / 2);
+  }
+  if (!Number.isFinite(lowest)) return null;
+  // Ground a little below the scenery is a kerb, not a drop.
+  if (lowest - level.groundY < 4) return null;
+  return lowest - 3;
+}
+
 /**
  * Whether a run has used up a level's hard clock. Par is a target you can
  * miss and still win; this one ends the run.
