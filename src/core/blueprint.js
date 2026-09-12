@@ -125,6 +125,27 @@ export class Blueprint {
     return true;
   }
 
+  /**
+   * Throws away parts whose type is no longer installed, and says what went.
+   *
+   * Everything downstream — the cost, the meshes, the physics — takes it for
+   * granted that a placed type can be looked up, so when a pack is removed out
+   * from under a machine the parts have to go rather than be tolerated one
+   * call site at a time.
+   */
+  dropMissing() {
+    const gone = [];
+    for (const placed of this.list()) {
+      if (findPart(placed.type)) continue;
+      gone.push(placed.type);
+      this.parts.delete(placed.id);
+      for (const [at, id] of this.occupancy) {
+        if (id === placed.id) this.occupancy.delete(at);
+      }
+    }
+    return gone;
+  }
+
   partAt(cell) {
     const id = this.occupancy.get(key(cell));
     return id ? this.parts.get(id) : null;

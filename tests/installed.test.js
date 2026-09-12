@@ -121,6 +121,36 @@ describe('a machine with pack parts on it', () => {
     expect(usesPacks(bp)).toBe(true);
   });
 
+  /**
+   * Removing a pack out from under a machine that is on the screen. Everything
+   * downstream takes it for granted that a placed type can be looked up, so
+   * the parts have to come off rather than be tolerated one call site at a
+   * time.
+   */
+  it('loses those parts, and only those, when the pack goes', () => {
+    const bp = new Blueprint();
+    bp.place('core', [0, 0, 0]);
+    bp.place('wheel', [2, 0, 0]);
+    bp.place('heavy-plant:tractor-wheel', [-2, 0, 0]);
+    expect(bp.size).toBe(3);
+
+    removePack('heavy-plant');
+    expect(bp.dropMissing()).toEqual(['heavy-plant:tractor-wheel']);
+    expect(bp.size).toBe(2);
+    expect(bp.list().map((p) => p.type).sort()).toEqual(['core', 'wheel']);
+    expect(() => bp.cost()).not.toThrow();
+    // And the cells it held are free again.
+    expect(bp.place('wheel', [-2, 0, 0]).ok).toBe(true);
+  });
+
+  it('loses nothing when every part is still there', () => {
+    const bp = new Blueprint();
+    bp.place('core', [0, 0, 0]);
+    bp.place('heavy-plant:tractor-wheel', [2, 0, 0]);
+    expect(bp.dropMissing()).toEqual([]);
+    expect(bp.size).toBe(2);
+  });
+
   it('is not confused with one built out of the box', () => {
     const bp = new Blueprint();
     bp.place('core', [0, 0, 0]);

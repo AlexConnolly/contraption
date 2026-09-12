@@ -533,7 +533,9 @@ export class FrontEnd {
       if (!code) return;
       const result = await installPackCode(code);
       this.h.onToast?.(result.ok ? `${result.pack.name} installed` : result.reason, !result.ok);
-      if (result.ok) this.show('parts');
+      if (!result.ok) return;
+      this.h.onPartsChanged?.();
+      this.show('parts');
     });
     grid.append(paste);
 
@@ -595,6 +597,7 @@ export class FrontEnd {
     remove.addEventListener('click', () => {
       removePack(pack.id);
       this.h.onToast?.(`${pack.name} removed`);
+      this.h.onPartsChanged?.();
       this.show('parts');
     });
     row.append(edit, share, use, remove);
@@ -691,7 +694,9 @@ export class FrontEnd {
       }
       const result = installPack(clean);
       this.h.onToast?.(result.ok ? `${result.pack.name} installed` : result.reason, !result.ok);
-      if (result.ok) this.show('parts');
+      if (!result.ok) return;
+      this.h.onPartsChanged?.();
+      this.show('parts');
     });
     copy.addEventListener('click', async () => {
       if (!clean) return;

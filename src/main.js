@@ -12,7 +12,7 @@ import { Arena } from './sim/arena.js';
 import { createWorld, gravityOf } from './sim/world.js';
 import { SignalBus } from './sim/signals.js';
 import { controllerOf, firstController } from './sim/flight.js';
-import { getPart } from './parts/registry.js';
+import { getPart, findPart } from './parts/registry.js';
 import { loadPacks, usesPacks } from './parts/installed.js';
 import {
   ObjectiveTracker, withinBudget, withinMassCap, breachedBy,
@@ -1044,6 +1044,22 @@ async function boot() {
         if (loadMachine(blueprint, machine.name)) hud.toast(`Loaded ${machine.name}`);
       },
       onBuildLevel: (level) => openBuilder(level ?? blankLevel()),
+      // A pack installed or removed while the menu is up changes what is in
+      // the palette, which is built once and would otherwise not notice until
+      // the next reload.
+      onPartsChanged: () => {
+        // The part in hand, and parts already on the machine, may have gone
+        // out with the pack they came from.
+        if (!findPart(studio.partType)) studio.setPartType('block');
+        const gone = state.blueprint.dropMissing();
+        if (gone.length) {
+          studio.replaceBlueprint(state.blueprint);
+          hud.toast(`${gone.length} parts came off — their pack is gone`, true);
+        }
+        hud.buildPalette();
+        hud.setLevel(state.level);
+        hud.setActivePart(studio.partType);
+      },
       getSettings: () => ({ ...settings }),
       onSetting: applySetting,
     },
