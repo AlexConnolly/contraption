@@ -464,3 +464,83 @@
 
 .fe-head.sub { margin-top: 34px; }
 .fe-head.sub h2 { font-size: clamp(22px, 2.6vw, 30px); }
+
+/* A parts pack: the parts across the top of the card, drawn the same way the
+   palette draws them. */
+.fe-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--edge);
+  border-bottom: 1px solid var(--edge);
+}
+.fe-chip {
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  padding: 9px 4px 8px;
+  background: #0b1018;
+}
+.fe-chip img { width: 46px; height: 46px; display: block; }
+.fe-chip.blank img { visibility: hidden; }
+.fe-chip span {
+  font-size: 10.5px;
+  color: var(--dim);
+  text-align: center;
+  line-height: 1.25;
+}
+
+/* Writing one: the pack on the left, what the game made of it on the right. */
+.fe-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: stretch;
+}
+.fe-code {
+  min-height: 52vh;
+  resize: vertical;
+  padding: 14px 15px;
+  background: #0a0e14;
+  border: 1px solid var(--edge);
+  color: var(--text);
+  font-family: ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, monospace;
+  font-size: 12.5px;
+  line-height: 1.55;
+  tab-size: 2;
+}
+.fe-code:focus-visible { outline: none; border-color: var(--amber); }
+.fe-review {
+  min-height: 52vh;
+  overflow-y: auto;
+  padding: 13px 14px;
+  border: 1px solid var(--edge);
+  background: rgba(255, 255, 255, .015);
+  display: grid;
+  gap: 7px;
+  align-content: start;
+}
+.fe-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+  padding: 8px 10px;
+  border-left: 2px solid var(--edge);
+  background: rgba(255, 255, 255, .02);
+}
+.fe-line b { font-size: 13.5px; font-weight: 600; }
+.fe-line code { font-size: 11px; color: var(--faint); }
+.fe-line span { font-size: 11.5px; color: var(--dim); font-variant-numeric: tabular-nums; }
+.fe-bad { margin: 0; font-size: 12.5px; color: var(--red); }
+.fe-good { margin: 0; font-size: 12.5px; color: var(--green); }
+.fe-note { margin: 6px 0 0; font-size: 11.5px; color: var(--faint); line-height: 1.5; }
+.fe-row.wide { border-top: 0; padding-top: 12px; justify-content: flex-end; }
+.fe-row.wide .fe-mini { flex: 0 0 auto; height: 34px; padding: 0 26px; }
+.fe-row.wide .fe-mini:first-child { border-color: var(--amber); color: var(--amber); }
+
+@media (max-width: 860px) {
+  .fe-split { grid-template-columns: minmax(0, 1fr); }
+  .fe-code, .fe-review { min-height: 34vh; }
+}
+.fe-warn { margin: 0; font-size: 12px; color: var(--amber); }
+.fe-chip.empty { background: #0b1018; }

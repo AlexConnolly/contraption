@@ -710,18 +710,63 @@ const PARTS = [
 
 const BY_ID = new Map(PARTS.map((p) => [p.id, p]));
 
+/**
+ * The shapes the game knows how to draw. A pack cannot bring a mesh with it —
+ * a mesh is code — but it can ask for any of these, so a pack wheel looks like
+ * a wheel instead of a grey box. Kept here rather than in the geometry so that
+ * checking a pack does not drag Three.js in with it; the geometry checks the
+ * name against its own table again before it draws anything.
+ */
+export const PART_LOOKS = [
+  'coupling', 'wedge', 'core', 'wheel', 'hinge', 'turntable', 'positioner',
+  'suspension', 'piston', 'propeller', 'thruster', 'grabber', 'controller',
+  'sensor',
+];
+
+/**
+ * Parts that arrived in a pack.
+ *
+ * They sit in their own table rather than being poured into PARTS, so the
+ * shipped list is exactly what it was and a pack can be taken back out again
+ * without a reload. Lookups check the shipped parts first, which is what stops
+ * a pack from quietly replacing the wheel everyone's machines are built from —
+ * though the ids are prefixed as well, so it cannot name one in the first
+ * place.
+ */
+const ADDED = new Map();
+
+export function installParts(parts) {
+  for (const part of parts) {
+    if (BY_ID.has(part.id)) continue;
+    ADDED.set(part.id, part);
+  }
+}
+
+export function uninstallPack(packId) {
+  for (const [id, part] of ADDED) if (part.pack === packId) ADDED.delete(id);
+}
+
+export function installedParts() {
+  return [...ADDED.values()];
+}
+
 export function getPart(id) {
-  const part = BY_ID.get(id);
+  const part = BY_ID.get(id) ?? ADDED.get(id);
   if (!part) throw new Error(`Unknown part type: ${id}`);
   return part;
 }
 
+/** The same lookup for a part that may have gone away with its pack. */
+export function findPart(id) {
+  return BY_ID.get(id) ?? ADDED.get(id) ?? null;
+}
+
 export function allParts() {
-  return PARTS.slice();
+  return [...PARTS, ...ADDED.values()];
 }
 
 export function partsInCategory(category) {
-  return PARTS.filter((p) => p.category === category);
+  return allParts().filter((p) => p.category === category);
 }
 
 export function attachFaces(part) {

@@ -13,6 +13,7 @@ import { createWorld, gravityOf } from './sim/world.js';
 import { SignalBus } from './sim/signals.js';
 import { controllerOf, firstController } from './sim/flight.js';
 import { getPart } from './parts/registry.js';
+import { loadPacks, usesPacks } from './parts/installed.js';
 import {
   ObjectiveTracker, withinBudget, withinMassCap, breachedBy,
 } from './challenges/objectives.js';
@@ -733,26 +734,33 @@ function simulateStep() {
     && report.elapsed >= state.level.scored.seconds) {
     state.won = true;
     audio.win();
-    store.recordScore(state.level.id, report.score ?? 0);
+    // A pack writes its own costs and masses, so a run using one is not
+    // against the same yardstick as everyone else's and does not go on the
+    // board. It still counts as a win on screen.
+    const modded = usesPacks(state.blueprint);
+    if (!modded) store.recordScore(state.level.id, report.score ?? 0);
     hud.showScore(
       state.level,
       report,
       state.blueprint.cost(),
       state.blueprint,
       nextLevel(state.level.id),
+      { modded },
     );
     return;
   }
   if (report.complete && !state.won) {
     state.won = true;
     audio.win();
-    store.recordWin(state.level.id, report.elapsed, state.blueprint.cost());
+    const modded = usesPacks(state.blueprint);
+    if (!modded) store.recordWin(state.level.id, report.elapsed, state.blueprint.cost());
     hud.showWin(
       state.level,
       report,
       state.blueprint.cost(),
       state.blueprint,
       nextLevel(state.level.id),
+      { modded },
     );
   }
 }
@@ -834,6 +842,9 @@ function frame(now) {
 // ------------------------------------------------------------------------ boot
 
 async function boot() {
+  // Before anything reads a saved machine: a machine built with a pack needs
+  // the pack's parts in the registry to load at all.
+  loadPacks();
   world = createWorld(RAPIER, gravityOf(state.level));
 
   state.level = resolveLevel(store.lastLevel() ?? 'first-haul');

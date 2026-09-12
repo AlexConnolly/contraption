@@ -1,5 +1,5 @@
 import { applyOrientation, IDENTITY_ORIENTATION } from './orientation.js';
-import { getPart } from '../parts/registry.js';
+import { getPart, findPart } from '../parts/registry.js';
 
 export const BLUEPRINT_VERSION = 1;
 
@@ -64,6 +64,7 @@ export class Blueprint {
     this.bounds = options.bounds ?? DEFAULT_BOUNDS;
     this.parts = new Map();
     this.occupancy = new Map();
+    this.missing = [];
   }
 
   get size() {
@@ -236,6 +237,13 @@ export class Blueprint {
   static fromJSON(data, options = {}) {
     const bp = new Blueprint({ name: data.name, bounds: options.bounds });
     for (const p of data.parts ?? []) {
+      // A machine saved with a pack that has since been removed. Dropping the
+      // part is the only thing that can be done with it, but the machine is
+      // still worth having, and `missing` lets the builder say what went.
+      if (!findPart(p.type)) {
+        bp.missing.push(p.type);
+        continue;
+      }
       const cells = occupiedCells(p.type, p.cell, p.rot);
       const placed = {
         id: p.id,

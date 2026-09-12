@@ -177,6 +177,25 @@ export const store = {
     write(data);
   },
 
+  // ----------------------------------------------------------- parts packs
+
+  packs() {
+    return read().packs ?? [];
+  },
+
+  savePack(pack) {
+    const data = read();
+    data.packs = (data.packs ?? []).filter((entry) => entry.id !== pack.id);
+    data.packs.unshift({ ...pack, at: Date.now() });
+    return write(data);
+  },
+
+  deletePack(id) {
+    const data = read();
+    data.packs = (data.packs ?? []).filter((entry) => entry.id !== id);
+    write(data);
+  },
+
   renameMachine(id, name) {
     const data = read();
     const entry = data.machines?.find((m) => m.id === id);

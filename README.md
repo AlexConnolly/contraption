@@ -467,7 +467,7 @@ src/ui/          design tokens, front end (title, challenges, garage,
 
 ## Tests
 
-`npm test` runs 313 tests. The pure logic (orientations, grid placement, body
+`npm test` runs 953 tests. The pure logic (orientations, grid placement, body
 grouping, key bindings, objectives) is covered directly. On top of that,
 `tests/physics.test.js` builds real machines in a real Rapier world and asserts
 they behave — a rover drives, reverses and steers the correct way; an
@@ -562,6 +562,23 @@ because Node loads it without needing experimental flags.
 `vite.config.js` excludes Rapier from dependency pre-bundling. Without that the
 dev server makes a second copy of the wasm-bindgen glue, only one copy holds
 the wasm memory views, and every physics call through the other one throws.
+
+## Parts packs
+
+Anybody can add parts without writing code. A pack is JSON: a name, and a list
+of parts that each pick one of the game's eight behaviours and supply their own
+numbers — which is enough to rebuild every part the game ships, and a good deal
+it does not. Main menu → **Parts**. The editor shows what the game made of the
+pack as you type, every number as it will really be used, and a `CTPK1…` code
+sends it to somebody else.
+
+Nothing in a pack runs. It cannot bring a mesh or a ninth behaviour, it cannot
+shadow a shipped part, and it does not get out of a level's bans — those read a
+part's behaviour rather than its name, so a pack rotor is flight because it
+pushes. A run using pack parts is played and won as normal but is not recorded,
+the same line custom levels are on.
+
+The format, field by field, is in [docs/PARTS-PACKS.md](docs/PARTS-PACKS.md).
 
 ## Adding to it
 

@@ -1,5 +1,5 @@
 import {
-  CATEGORIES, partsInCategory, getPart, pistonStroke, separationPush, workingAxis,
+  CATEGORIES, partsInCategory, getPart, findPart, pistonStroke, separationPush, workingAxis,
   jointTension, springStiffness, springDamping, springTravel,
   servoAngleA, servoAngleB, servoSpeed, turntableRecentres,
   turntableSpin, turntableTorque, CELL, CELL_VOLUME,
@@ -9,6 +9,9 @@ import { estimateGains, firstController, controllerOf } from '../sim/flight.js';
 import { renderPart, renderMachine } from './thumbnails.js';
 import { store } from './progress.js';
 import { bannedParts, banFor } from '../challenges/bans.js';
+
+// Said instead of a best time when the machine has pack parts on it.
+const MODDED = '<span>Pack parts &middot; <strong>not on the board</strong></span>';
 
 const HELP = {
   studio: [
@@ -890,19 +893,19 @@ export class Hud {
    * better. Same card, because it is the same moment — you are being told how
    * you did and offered the next thing.
    */
-  showScore(level, report, cost, blueprint, next) {
+  showScore(level, report, cost, blueprint, next, { modded = false } = {}) {
     const dom = this.dom;
     dom.winKicker.textContent = 'Time up';
     dom.winTitle.textContent = level.name;
     dom.winClock.textContent = String(report.score ?? 0);
     const best = store.result(level.id)?.bestScore;
-    const record = best === undefined || (report.score ?? 0) >= best;
+    const record = !modded && (best === undefined || (report.score ?? 0) >= best);
     dom.winClock.classList.toggle('beat', record);
     dom.winStats.innerHTML = [
       `<span>${report.scoreLabel ?? 'Score'}</span>`,
       `<span>Cost <strong>${cost}</strong></span>`,
-      record ? '<span class="beat"><strong>Personal best</strong></span>'
-        : `<span>Best <strong>${best}</strong></span>`,
+      modded ? MODDED : (record ? '<span class="beat"><strong>Personal best</strong></span>'
+        : `<span>Best <strong>${best}</strong></span>`),
     ].join('');
     this.renderRig(blueprint);
     dom.winNext.textContent = next ? 'Play next challenge' : 'Back to challenges';
@@ -910,7 +913,7 @@ export class Hud {
     dom.winNext.focus();
   }
 
-  showWin(level, report, cost, blueprint, next) {
+  showWin(level, report, cost, blueprint, next, { modded = false } = {}) {
     const dom = this.dom;
     dom.winTitle.textContent = level.name;
 
@@ -919,13 +922,14 @@ export class Hud {
     dom.winClock.classList.toggle('beat', Boolean(beatPar));
 
     const best = store.result(level.id)?.best;
-    const record = best !== undefined && report.elapsed <= best + 1e-6;
+    const record = !modded && best !== undefined && report.elapsed <= best + 1e-6;
     dom.winStats.innerHTML = [
       level.par ? `<span${beatPar ? ' class="beat"' : ''}>Par <strong>${level.par}s</strong></span>` : '',
       `<span>Cost <strong>${cost}</strong></span>`,
       `<span>Parts <strong>${blueprint?.size ?? 0}</strong></span>`,
-      record ? '<span class="beat"><strong>Personal best</strong></span>'
-        : (best !== undefined ? `<span>Best <strong>${best.toFixed(1)}s</strong></span>` : ''),
+      modded ? MODDED
+        : (record ? '<span class="beat"><strong>Personal best</strong></span>'
+          : (best !== undefined ? `<span>Best <strong>${best.toFixed(1)}s</strong></span>` : '')),
     ].filter(Boolean).join('');
 
     this.renderRig(blueprint);
@@ -946,8 +950,8 @@ export class Hud {
     this.dom.winRig.hidden = counts.size === 0;
     const ordered = [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
     for (const [type, count] of ordered) {
-      const part = getPart(type);
-      list.append(el('li', null, `${count} x ${part.name}`));
+      const part = findPart(type);
+      list.append(el('li', null, `${count} x ${part?.name ?? 'a part you no longer have'}`));
     }
   }
 

@@ -2,10 +2,17 @@ import './menu.css';
 import { LEVELS, tierOf, tier } from '../challenges/levels.js';
 import { bansOn } from '../challenges/bans.js';
 import { store } from './progress.js';
-import { levelThumb, renderMachine } from './thumbnails.js';
+import { levelThumb, renderMachine, renderPart } from './thumbnails.js';
 import { Blueprint } from '../core/blueprint.js';
 import { customLevels, deleteCustomLevel } from '../challenges/custom.js';
 import { toShareCode, fromShareCode } from '../challenges/format.js';
+import {
+  installPack, installPackCode, removePack, installedPacks,
+} from '../parts/installed.js';
+import {
+  sanitisePack, packProblems, packChanges, toPackCode, blankPack, EXAMPLE_PACK,
+  ACTUATOR_KINDS,
+} from '../parts/packs.js';
 
 const SVG = {
   play: '<path d="M8 5v14l11-7z" fill="currentColor"/>',
@@ -111,6 +118,8 @@ export class FrontEnd {
     if (screen === 'challenges') this.renderChallenges();
     if (screen === 'garage') this.renderGarage();
     if (screen === 'build') this.renderBuild();
+    if (screen === 'parts') this.renderParts();
+    if (screen === 'pack') this.renderPackEditor();
     if (screen === 'settings') this.renderSettings();
   }
 
@@ -163,6 +172,17 @@ export class FrontEnd {
         glyph: 'build',
         meta: `${customLevels().length} of your own`,
         go: () => this.show('build'),
+      },
+      {
+        label: 'Parts',
+        glyph: 'cog',
+        meta: (() => {
+          const packs = installedPacks();
+          const parts = packs.reduce((n, pack) => n + pack.parts.length, 0);
+          if (!packs.length) return 'Add your own';
+          return `${packs.length} pack${packs.length === 1 ? '' : 's'} · ${parts} parts`;
+        })(),
+        go: () => this.show('parts'),
       },
       { label: 'Settings', glyph: 'cog', meta: 'Camera · Graphics', go: () => this.show('settings') },
       { label: 'Exit', glyph: 'exit', meta: '', exit: true, go: () => this.h.onExit() },
@@ -480,6 +500,209 @@ export class FrontEnd {
     card.append(shot, meat);
     card.addEventListener('click', () => this.h.onBuildLevel(level));
     return card;
+  }
+
+  // ------------------------------------------------------------------ parts
+
+  /**
+   * Parts somebody else made.
+   *
+   * A pack is data — a name, some numbers, and one of the behaviours the game
+   * already has. It cannot bring code with it, which is why a pack can be
+   * pasted in from a stranger, and why everything here is written as JSON
+   * rather than as a language.
+   */
+  renderParts() {
+    this.backBar('Parts');
+    const packs = installedPacks();
+    const parts = packs.reduce((n, pack) => n + pack.parts.length, 0);
+    this.top.append(el('div', 'fe-pill', `<b>${parts}</b> extra parts`));
+
+    const sheet = el('div', 'fe-sheet');
+    sheet.append(el('div', 'fe-head', '<h2>Parts packs</h2><p>New parts, written as numbers rather than as code. A pack can build anything the parts in the box are &mdash; a heavier wheel, a longer ram, a rotor that lifts three times as much &mdash; and nothing in one ever runs.</p>'));
+
+    const grid = el('div', 'fe-grid');
+
+    const add = el('button', 'fe-card add', `${icon('plus', 26)}<span>Write a pack</span>`);
+    add.addEventListener('click', () => this.editPack(blankPack()));
+    grid.append(add);
+
+    const paste = el('button', 'fe-card add', `${icon('back', 22)}<span>Open a pack code</span>`);
+    paste.addEventListener('click', async () => {
+      const code = prompt('Paste a pack code');
+      if (!code) return;
+      const result = await installPackCode(code);
+      this.h.onToast?.(result.ok ? `${result.pack.name} installed` : result.reason, !result.ok);
+      if (result.ok) this.show('parts');
+    });
+    grid.append(paste);
+
+    const sample = el('button', 'fe-card add', `${icon('build', 22)}<span>Look at the example</span>`);
+    sample.addEventListener('click', () => this.editPack(EXAMPLE_PACK));
+    grid.append(sample);
+
+    for (const pack of packs) grid.append(this.packCard(pack));
+    sheet.append(grid);
+
+    if (packs.length === 0) {
+      sheet.append(el('p', 'fe-empty', 'No packs installed. Open the example to see what one looks like, then change the numbers.'));
+    }
+    this.body.append(sheet);
+  }
+
+  packCard(pack) {
+    const card = el('div', 'fe-card');
+    const strip = el('div', 'fe-strip');
+    for (const part of pack.parts.slice(0, 6)) {
+      const chip = el('div', 'fe-chip');
+      const image = document.createElement('img');
+      image.alt = part.name;
+      try {
+        image.src = renderPart(part.id);
+      } catch {
+        chip.classList.add('blank');
+      }
+      chip.append(image, el('span', null, part.name));
+      strip.append(chip);
+    }
+    // The strip is three across; a part-filled last row would otherwise show
+    // the gaps between cells as holes in the card.
+    while (strip.children.length % 3) strip.append(el('div', 'fe-chip empty'));
+
+    const meat = el('div', 'fe-meat');
+    meat.append(
+      el('h3', null, pack.name),
+      el('p', null, pack.author ? `By ${pack.author}` : 'No author given'),
+      el('div', 'fe-facts', `<span>Parts <b>${pack.parts.length}</b></span><span>Id <b>${pack.id}</b></span>`),
+    );
+
+    const row = el('div', 'fe-row');
+    const edit = el('button', 'fe-mini', 'Edit');
+    edit.addEventListener('click', () => this.editPack(pack));
+    const share = el('button', 'fe-mini', 'Share');
+    share.addEventListener('click', async () => {
+      const code = await toPackCode(pack);
+      try {
+        await navigator.clipboard.writeText(code);
+        this.h.onToast?.('Pack code copied');
+      } catch {
+        prompt('Your pack code', code);
+      }
+    });
+    const use = el('button', 'fe-mini', 'Try it');
+    use.addEventListener('click', () => this.h.onPlay('sandbox'));
+    const remove = el('button', 'fe-mini danger', 'Remove');
+    remove.addEventListener('click', () => {
+      removePack(pack.id);
+      this.h.onToast?.(`${pack.name} removed`);
+      this.show('parts');
+    });
+    row.append(edit, share, use, remove);
+    meat.append(row);
+
+    card.append(strip, meat);
+    return card;
+  }
+
+  editPack(pack) {
+    this.draft = JSON.stringify(pack, null, 2);
+    this.show('pack');
+  }
+
+  /**
+   * Writing one. The pack goes in on the left as it was written; what the game
+   * made of it comes back on the right, with every number as it will actually
+   * be used. A pack asking for a thrust of ninety thousand is not refused, it
+   * is answered — with four hundred, which is what it is going to get.
+   */
+  renderPackEditor() {
+    const back = el('button', 'fe-back', `${icon('back', 15)} Parts`);
+    back.addEventListener('click', () => this.show('parts'));
+    this.top.append(back, el('div', 'fe-pill', '<b>Pack</b>'), el('span', 'fe-spacer'));
+
+    const sheet = el('div', 'fe-sheet');
+    sheet.append(el('div', 'fe-head', '<h2>Write a pack</h2><p>Each part picks one of the behaviours the game already has and gives it its own numbers. What it will really be is on the right.</p>'));
+
+    const split = el('div', 'fe-split');
+    const area = document.createElement('textarea');
+    area.className = 'fe-code';
+    area.id = 'pack-source';
+    area.spellcheck = false;
+    area.value = this.draft ?? '';
+    const review = el('div', 'fe-review');
+    split.append(area, review);
+    sheet.append(split);
+
+    const row = el('div', 'fe-row wide');
+    const install = el('button', 'fe-mini', 'Install');
+    const copy = el('button', 'fe-mini', 'Copy code');
+    row.append(install, copy);
+    sheet.append(row);
+    this.body.append(sheet);
+
+    let clean = null;
+    const look = () => {
+      this.draft = area.value;
+      review.innerHTML = '';
+      let parsed;
+      try {
+        parsed = JSON.parse(area.value);
+      } catch (error) {
+        clean = null;
+        review.append(el('p', 'fe-bad', `That is not valid JSON: ${error.message}`));
+        return;
+      }
+      clean = sanitisePack(parsed);
+      const problems = packProblems(clean);
+      const changes = packChanges(parsed, clean);
+      for (const problem of problems) review.append(el('p', 'fe-bad', problem));
+      if (!problems.length) {
+        review.append(el('p', 'fe-good', `${clean.name}: ${clean.parts.length} parts, nothing wrong with it.`));
+      }
+      // What was asked for and not given. Never a refusal, always a number.
+      for (const change of changes) review.append(el('p', 'fe-warn', change));
+      for (const part of clean.parts) {
+        const facts = [
+          `cost ${part.cost}`,
+          `${part.mass} kg`,
+          part.actuator ? part.actuator.kind : 'no behaviour',
+          part.look ? `drawn as ${part.look}` : 'plain block',
+        ];
+        review.append(el(
+          'div',
+          'fe-line',
+          `<b>${part.name}</b><code>${part.id}</code><span>${facts.join(' &middot; ')}</span>`,
+        ));
+      }
+      review.append(el('p', 'fe-note', `Behaviours a part can pick from: ${ACTUATOR_KINDS.join(', ')}.`));
+    };
+
+    let pending = null;
+    area.addEventListener('input', () => {
+      clearTimeout(pending);
+      pending = setTimeout(look, 200);
+    });
+    look();
+
+    install.addEventListener('click', () => {
+      if (!clean) {
+        this.h.onToast?.('Fix the JSON first', true);
+        return;
+      }
+      const result = installPack(clean);
+      this.h.onToast?.(result.ok ? `${result.pack.name} installed` : result.reason, !result.ok);
+      if (result.ok) this.show('parts');
+    });
+    copy.addEventListener('click', async () => {
+      if (!clean) return;
+      const code = await toPackCode(clean);
+      try {
+        await navigator.clipboard.writeText(code);
+        this.h.onToast?.('Pack code copied');
+      } catch {
+        prompt('Your pack code', code);
+      }
+    });
   }
 
   // --------------------------------------------------------------- settings

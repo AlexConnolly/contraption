@@ -446,7 +446,11 @@ function directionArrow(axis, colour = HINT_COLOUR.act) {
 }
 
 export function createPartMesh(part, options = {}) {
-  const build = BUILDERS[part.id] ?? shell;
+  // A part from a pack may ask to be drawn as something the game already
+  // draws. `hasOwn` because the name came from a stranger and `BUILDERS.toString`
+  // is a function too.
+  const asked = part.look && Object.hasOwn(BUILDERS, part.look) ? BUILDERS[part.look] : null;
+  const build = asked ?? BUILDERS[part.id] ?? shell;
   const object = build(part);
   object.traverse((child) => {
     if (!child.isMesh) return;

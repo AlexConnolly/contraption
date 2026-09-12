@@ -263,7 +263,7 @@ export function levelProblems(level) {
 
 const PREFIX = 'CTP1';
 
-function toBase64Url(bytes) {
+export function toBase64Url(bytes) {
   let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
   const base64 = typeof btoa === 'function'
@@ -272,7 +272,7 @@ function toBase64Url(bytes) {
   return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-function fromBase64Url(text) {
+export function fromBase64Url(text) {
   const base64 = text.replace(/-/g, '+').replace(/_/g, '/');
   if (typeof atob === 'function') {
     const binary = atob(base64);
@@ -283,7 +283,7 @@ function fromBase64Url(text) {
   return new Uint8Array(Buffer.from(base64, 'base64'));
 }
 
-async function squeeze(bytes, mode) {
+export async function squeeze(bytes, mode) {
   const Stream = mode === 'deflate' ? CompressionStream : DecompressionStream;
   if (typeof Stream !== 'function') return null;
   const stream = new Blob([bytes]).stream().pipeThrough(new Stream('deflate-raw'));
