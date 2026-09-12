@@ -230,10 +230,14 @@ export const NODE_TYPES = {
     name: 'Logic',
     group: 'logic',
     ops: Object.keys(LOGIC_OPS),
-    inputs: () => [
-      { id: 'a', name: 'A', kind: 'bool' },
-      { id: 'b', name: 'B', kind: 'bool' },
-    ],
+    // `not` has one operand. Showing it a second socket that is silently
+    // ignored is an invitation to wire something into nothing.
+    inputs: (node) => (node.config.op === 'not'
+      ? [{ id: 'a', name: 'Value', kind: 'bool' }]
+      : [
+        { id: 'a', name: 'A', kind: 'bool' },
+        { id: 'b', name: 'B', kind: 'bool' },
+      ]),
     outputs: () => [{ id: 'r', name: 'Result', kind: 'bool' }],
     evaluate: (node, inputs) => {
       const op = LOGIC_OPS[node.config.op] ?? LOGIC_OPS.and;
@@ -438,6 +442,42 @@ export function validateProgram(program, ctx) {
         problems.push(`${state.name}: a ${out.kind} is wired into a ${into.kind}`);
       }
     }
+
+    // A value that feeds nothing changes nothing. Reading three sensors into a
+    // chain of logic and stopping there is the commonest way to write a
+    // program that looks finished and does not do anything at all.
+    const feeds = new Set(state.links.map((link) => link.from.node));
+    for (const node of state.nodes) {
+      if (nodeOutputs(node, ctx).length === 0) continue;
+      if (feeds.has(node.id)) continue;
+      problems.push(`${state.name}: a ${NODE_TYPES[node.type].name} is wired to nothing`);
+    }
+
+    // Something has to drive a part or change the state, or the state is a
+    // dead stop however much is wired up inside it.
+    if (!state.nodes.some((n) => n.type === 'write' || n.type === 'goto')) {
+      problems.push(`${state.name}: nothing here drives a part or changes state`);
+    }
+  }
+
+  // States nothing can ever reach. Adding a state and never wiring a Go to it
+  // leaves it sitting there looking like part of the program.
+  const reached = new Set([program.start ?? program.states[0]?.id]);
+  let growing = true;
+  while (growing) {
+    growing = false;
+    for (const state of program.states) {
+      if (!reached.has(state.id)) continue;
+      for (const node of state.nodes) {
+        if (node.type !== 'goto' || reached.has(node.config.state)) continue;
+        if (!stateIds.has(node.config.state)) continue;
+        reached.add(node.config.state);
+        growing = true;
+      }
+    }
+  }
+  for (const state of program.states) {
+    if (!reached.has(state.id)) problems.push(`${state.name}: no Go to ever reaches this state`);
   }
   return problems;
 }
