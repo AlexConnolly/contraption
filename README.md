@@ -194,6 +194,14 @@ back — and the range runs from 12 Nm, which stalls a loaded boom outright, to
 1800, which is instant. That span is what takes the same part from nudging a
 flap to throwing something.
 
+A **coupling** holds like a weld until you fire it, and then is not there at
+all. It is the two-stage rocket part: build a booster, a coupling, and an upper
+stage, and `B` throws the halves apart. One shot per run — once the joint is
+gone there is nothing left to re-make it from, which is what makes it a
+coupling rather than a clamp. It reports whether it has gone yet, so a program
+can wait for the stage to clear before lighting the next motor instead of
+counting seconds and hoping.
+
 A piston's **reach** is set on the piston, anywhere from 0.4 m to 2.4 m, so a
 short jab and a long lift can sit on the same machine.
 

@@ -51,6 +51,9 @@ export function workingAxis(part, rot = IDENTITY_ORIENTATION) {
   if (part.sensor) return { axis: part.sensor.axis, kind: 'read' };
   if (part.flight) return { axis: [0, 0, 1], kind: 'read' };
   if (part.grabber) return { axis: [0, 1, 0], kind: 'act' };
+  // Which way the upper half goes when it fires. Worth seeing before you build
+  // a rocket upside down.
+  if (part.separation) return { axis: part.axis, kind: 'act' };
   if (part.joint === 'prismatic') return { axis: [0, 1, 0], kind: 'act' };
   return null;
 }
@@ -293,6 +296,38 @@ const PARTS = [
       defaultBinding: { mode: 'axis', pos: 'KeyZ', neg: 'KeyX' },
     },
     blurb: 'A motorised bearing. Stand anything on it and turn it. Set the speed and the torque.',
+  },
+  {
+    id: 'coupling',
+    ports: {
+      in: [{ id: 'release', name: 'Release', kind: 'bool' }],
+      out: [{ id: 'released', name: 'Released', kind: 'bool' }],
+    },
+    name: 'Coupling',
+    category: 'manipulator',
+    size: [1, 1, 1],
+    mass: 0.7,
+    colour: 0xe0554a,
+    cost: 3,
+    // Rigid until it is fired, and then not there at all. It is articulated so
+    // the two halves are separate bodies from the start, held by a fixed joint
+    // that is thrown away on release — turning one body into two at runtime is
+    // not something the rest of the machinery could do.
+    articulated: true,
+    joint: 'fixed',
+    axis: [0, 1, 0],
+    attach: [[0, -1, 0]],
+    carry: [[0, 1, 0]],
+    // Letting go is not enough. A stage that is merely released settles back
+    // onto the one below it and rides along; a real separation is pushed.
+    separation: 2.6,
+    actuator: {
+      kind: 'release',
+      port: 'release',
+      signal: 'hold',
+      defaultBinding: { mode: 'hold', pos: 'KeyB' },
+    },
+    blurb: 'Holds like a weld until you fire it, then throws the two halves apart. One shot.',
   },
   {
     id: 'piston',

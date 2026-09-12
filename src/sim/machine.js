@@ -161,7 +161,13 @@ export class Machine {
       const child = this.bodies[spec.childBody];
 
       let params;
-      if (spec.type === 'prismatic') {
+      if (spec.type === 'fixed') {
+        // No axis and no freedom: a weld, until somebody throws it away.
+        params = RAPIER.JointData.fixed(
+          anchor, { x: 0, y: 0, z: 0, w: 1 },
+          anchor, { x: 0, y: 0, z: 0, w: 1 },
+        );
+      } else if (spec.type === 'prismatic') {
         params = RAPIER.JointData.prismatic(anchor, anchor, axis);
         params.limitsEnabled = true;
         params.limits = [0, pistonStroke(placed, part)];
@@ -493,11 +499,48 @@ export class Machine {
         case 'grab':
           this.updateGrab(actuator, signal);
           break;
+        case 'release':
+          if (signal > 0.5) this.release(actuator);
+          break;
         default:
           break;
       }
     }
     this.animate(dt);
+  }
+
+  /**
+   * Throws the joint away and pushes the two halves apart.
+   *
+   * One way. Once the joint is gone there is nothing left to re-make it from,
+   * and that is the part behaving as a coupling rather than as a clamp: you
+   * get one separation per run, and a respawn is how you get another.
+   *
+   * The push is split between the halves in inverse proportion to their mass,
+   * so a heavy booster shoving off a light upper stage sends the light one
+   * away rather than shunting itself backwards — which is what actually
+   * happens, and what makes it read as a separation rather than a shrug.
+   */
+  release(actuator) {
+    const entry = this.joints.find((j) => j.partId === actuator.placed.id);
+    if (!entry || entry.released) return;
+    entry.released = true;
+    this.world.removeImpulseJoint(entry.joint, true);
+
+    const push = actuator.part.separation ?? 0;
+    if (push <= 0) return;
+    const dir = this.partWorldAxis(actuator.placed, actuator.part.axis).normalize();
+    const up = entry.child;
+    const down = entry.host;
+    const share = up.mass() * down.mass() / (up.mass() + down.mass());
+    up.applyImpulse({ x: dir.x * push * share, y: dir.y * push * share, z: dir.z * push * share }, true);
+    down.applyImpulse({ x: -dir.x * push * share, y: -dir.y * push * share, z: -dir.z * push * share }, true);
+  }
+
+  /** Which body a given part ended up in, once the machine was built. */
+  bodyOf(partId) {
+    const index = this.grouping.bodies.findIndex((group) => group.members.includes(partId));
+    return index >= 0 ? this.bodies[index] : null;
   }
 
   applyThrust(actuator, signal) {

@@ -73,6 +73,26 @@ function wedgeGeometry(part) {
 }
 
 const BUILDERS = {
+  // Two collars with a band between them: it reads as a thing that comes
+  // apart, and the seam shows where.
+  coupling(part) {
+    const group = new THREE.Group();
+    for (const y of [-CELL * 0.28, CELL * 0.28]) {
+      const collar = new THREE.Mesh(
+        new THREE.CylinderGeometry(CELL * 0.38, CELL * 0.38, CELL * 0.3, 16),
+        material(part.colour),
+      );
+      collar.position.y = y;
+      group.add(collar);
+    }
+    const band = new THREE.Mesh(
+      new THREE.CylinderGeometry(CELL * 0.26, CELL * 0.26, CELL * 0.3, 16),
+      material(0x2b2f36, { metalness: 0.7, roughness: 0.3 }),
+    );
+    group.add(band);
+    return group;
+  },
+
   wedge(part) {
     const mesh = new THREE.Mesh(wedgeGeometry(part), material(part.colour));
     mesh.add(new THREE.LineSegments(

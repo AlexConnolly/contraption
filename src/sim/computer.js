@@ -134,6 +134,15 @@ const READERS = {
     },
   },
 
+  coupling: {
+    // So a program can wait for the stage to be gone before it lights the next
+    // motor, rather than counting seconds and hoping.
+    released: (machine, placed) => {
+      const entry = machine.joints.find((j) => j.partId === placed.id);
+      return entry ? Boolean(entry.released) : false;
+    },
+  },
+
   hinge: {
     angle: (machine, placed) => {
       const arm = machine.partWorldAxis(placed, [0, 1, 0]);
