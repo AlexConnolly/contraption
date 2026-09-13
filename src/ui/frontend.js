@@ -2,6 +2,7 @@ import './menu.css';
 import { LEVELS, tierOf, tier } from '../challenges/levels.js';
 import { bansOn } from '../challenges/bans.js';
 import { store } from './progress.js';
+import { centreOfMass } from './hud.js';
 import { levelThumb, renderMachine, renderPart } from './thumbnails.js';
 import { Blueprint } from '../core/blueprint.js';
 import { customLevels, deleteCustomLevel } from '../challenges/custom.js';
@@ -34,6 +35,49 @@ function el(tag, className, html) {
   if (className) node.className = className;
   if (html !== undefined) node.innerHTML = html;
   return node;
+}
+
+
+/**
+ * Where the weight sits, drawn twice: from above for the side-to-side and
+ * fore-and-aft of it, and from the side for how high it is carried. Drawn
+ * from the blueprint rather than marked on the thumbnail, so it is right for
+ * machines saved long before this existed.
+ */
+function balanceChart(blueprint) {
+  const com = centreOfMass(blueprint);
+  if (!com) return null;
+  const W = 96;
+  const H = 54;
+  const pad = 5;
+  // The machine's own box, drawn to fit, with the dot placed as a fraction of
+  // it so a long machine and a short one read the same way.
+  const plan = (across, along) => [
+    pad + ((across + 0.5) * (W / 2 - pad * 2)) + (W / 4 - (W / 2 - pad * 2) / 2),
+    pad + ((along + 0.5) * (H - pad * 2)),
+  ];
+  const x = Math.max(-0.48, Math.min(0.48, com.right / (com.width || 1)));
+  const z = Math.max(-0.48, Math.min(0.48, -com.forward / (com.depth || 1)));
+  const up = Math.max(0.02, Math.min(0.98, com.above / (com.height || 1)));
+  const [px, py] = plan(x, z);
+  const sideX = W * 0.75;
+  const sideY = H - pad - up * (H - pad * 2);
+
+  const say = (n) => `${n >= 0 ? '+' : '−'}${Math.abs(n).toFixed(2)}`;
+  const el2 = el('div', 'fe-balance');
+  el2.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" aria-hidden="true">
+      <rect x="${pad}" y="${pad}" width="${W / 2 - pad * 2}" height="${H - pad * 2}"/>
+      <line x1="${pad + (W / 2 - pad * 2) / 2}" y1="${pad}" x2="${pad + (W / 2 - pad * 2) / 2}" y2="${H - pad}"/>
+      <line x1="${pad}" y1="${H / 2}" x2="${W / 2 - pad}" y2="${H / 2}"/>
+      <circle cx="${px}" cy="${py}" r="4"/>
+      <rect x="${W / 2 + pad}" y="${pad}" width="${W / 2 - pad * 2}" height="${H - pad * 2}"/>
+      <line x1="${W / 2 + pad}" y1="${H - pad}" x2="${W - pad}" y2="${H - pad}" class="ground"/>
+      <circle cx="${sideX}" cy="${sideY}" r="4"/>
+    </svg>
+    <span>Balance <b>${say(com.right)}</b> across &middot; <b>${say(com.forward)}</b> along
+      &middot; <b>${com.above.toFixed(2)}</b> m up</span>`;
+  return el2;
 }
 
 function seconds(value) {
@@ -369,6 +413,7 @@ export class FrontEnd {
     image.alt = '';
     image.src = machine.thumb ?? renderMachine(blueprint);
     shot.append(image);
+    const balance = balanceChart(blueprint);
 
     const facts = el('div', 'fe-facts');
     facts.append(
@@ -378,6 +423,7 @@ export class FrontEnd {
 
     const meat = el('div', 'fe-meat');
     meat.append(el('h3', null, machine.name), facts);
+    if (balance) meat.append(balance);
 
     const row = el('div', 'fe-row');
     const open = el('button', 'fe-mini', 'Open');

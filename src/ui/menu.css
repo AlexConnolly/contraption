@@ -544,3 +544,18 @@
 }
 .fe-warn { margin: 0; font-size: 12px; color: var(--amber); }
 .fe-chip.empty { background: #0b1018; }
+
+/* Where the weight sits: from above on the left, from the side on the right. */
+.fe-balance { display: grid; gap: 5px; }
+.fe-balance svg { width: 100%; max-width: 150px; height: auto; }
+.fe-balance rect { fill: rgba(255, 255, 255, .03); stroke: var(--edge); stroke-width: 1; }
+.fe-balance line { stroke: var(--edge); stroke-width: 1; }
+.fe-balance line.ground { stroke: var(--faint); }
+.fe-balance circle { fill: var(--amber); }
+.fe-balance span {
+  font-size: 10.5px;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+}
+.fe-balance b { color: var(--text); font-weight: 500; }

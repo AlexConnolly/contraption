@@ -178,6 +178,16 @@ const COUNTS = {
 };
 
 const CHECKS = {
+  /**
+   * A run you win by outlasting rather than by finishing anything.
+   *
+   * Every other objective in the game is a job. This one is the absence of a
+   * failure: the course acts, and the machine is still standing at the end of
+   * it. Only useful alongside a way to lose, which is what makes it new.
+   */
+  survived(objective, level, ctx, elapsed) {
+    return elapsed >= (objective.seconds ?? 30);
+  },
   propInZone(objective, level, ctx) {
     const zone = level.zones.find((z) => z.id === objective.zone);
     return inZone(ctx.propPosition(objective.prop), zone);
@@ -229,6 +239,19 @@ const CHECKS = {
   },
 };
 
+/**
+ * How far along a single objective is, as a fraction. A survival objective
+ * measures against the clock; everything else against its hold, if it has one.
+ */
+function progressOf(entry, elapsed) {
+  const { objective } = entry;
+  if (objective.type === 'survived') {
+    return Math.min(1, elapsed / (objective.seconds ?? 30));
+  }
+  if (objective.hold) return entry.held / objective.hold;
+  return Number(entry.done);
+}
+
 export function describeObjective(objective) {
   return objective.label ?? objective.type;
 }
@@ -268,7 +291,7 @@ export class ObjectiveTracker {
       const check = CHECKS[entry.objective.type];
       const satisfied = counter
         ? entry.count >= entry.of && entry.of > 0
-        : Boolean(check && check(entry.objective, this.level, ctx));
+        : Boolean(check && check(entry.objective, this.level, ctx, this.elapsed));
       const hold = entry.objective.hold ?? 0;
       if (satisfied) {
         entry.held = Math.min(hold, entry.held + dt);
@@ -302,7 +325,7 @@ export class ObjectiveTracker {
         of: entry.of,
         progress: entry.of
           ? entry.count / entry.of
-          : (entry.objective.hold ? entry.held / entry.objective.hold : Number(entry.done)),
+          : progressOf(entry, this.elapsed),
       })),
     };
   }
@@ -335,6 +358,24 @@ export function withinBudget(blueprint, level) {
  * Checked while building, like the parts budget and unlike the mass cap. Being
  * told the machine is too tall as the run starts is being told too late.
  */
+/**
+ * A load that has hit the floor, or null if they are all still up.
+ *
+ * The line is where a ball resting on the ground would sit, not where a
+ * careful player would like to hold one: caught low is still caught. Only
+ * loads that are actually in play are looked at, because the rest are still in
+ * the cannon and a level that failed you for its own unfired ammunition would
+ * be unplayable.
+ */
+export function droppedLoad(level, ctx) {
+  const floor = level?.catchFloor;
+  if (!floor) return null;
+  for (const load of ctx.liveProps?.() ?? []) {
+    if (load.point && load.point.y < floor) return load.id;
+  }
+  return null;
+}
+
 export function withinHeight(blueprint, level) {
   const cap = level?.heightCap;
   if (!cap) return { ok: true };

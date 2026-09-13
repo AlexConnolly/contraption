@@ -1,7 +1,7 @@
 import {
   CATEGORIES, partsInCategory, getPart, findPart, pistonStroke, separationPush, workingAxis,
   jointTension, springStiffness, springDamping, springTravel,
-  servoAngleA, servoAngleB, servoSpeed, turntableRecentres,
+  servoAngleA, servoAngleB, servoSpeed, turntableRecentres, padMode, padDamping,
   turntableSpin, turntableTorque, CELL, CELL_VOLUME,
 } from '../parts/registry.js';
 import { BINDING_MODES, bindingLabel, keyLabel, defaultBinding } from '../sim/signals.js';
@@ -52,21 +52,50 @@ function el(tag, className, text) {
  * and each collider's own volume decides the rest. A wheel is a cylinder and a
  * wedge is half a box, so neither weighs what its cell count suggests.
  */
+export function partMass(part) {
+  const density = part.mass / CELL_VOLUME;
+  if (part.radius) return density * Math.PI * part.radius * part.radius * part.width;
+  const box = part.size.reduce((a, n) => a * n * CELL, 1);
+  return density * (part.shape === 'wedge' ? box / 2 : box);
+}
+
 export function blueprintMass(blueprint) {
   let total = 0;
-  for (const placed of blueprint.list()) {
-    const part = getPart(placed.type);
-    const density = part.mass / CELL_VOLUME;
-    let volume;
-    if (part.radius) {
-      volume = Math.PI * part.radius * part.radius * part.width;
-    } else {
-      const box = part.size.reduce((a, n) => a * n * CELL, 1);
-      volume = part.shape === 'wedge' ? box / 2 : box;
-    }
-    total += density * volume;
-  }
+  for (const placed of blueprint.list()) total += partMass(getPart(placed.type));
   return total;
+}
+
+/**
+ * Where the weight of a machine actually sits, in metres, measured against the
+ * machine rather than against the world: across and along from the middle of
+ * the box it fills, and up from the bottom of it.
+ *
+ * Those are the three numbers that decide how it behaves. Weight off to one
+ * side steers itself; weight at one end lifts the other over a bump; and
+ * weight carried high is what turns a corner into a roll, which is the one
+ * players never think to check until it happens.
+ */
+export function centreOfMass(blueprint) {
+  let total = 0;
+  const sum = [0, 0, 0];
+  for (const placed of blueprint.list()) {
+    const kg = partMass(getPart(placed.type));
+    total += kg;
+    for (let axis = 0; axis < 3; axis += 1) sum[axis] += placed.cell[axis] * CELL * kg;
+  }
+  if (total <= 0) return null;
+  const at = sum.map((n) => n / total);
+  const { min, max } = blueprint.extent();
+  const middle = [0, 1, 2].map((axis) => ((min[axis] + max[axis]) / 2) * CELL);
+  return {
+    mass: total,
+    right: at[0] - middle[0],
+    forward: at[2] - middle[2],
+    above: at[1] - min[1] * CELL,
+    height: (max[1] - min[1] + 1) * CELL,
+    width: (max[0] - min[0] + 1) * CELL,
+    depth: (max[2] - min[2] + 1) * CELL,
+  };
 }
 
 export class Hud {
@@ -365,6 +394,7 @@ export class Hud {
     if (part.positions) this.renderPositions(body, placed, part);
     if (part.spring) this.renderSpring(body, placed, part);
     if (part.spinRange) this.renderTurntable(body, placed, part);
+    if (part.id === 'pressure') this.renderPad(body, placed, part);
 
     const remove = el('button', 'danger', 'Delete part');
     remove.style.width = '100%';
@@ -762,6 +792,48 @@ export class Hud {
    * stops moving afterwards, and how far it is allowed to move at all. Stiff
    * and short is a go-kart, soft and long is something that climbs.
    */
+  /**
+   * A pressure pad's two settings, which between them decide what a program
+   * downstream of it can sensibly do.
+   */
+  renderPad(body, placed, part) {
+    const row = el('div', 'row');
+    row.append(el('label', null, 'Fires'));
+    const button = el('button');
+    button.style.width = '100%';
+    const note = el('p', 'insp-blurb');
+    const say = (mode) => {
+      const once = mode === 'once';
+      button.textContent = once ? 'One shot' : 'While pressed';
+      button.classList.toggle('on', once);
+      note.textContent = once
+        ? 'A single pulse the moment something lands. What anything that toggles wants — fed a steady signal, a toggle flips every frame.'
+        : 'On for as long as something is on it. What anything you want held open wants.';
+    };
+    button.addEventListener('click', () => {
+      const mode = padMode(placed, part) === 'once' ? 'while' : 'once';
+      this.h.onConfigChange(placed.id, { mode });
+      say(mode);
+    });
+    say(padMode(placed, part));
+    row.append(button);
+    body.append(row, note);
+
+    const dampNote = el('p', 'insp-blurb');
+    const sayDamp = (v) => {
+      dampNote.textContent = v < 0.05
+        ? 'No damping. A load that bounces will read as several separate landings.'
+        : `${v.toFixed(2)} s — rides out a bounce, and holds a one-shot pulse open that long.`;
+    };
+    this.renderSlider(
+      body, 'Damping', padDamping(placed, part),
+      part.dampingRange[0], part.dampingRange[1], 0.05,
+      (value) => { this.h.onConfigChange(placed.id, { damping: value }); sayDamp(value); },
+    );
+    sayDamp(padDamping(placed, part));
+    body.append(dampNote);
+  }
+
   renderSpring(body, placed, part) {
     const stiffNote = el('p', 'insp-blurb');
     const sayStiff = (v) => {

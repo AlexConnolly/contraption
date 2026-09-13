@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {
   getPart, partDensity, pistonStroke, separationPush, jointTension, jointFlip,
   servoAngleA, servoAngleB, servoSpeed, shortestTurn, turntableRecentres,
-  springTravel, springStiffness, springDamping,
+  springTravel, springStiffness, springDamping, padMode, padDamping,
   turntableSpin, turntableTorque, CELL,
 } from '../parts/registry.js';
 import { PISTON_ROD_TOP, PISTON_REST, wedgeCorners } from '../parts/geometry.js';
@@ -85,6 +85,9 @@ export class Machine {
     this.controllers = [];
     this.computers = [];
     this.sensorReadings = new Map();
+    this.colliderOfPart = new Map();
+    this.padState = new Map();
+    this.pads = [];
     this.grabs = new Map();
     this.events = [];
     this.partMeshes = new Map();
@@ -164,7 +167,13 @@ export class Machine {
       .setFriction(part.friction ?? 0.85)
       .setRestitution(0.04)
       .setCollisionGroups(GROUP_MACHINE);
-    this.colliders.push(world.createCollider(desc, body));
+    const made = world.createCollider(desc, body);
+    this.colliders.push(made);
+    this.colliderOfPart.set(placed.id, made);
+    if (part.id === 'pressure') {
+      this.pads.push(placed);
+      this.padState.set(placed.id, { pressed: false, quiet: 0, pulse: 0 });
+    }
 
     const mesh = createPartMesh(part);
     mesh.position.copy(local);
@@ -351,6 +360,62 @@ export class Machine {
    * Broad-phase pairs include things that are merely near, so each pair is
    * checked for a contact point that has actually closed.
    */
+  /**
+   * Pressure pads: which of them has something resting on it.
+   *
+   * Machine parts do not collide with each other, so anything touching a pad's
+   * collider at all came from the world. Damping keeps a landing from reading
+   * as a dozen separate touches while it bounces, and a one-shot pad turns the
+   * first of those touches into a single pulse.
+   */
+  updatePads(dt) {
+    for (const placed of this.pads) {
+      const state = this.padState.get(placed.id);
+      const collider = this.colliderOfPart.get(placed.id);
+      const damping = padDamping(placed);
+      const touching = collider ? this.touchingWorld(collider) : false;
+
+      // Last step's pulse runs down before this step's is set, or a pad with
+      // no damping on it would start and finish its pulse inside one step and
+      // nothing would ever see it.
+      if (state.pulse > 0) state.pulse = Math.max(0, state.pulse - dt);
+
+      if (touching) {
+        // The rising edge, once the pad has genuinely been clear.
+        if (!state.pressed) state.pulse = Math.max(damping, dt * 1.5);
+        state.pressed = true;
+        state.quiet = 0;
+      } else if (state.pressed) {
+        state.quiet += dt;
+        if (state.quiet >= damping) state.pressed = false;
+      }
+    }
+  }
+
+  /** Whether anything from the world is touching this collider right now. */
+  touchingWorld(collider) {
+    let found = false;
+    this.world.contactPairsWith(collider, (other) => {
+      if (found || other.collisionGroups() === GROUP_MACHINE) return;
+      this.world.contactPair(collider, other, (manifold) => {
+        for (let i = 0; i < manifold.numContacts(); i += 1) {
+          if (manifold.contactDist(i) <= 0) {
+            found = true;
+            return;
+          }
+        }
+      });
+    });
+    return found;
+  }
+
+  padTriggered(partId) {
+    const placed = this.blueprint.get(partId);
+    const state = this.padState.get(partId);
+    if (!placed || !state) return false;
+    return padMode(placed) === 'once' ? state.pulse > 0 : state.pressed;
+  }
+
   contact(ignore = null) {
     let found = null;
     for (const collider of this.colliders) {
@@ -517,6 +582,7 @@ export class Machine {
     // Sensors first, so a program reads this step's world rather than the last
     // one; then the programs; then the controllers and actuators they drive.
     this.readSensors(bus);
+    this.updatePads(dt);
     for (const computer of this.computers) computer.tick(dt);
     this.updateControllers(dt, bus);
 

@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { Blueprint } from '../src/core/blueprint.js';
 import { withinHeight, buildProblem, ObjectiveTracker } from '../src/challenges/objectives.js';
 import { sanitiseLevel } from '../src/challenges/format.js';
+import { centreOfMass } from '../src/ui/hud.js';
 
 /**
  * A height cap on the machine.
@@ -178,5 +179,41 @@ describe('counting a stack', () => {
     expect(tracker.report().complete, 'the hold carried over the collapse').toBe(false);
     for (let i = 0; i < 62; i += 1) tracker.update(1 / 60, ctx(pile(4)));
     expect(tracker.report().complete).toBe(true);
+  });
+});
+
+/**
+ * Where the weight sits. Three numbers, and the one players never check until
+ * it has already tipped them over is the third.
+ */
+describe('centre of mass', () => {
+
+  const bp = (cells) => {
+    const b = new Blueprint();
+    b.place('core', [0, 0, 0]);
+    for (const [type, cell] of cells) b.place(type, cell);
+    return b;
+  };
+
+  it('is in the middle of something symmetrical', () => {
+    const even = bp([['block', [-1, 0, 0]], ['block', [1, 0, 0]]]);
+    const com = centreOfMass(even);
+    expect(Math.abs(com.right)).toBeLessThan(0.01);
+    expect(Math.abs(com.forward)).toBeLessThan(0.01);
+  });
+
+  it('leans towards the heavy end', () => {
+    const lopsided = bp([['ballast', [2, 0, 0]], ['block', [-1, 0, 0]]]);
+    expect(centreOfMass(lopsided).right).toBeGreaterThan(0);
+  });
+
+  it('rises when the weight goes up, which is the number that tips you over', () => {
+    const low = bp([['ballast', [0, 0, 1]]]);
+    const high = bp([['block', [0, 1, 0]], ['ballast', [0, 2, 0]]]);
+    expect(centreOfMass(high).above).toBeGreaterThan(centreOfMass(low).above);
+  });
+
+  it('says nothing about nothing', () => {
+    expect(centreOfMass(new Blueprint())).toBe(null);
   });
 });

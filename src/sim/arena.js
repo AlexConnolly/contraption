@@ -84,6 +84,7 @@ export class Arena {
     this.objects = [];
     this.props = new Map();
     this.plates = new Map();
+    this.shots = [];
     this.opponents = new Map();
     this.movers = [];
     this.belts = [];
@@ -154,6 +155,7 @@ export class Arena {
     this.shuffleStarts();
     for (const prop of level.props ?? []) this.addProp(prop);
     for (const stack of level.stacks ?? []) this.addStack(stack);
+    for (const launcher of level.launchers ?? []) this.addLauncher(launcher);
     for (const mover of level.movers ?? []) this.addMover(mover);
     for (const rival of level.opponents ?? []) this.addOpponent(rival);
     for (const plate of level.plates ?? []) this.addPlate(plate);
@@ -597,6 +599,84 @@ export class Arena {
     return this.motions.get(key);
   }
 
+  /**
+   * A cannon, and the loads it has in it.
+   *
+   * Everything it will fire already exists as an ordinary prop; until its turn
+   * comes it is parked well under the course with its velocity held at zero,
+   * which keeps it out of the physics and out of the way rather than needing a
+   * body created mid-run. Firing is a teleport to the muzzle and a shove.
+   */
+  addLauncher(spec) {
+    const { scene } = this;
+    const aim = new THREE.Vector3(...spec.aim).normalize();
+    const at = new THREE.Vector3(...spec.pos);
+
+    const barrel = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.42, 0.5, 1.8, 16),
+      new THREE.MeshStandardMaterial({ color: spec.colour, roughness: 0.5, metalness: 0.45 }),
+    );
+    barrel.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), aim);
+    barrel.position.copy(at);
+    barrel.castShadow = true;
+    scene.add(barrel);
+    this.objects.push({ mesh: barrel });
+
+    const collar = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.62, 0.62, 0.3, 16),
+      new THREE.MeshStandardMaterial({ color: 0x2b323b, roughness: 0.6, metalness: 0.3 }),
+    );
+    collar.quaternion.copy(barrel.quaternion);
+    collar.position.copy(at).addScaledVector(aim, -0.5);
+    scene.add(collar);
+    this.objects.push({ mesh: collar });
+
+    const muzzle = at.clone().addScaledVector(aim, 1.1);
+    spec.balls.forEach((id, i) => {
+      this.shots.push({
+        ball: id,
+        at: spec.first + i * spec.gap,
+        muzzle,
+        velocity: aim.clone().multiplyScalar(spec.speed),
+        fired: false,
+      });
+    });
+  }
+
+  /**
+   * Holds everything still waiting its turn out of play, and fires whatever is
+   * due. A shot is one teleport and one velocity: after that it is an ordinary
+   * prop falling like any other.
+   */
+  driveShots() {
+    for (const shot of this.shots) {
+      const prop = this.props.get(shot.ball);
+      if (!prop) continue;
+      if (shot.fired) continue;
+      if (this.elapsed < shot.at) {
+        prop.body.setTranslation({ x: shot.muzzle.x, y: -60, z: shot.muzzle.z }, true);
+        prop.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+        prop.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+        continue;
+      }
+      prop.body.setTranslation(shot.muzzle, true);
+      prop.body.setLinvel(shot.velocity, true);
+      shot.fired = true;
+    }
+  }
+
+  /** Which loads are in play: fired, and not still sitting in a cannon. */
+  liveProps() {
+    if (this.shots.length === 0) return this.propStates();
+    const waiting = new Set(this.shots.filter((s) => !s.fired).map((s) => s.ball));
+    return this.propStates().filter((p) => !waiting.has(p.id));
+  }
+
+  /** How many shots are still to come, for a level that wants to say so. */
+  shotsLeft() {
+    return this.shots.filter((s) => !s.fired).length;
+  }
+
   addMover(spec) {
     const { RAPIER, world, scene } = this;
     const body = world.createRigidBody(
@@ -667,6 +747,7 @@ export class Arena {
   // is where the sensors will see it.
   step(dt) {
     this.elapsed += dt;
+    this.driveShots();
     this.driveBelts();
     this.driveOpponents();
     this.driveWind(dt);
@@ -848,6 +929,7 @@ export class Arena {
     this.objects = [];
     this.props.clear();
     this.plates.clear();
+    this.shots = [];
     this.opponents.clear();
     this.movers = [];
     this.belts = [];

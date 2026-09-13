@@ -203,6 +203,10 @@ const READERS = {
     holding: (machine, placed) => machine.grabs.has(placed.id),
   },
 
+  pressure: {
+    triggered: (machine, placed) => machine.padTriggered(placed.id),
+  },
+
   sensor: {
     distance: (machine, placed) => machine.sensorDistance(placed.id),
     tripped: (machine, placed) => machine.sensorTripped(placed.id),

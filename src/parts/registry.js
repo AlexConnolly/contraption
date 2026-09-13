@@ -133,6 +133,30 @@ export function separationPush(placed, part = getPart('coupling')) {
  * A velocity motor stops where it is left, which is right for a crane and
  * wrong for anything that has to point forwards again afterwards.
  */
+/**
+ * A pressure pad's settings.
+ *
+ * `mode` is what the output means. "while" is a level: true for as long as
+ * something is on it, which is what you want for holding a gate open. "once"
+ * is an edge: a single pulse the moment something lands, which is what you
+ * want for anything that toggles, because a toggle fed a level flips back and
+ * forth every frame it stays pressed.
+ *
+ * `damping` is how long a press outlives the thing that made it. A load that
+ * lands bounces, and a pad with no damping on it chatters on and off for the
+ * first half second — which reads as a fault rather than as a catch. It is
+ * also how long a one-shot pulse lasts, since a pulse nothing can see is no
+ * use either.
+ */
+export function padMode(placed, part = getPart('pressure')) {
+  const mode = placed?.config?.mode ?? part.config.mode;
+  return mode === 'once' ? 'once' : 'while';
+}
+
+export function padDamping(placed, part = getPart('pressure')) {
+  return clampTo(placed?.config?.damping, part.dampingRange, part.damping);
+}
+
 export function turntableRecentres(placed, part = getPart('turntable')) {
   return placed?.config?.recentre ?? part.recentre ?? false;
 }
@@ -705,6 +729,25 @@ const PARTS = [
     emits: true,
     config: { threshold: 0.5, invert: false },
     blurb: 'Looks along its face, and says how far and what. Bind a motor to it to drive itself.',
+  },
+  {
+    id: 'pressure',
+    ports: {
+      out: [{ id: 'triggered', name: 'Triggered', kind: 'bool' }],
+    },
+    name: 'Pressure Pad',
+    category: 'logic',
+    size: [1, 1, 1],
+    mass: 0.6,
+    colour: 0x4f8f7a,
+    cost: 4,
+    emits: true,
+    // Long enough to ride out the bounce of something landing on it, short
+    // enough that letting go still reads as letting go.
+    damping: 0.2,
+    dampingRange: [0, 2],
+    config: { mode: 'while', damping: 0.2 },
+    blurb: 'Knows when something is resting on it. Wire it to a computer to act on a catch.',
   },
 ];
 

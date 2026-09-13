@@ -77,3 +77,25 @@ describe('skill levels', () => {
     expect(tier('nope')).toBe(null);
   });
 });
+
+/**
+ * Two levels with the same id is a bug that hides itself: getLevel returns the
+ * first one, the second is unreachable from the grid it is drawn in, and the
+ * two of them share a saved design. It cost an afternoon once.
+ */
+describe('every level is its own level', () => {
+  it('has an id nothing else has', () => {
+    const seen = new Map();
+    const clashes = [];
+    for (const level of LEVELS) {
+      if (seen.has(level.id)) clashes.push(`${level.id}: "${seen.get(level.id)}" and "${level.name}"`);
+      seen.set(level.id, level.name);
+    }
+    expect(clashes).toEqual([]);
+  });
+
+  it('has a name nothing else has either', () => {
+    const names = LEVELS.map((l) => l.name);
+    expect(names.length).toBe(new Set(names).size);
+  });
+});

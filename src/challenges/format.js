@@ -27,6 +27,7 @@ export const LIMITS = {
   zones: 12,
   keepout: 12,
   plates: 12,
+  launchers: 8,
   objectives: 8,
   chars: 64 * 1024,
   bytes: 512 * 1024,
@@ -35,13 +36,24 @@ export const LIMITS = {
 const BANS = ['flight', 'wheels', 'grabber', 'coupling'];
 const OBJECTIVE_TYPES = [
   'propInZone', 'coreInZone', 'propsInZone', 'propThroughHoop', 'platePressed',
-  'propsStacked',
+  'propsStacked', 'survived',
 ];
 
 // The world is a box. Nothing a level describes may sit outside it, however
 // enthusiastic the person who built it was.
 const REACH = 200;
 const HIGH = 120;
+
+// A direction, guaranteed to point somewhere. Not normalised — the launcher
+// scales it by its own speed — but never all zeroes.
+function unitish(value, fallback) {
+  if (!Array.isArray(value) || value.length !== 3) return [...fallback];
+  const out = value.map((n) => {
+    const v = Number(n);
+    return Number.isFinite(v) ? Math.max(-1, Math.min(1, v)) : 0;
+  });
+  return out.some((n) => n !== 0) ? out : [...fallback];
+}
 
 function clamp(value, low, high, fallback = 0) {
   const n = Number(value);
@@ -120,6 +132,26 @@ export function sanitiseLevel(input, { id } = {}) {
     tag: Number.isInteger(Number(p?.tag)) ? clamp(p.tag, 0, 9, 0) : 0,
   }));
 
+  /**
+   * Cannons. A launcher owns its own barrel and its own schedule: where it
+   * sits, which way it points, how hard it throws, which loads it has in it
+   * and when each one goes.
+   */
+  const propIds = new Set(props.map((p) => p.id));
+  const launchers = list(raw.launchers, LIMITS.launchers).map((l, i) => ({
+    id: slug(l?.id) || `launcher-${i}`,
+    pos: vec(l?.pos, [0, 1.5, 10]),
+    // A launcher pointed nowhere would drop its load on its own foot.
+    aim: unitish(l?.aim, [0, 0.5, -1]),
+    speed: clamp(l?.speed, 1, 60, 12),
+    // Ammunition it has not got would leave the level unwinnable and nothing
+    // on screen to say why.
+    balls: list(l?.balls, LIMITS.props).map((b) => slug(b)).filter((b) => propIds.has(b)),
+    first: clamp(l?.first, 0, 600, 3),
+    gap: clamp(l?.gap, 0.2, 120, 3),
+    colour: colour(l?.colour, 0x555f6b),
+  }));
+
   const zones = list(raw.zones, LIMITS.zones).map((z, i) => ({
     id: slug(z?.id) || `zone-${i}`,
     pos: vec(z?.pos, [0, 1, 0]),
@@ -162,6 +194,7 @@ export function sanitiseLevel(input, { id } = {}) {
       if (o.plate) out.plate = slug(o.plate);
       if (o.count !== undefined) out.count = Math.round(clamp(o.count, 1, 40, 3));
       if (o.rise !== undefined) out.rise = clamp(o.rise, 0.2, 5, 1);
+      if (o.seconds !== undefined) out.seconds = clamp(o.seconds, 1, 900, 30);
       return out;
     });
 
@@ -184,6 +217,7 @@ export function sanitiseLevel(input, { id } = {}) {
     }),
     props,
     plates,
+    launchers,
     zones,
     keepout: list(raw.keepout, LIMITS.keepout).map((k, i) => ({
       id: slug(k?.id) || `keepout-${i}`,
@@ -215,6 +249,9 @@ export function sanitiseLevel(input, { id } = {}) {
   // A hard clock, as against par, which is only a target. Run out of it and
   // the run is failed, so the answer has to be quick as well as correct.
   if (Number.isFinite(Number(raw.deadline))) level.deadline = clamp(raw.deadline, 1, 3600, 60);
+  if (Number.isFinite(Number(raw.catchFloor))) {
+    level.catchFloor = clamp(raw.catchFloor, 0, 40, 0.6);
+  }
   if (Number.isFinite(Number(raw.massCap))) level.massCap = clamp(raw.massCap, 1, 5000, 50);
   // In cells, because that is what a player counts as they build.
   if (Number.isFinite(Number(raw.heightCap))) {

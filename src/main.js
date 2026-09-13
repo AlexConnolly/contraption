@@ -15,7 +15,7 @@ import { controllerOf, firstController } from './sim/flight.js';
 import { getPart, findPart } from './parts/registry.js';
 import { loadPacks, usesPacks } from './parts/installed.js';
 import {
-  ObjectiveTracker, withinMassCap, breachedBy, buildProblem,
+  ObjectiveTracker, withinMassCap, breachedBy, buildProblem, droppedLoad,
 } from './challenges/objectives.js';
 import { bannedParts, banFor, firstBanned } from './challenges/bans.js';
 import { LEVELS, nextLevel } from './challenges/levels.js';
@@ -685,10 +685,25 @@ function simulateStep() {
     propPosition: (id) => state.arena.propPosition(id),
     corePosition: () => state.machine.corePosition(),
     props: () => (props ??= state.arena.propStates()),
+    liveProps: () => state.arena.liveProps(),
     machinePoints: () => (machinePoints ??= state.machine.blueprint.list()
       .map((placed) => state.machine.partWorldPoint(placed))),
   });
   state.arena.showPlates(report.objectives);
+
+  // A course that throws things at you is lost by dropping one, which is the
+  // only failure in the game that is not about where the machine went.
+  if (!state.won && !state.crashed) {
+    const dropped = droppedLoad(state.level, {
+      liveProps: () => state.arena.liveProps(),
+    });
+    if (dropped) {
+      state.crashed = true;
+      audio.fail();
+      hud.showFailure(state.level, report, 'You dropped one');
+      return;
+    }
+  }
 
   // Some courses have to be flown without touching anything at all.
   if (state.level.noContact && !state.won && !state.crashed && state.machine.contact()) {
