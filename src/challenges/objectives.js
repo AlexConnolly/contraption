@@ -136,6 +136,39 @@ function stackIds(level, id) {
 // Checks that answer with a number rather than with yes or no. A scored level
 // is built out of these: there is nothing to complete, only a tally.
 const COUNTS = {
+  /**
+   * A tower of loads on a pad.
+   *
+   * Counts the tallest run of loads standing on the pad's footprint, each
+   * roughly one load above the one below. A run rather than a count, because
+   * four loads parked in a row on the ground is not a stack of four, and a
+   * tower with a hole in the middle of it is two short towers.
+   *
+   * Nothing here is remembered: knock the tower over and the count falls with
+   * it, which is what makes the last load the hard one.
+   */
+  propsStacked(objective, level, ctx) {
+    const want = objective.count ?? 3;
+    const zone = (level.zones ?? []).find((z) => z.id === objective.zone);
+    if (!zone) return { count: 0, of: want };
+    const rise = objective.rise ?? 1;
+    const half = [zone.size[0] / 2, zone.size[2] / 2];
+    const column = (ctx.props?.() ?? [])
+      .filter((p) => p.point
+        && Math.abs(p.point.x - zone.pos[0]) <= half[0]
+        && Math.abs(p.point.z - zone.pos[2]) <= half[1])
+      .map((p) => p.point.y)
+      .sort((a, b) => a - b);
+
+    let best = column.length ? 1 : 0;
+    let run = 1;
+    for (let i = 1; i < column.length; i += 1) {
+      const gap = column[i] - column[i - 1];
+      run = gap > rise * 0.55 && gap < rise * 1.35 ? run + 1 : 1;
+      best = Math.max(best, run);
+    }
+    return { count: Math.min(best, want), of: want };
+  },
   propsInZone(objective, level, ctx) {
     const zone = level.zones.find((z) => z.id === objective.zone);
     const ids = objective.props ?? stackIds(level, objective.stack);
@@ -291,6 +324,32 @@ export function withinBudget(blueprint, level) {
 }
 
 /**
+ * Whether a machine is inside a level's height cap.
+ *
+ * Measured on the machine as built, in cells, and deliberately never on the
+ * machine as it runs. That is the whole of the mechanic: a cap you could not
+ * exceed at runtime would only be a shorter machine, but a cap on what you may
+ * assemble leaves the height to come from somewhere else -- a mast that
+ * telescopes, an arm that unfolds, a tower built lying down and stood up.
+ *
+ * Checked while building, like the parts budget and unlike the mass cap. Being
+ * told the machine is too tall as the run starts is being told too late.
+ */
+export function withinHeight(blueprint, level) {
+  const cap = level?.heightCap;
+  if (!cap) return { ok: true };
+  const height = blueprint?.height() ?? 0;
+  return height <= cap
+    ? { ok: true, height, cap }
+    : {
+      ok: false,
+      height,
+      cap,
+      reason: `Too tall: ${height} blocks of ${cap}`,
+    };
+}
+
+/**
  * Why this machine cannot be run on this level, or null if it can.
  *
  * This used to live inside main.js, reading module state, which meant every
@@ -307,6 +366,8 @@ export function buildProblem(blueprint, level) {
   }
   const budget = withinBudget(blueprint, level);
   if (!budget.ok) return budget.reason;
+  const height = withinHeight(blueprint, level);
+  if (!height.ok) return height.reason;
   // The palette will not let you place one, but a machine can arrive from the
   // garage or from a design saved before the level banned it.
   const broken = firstBanned(level, blueprint);

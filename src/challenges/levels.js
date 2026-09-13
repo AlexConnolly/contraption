@@ -11,6 +11,7 @@ import { JOBS } from './packs/jobs.js';
 import { QUESTIONS } from './packs/questions.js';
 import { GROUND } from './packs/ground.js';
 import { PLATES } from './packs/plates.js';
+import { STACKING } from './packs/stacking.js';
 import { EXPERT } from './packs/expert.js';
 
 /**
@@ -67,6 +68,7 @@ const PACKS = [
   ...QUESTIONS,
   ...WORLDS,
   ...PLATES,
+  ...STACKING,
   ...EXPERT,
 ];
 

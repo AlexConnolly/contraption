@@ -303,9 +303,9 @@ export class Hud {
    * way the budget does, so being over is something you see while you can
    * still do something about it.
    */
-  setBudget(cost, budget, partCount, blueprint, massCap) {
-    const over = budget && cost > budget;
-    this.dom.budget.classList.toggle('over', Boolean(over));
+  setBudget(cost, budget, partCount, blueprint, massCap, heightCap) {
+    let over = Boolean(budget && cost > budget);
+    this.dom.budget.classList.toggle('over', over);
 
     const parts = [`${partCount} parts`];
     parts.push(budget
@@ -315,8 +315,16 @@ export class Hud {
     if (massCap && blueprint) {
       const kg = blueprintMass(blueprint);
       parts.push(`mass <strong>${kg.toFixed(0)}</strong> / ${massCap} kg`);
-      this.dom.budget.classList.toggle('over', Boolean(over) || kg > massCap);
+      over = over || kg > massCap;
     }
+    // Counted as it is built, so it is something you can see going wrong while
+    // there is still time to do something about it.
+    if (heightCap && blueprint) {
+      const tall = blueprint.height();
+      parts.push(`height <strong>${tall}</strong> / ${heightCap}`);
+      over = over || tall > heightCap;
+    }
+    this.dom.budget.classList.toggle('over', over);
     this.dom.budget.innerHTML = parts.join(' · ');
   }
 

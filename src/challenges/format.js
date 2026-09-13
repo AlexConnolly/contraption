@@ -35,6 +35,7 @@ export const LIMITS = {
 const BANS = ['flight', 'wheels', 'grabber', 'coupling'];
 const OBJECTIVE_TYPES = [
   'propInZone', 'coreInZone', 'propsInZone', 'propThroughHoop', 'platePressed',
+  'propsStacked',
 ];
 
 // The world is a box. Nothing a level describes may sit outside it, however
@@ -159,6 +160,8 @@ export function sanitiseLevel(input, { id } = {}) {
       if (o.stack) out.stack = slug(o.stack);
       if (o.hoop) out.hoop = slug(o.hoop);
       if (o.plate) out.plate = slug(o.plate);
+      if (o.count !== undefined) out.count = Math.round(clamp(o.count, 1, 40, 3));
+      if (o.rise !== undefined) out.rise = clamp(o.rise, 0.2, 5, 1);
       return out;
     });
 
@@ -213,6 +216,10 @@ export function sanitiseLevel(input, { id } = {}) {
   // the run is failed, so the answer has to be quick as well as correct.
   if (Number.isFinite(Number(raw.deadline))) level.deadline = clamp(raw.deadline, 1, 3600, 60);
   if (Number.isFinite(Number(raw.massCap))) level.massCap = clamp(raw.massCap, 1, 5000, 50);
+  // In cells, because that is what a player counts as they build.
+  if (Number.isFinite(Number(raw.heightCap))) {
+    level.heightCap = Math.round(clamp(raw.heightCap, 1, 40, 4));
+  }
   if (Number.isFinite(Number(raw.gravity))) level.gravity = clamp(raw.gravity, -40, 0, -9.81);
   if (Number.isFinite(Number(raw.friction))) level.friction = clamp(raw.friction, 0, 4, 1);
   if (raw.fog) {

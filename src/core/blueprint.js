@@ -200,8 +200,14 @@ export class Blueprint {
    * that end and putting the machine down on it lands the whole thing off to
    * one side.
    */
-  extentCentre() {
-    if (this.parts.size === 0) return [0, 0, 0];
+  /**
+   * The box the machine fills, in cells: where it starts, where it ends, and
+   * how many cells across it is on each axis.
+   */
+  extent() {
+    if (this.parts.size === 0) {
+      return { min: [0, 0, 0], max: [0, 0, 0], size: [0, 0, 0] };
+    }
     const min = [Infinity, Infinity, Infinity];
     const max = [-Infinity, -Infinity, -Infinity];
     for (const placed of this.parts.values()) {
@@ -212,6 +218,17 @@ export class Blueprint {
         }
       }
     }
+    return { min, max, size: [0, 1, 2].map((axis) => max[axis] - min[axis] + 1) };
+  }
+
+  /** How many cells tall the machine is, lowest part to highest. */
+  height() {
+    return this.parts.size === 0 ? 0 : this.extent().size[1];
+  }
+
+  extentCentre() {
+    if (this.parts.size === 0) return [0, 0, 0];
+    const { min, max } = this.extent();
     return [0, 1, 2].map((axis) => (min[axis] + max[axis]) / 2);
   }
 

@@ -568,6 +568,7 @@ function refreshReadouts() {
     state.blueprint.size,
     state.blueprint,
     state.level.massCap,
+    state.level.heightCap,
   );
 }
 
