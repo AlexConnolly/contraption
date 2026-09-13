@@ -19,7 +19,26 @@ import { Computer } from './computer.js';
 import { emptyProgram } from './program.js';
 
 export const GROUP_WORLD = 0x00010003;
-export const GROUP_MACHINE = 0x00020001;
+/**
+ * Machine parts collide with the world and with other machines, but never with
+ * the rest of their own machine. The group cannot say that last part -- there
+ * are sixteen membership bits and a world may hold more machines than that --
+ * so the group opens it up to everything and `Fleet`'s contact filter puts the
+ * one exclusion back. A machine built without a fleet gets the old behaviour,
+ * because with one machine in the world the two rules are the same rule.
+ */
+export const GROUP_MACHINE = 0x00020003;
+export const GROUP_MACHINE_ALONE = 0x00020001;
+
+/**
+ * Whether a collider belongs to some machine rather than to the world. There
+ * are two machine groups now -- one for a machine on its own, one for a machine
+ * sharing a world -- so the group can no longer be compared for equality.
+ */
+export function isMachineCollider(collider) {
+  const group = collider.collisionGroups();
+  return group === GROUP_MACHINE || group === GROUP_MACHINE_ALONE;
+}
 
 const UP = new THREE.Vector3(0, 1, 0);
 const CYLINDER_TO_X = new THREE.Quaternion().setFromAxisAngle(
@@ -69,8 +88,21 @@ const SERVO_KINDS = new Set(['servo', 'spin', 'linear', 'position']);
 const POSITION_GAIN = 30;
 
 export class Machine {
-  constructor({ RAPIER, world, scene, blueprint, spawn, level }) {
+  constructor({
+    RAPIER, world, scene, blueprint, spawn, level,
+    canSleep = false, headless = false, contacts = 0,
+  }) {
     this.level = level ?? null;
+    // A machine in a challenge must never sleep: it is the only thing in the
+    // world and a parked one still has to answer the next key. A machine
+    // deployed in an open world is one of many, and a parked one should cost
+    // nothing until something touches it.
+    this.canSleep = canSleep;
+    this.headless = headless;
+    // Set on the colliders so Rapier bothers to ask the fleet's filter about
+    // them. Zero means nobody is filtering, which is the campaign.
+    this.contacts = contacts;
+    this.group = contacts ? GROUP_MACHINE : GROUP_MACHINE_ALONE;
     this.RAPIER = RAPIER;
     this.world = world;
     this.scene = scene;
@@ -118,7 +150,7 @@ export class Machine {
         .setTranslation(this.spawn.x, this.spawn.y, this.spawn.z)
         .setLinearDamping(0.05)
         .setAngularDamping(0.1)
-        .setCanSleep(false);
+        .setCanSleep(this.canSleep);
       const body = world.createRigidBody(desc);
       const object = new THREE.Group();
       this.scene.add(object);
@@ -166,7 +198,8 @@ export class Machine {
       .setDensity(partDensity(part))
       .setFriction(part.friction ?? 0.85)
       .setRestitution(0.04)
-      .setCollisionGroups(GROUP_MACHINE);
+      .setCollisionGroups(this.group);
+    if (this.contacts) desc.setActiveHooks(this.contacts);
     const made = world.createCollider(desc, body);
     this.colliders.push(made);
     this.colliderOfPart.set(placed.id, made);
@@ -396,7 +429,7 @@ export class Machine {
   touchingWorld(collider) {
     let found = false;
     this.world.contactPairsWith(collider, (other) => {
-      if (found || other.collisionGroups() === GROUP_MACHINE) return;
+      if (found || isMachineCollider(other)) return;
       this.world.contactPair(collider, other, (manifold) => {
         for (let i = 0; i < manifold.numContacts(); i += 1) {
           if (manifold.contactDist(i) <= 0) {
@@ -421,7 +454,7 @@ export class Machine {
     for (const collider of this.colliders) {
       if (found) break;
       this.world.contactPairsWith(collider, (other) => {
-        if (found || other.collisionGroups() === GROUP_MACHINE) return;
+        if (found || isMachineCollider(other)) return;
         if (ignore && other.parent()?.handle === ignore.handle) return;
         this.world.contactPair(collider, other, (manifold) => {
           for (let i = 0; i < manifold.numContacts(); i += 1) {
@@ -504,7 +537,7 @@ export class Machine {
   }
 
   notOwnMachine(collider) {
-    return collider.collisionGroups() !== GROUP_MACHINE;
+    return !isMachineCollider(collider);
   }
 
   // A sensor can be aimed off its mounting, swept round the machine's up axis,
@@ -595,12 +628,18 @@ export class Machine {
       const power = placed.config.power ?? 1;
       actuator.signal = signal;
       switch (part.actuator.kind) {
-        case 'motor':
-          joint?.configureMotorVelocity(
-            signal * driveSide(placed.rot) * part.actuator.maxSpeed * power,
-            part.actuator.maxForce,
-          );
+        case 'motor': {
+          // Configured only when the number changes. Setting a joint motor
+          // every step wakes the body every step, which is invisible with one
+          // machine and means a parked fleet never sleeps. Zero is still sent
+          // once on the way down, so letting go of the throttle still brakes.
+          const want = signal * driveSide(placed.rot) * part.actuator.maxSpeed * power;
+          if (joint && want !== actuator.lastMotor) {
+            joint.configureMotorVelocity(want, part.actuator.maxForce);
+            actuator.lastMotor = want;
+          }
           break;
+        }
         case 'servo':
           this.driveMotor(
             joint, placed, part,
