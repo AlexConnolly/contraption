@@ -43,9 +43,9 @@ export const CANNONADE = [
     name: 'Cannonade',
     brief: 'Three cannons, nine balls, one every three seconds. Drop one and the run is over.',
     hint: 'A flat deck will not do it — a ball that lands on one rolls straight off, and off is the floor. You want walls, and something soft about how it lands: a tray on a spring, or a piston you can give a little on. The cannons take turns from left to right, so you have three seconds to be somewhere else.',
-    spawn: [0, 1.2, -6],
+    spawn: [0, 1.2, 0],
     groundSize: 120,
-    budget: { cost: 160 },
+    budget: { cost: 240 },
     // Where a ball resting on the ground would sit. Caught low is still caught.
     catchFloor: 0.62,
     pieces: [
@@ -54,9 +54,11 @@ export const CANNONADE = [
       { pos: [9, 0.9, 17], size: [1.6, 1.8, 1.6], colour: DARK },
     ],
     launchers: [
-      cannon('left', -9, 0.34, 4),
-      cannon('mid', 0, 0, 4 + GAP),
-      cannon('right', 9, -0.34, 4 + GAP * 2),
+      // Six seconds before the first one: long enough to settle on the spot
+      // and creep into line, not long enough to build a second machine.
+      cannon('left', -9, 0.34, 6),
+      cannon('mid', 0, 0, 6 + GAP),
+      cannon('right', 9, -0.34, 6 + GAP * 2),
     ],
     props: [
       ball('left-1'), ball('left-2'), ball('left-3'),
@@ -65,9 +67,9 @@ export const CANNONADE = [
     ],
     zones: [],
     objectives: [
-      // Four seconds before the first shot, nine shots three apart, and a few
+      // Six seconds to settle and line up, nine shots three apart, and a few
       // seconds at the end for the last one to settle in whatever caught it.
-      { type: 'survived', seconds: 4 + GAP * 8 + 6, label: 'All nine caught and held' },
+      { type: 'survived', seconds: 6 + GAP * 8 + 6, label: 'All nine caught and held' },
     ],
     par: 40,
   },

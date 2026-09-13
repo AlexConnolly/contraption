@@ -249,6 +249,9 @@ export function sanitiseLevel(input, { id } = {}) {
   // A hard clock, as against par, which is only a target. Run out of it and
   // the run is failed, so the answer has to be quick as well as correct.
   if (Number.isFinite(Number(raw.deadline))) level.deadline = clamp(raw.deadline, 1, 3600, 60);
+  // The machine starts on the scenery rather than beside it, which is the
+  // one case where there is deliberately no clear ground at the spawn.
+  if (raw.mounted) level.mounted = true;
   if (Number.isFinite(Number(raw.catchFloor))) {
     level.catchFloor = clamp(raw.catchFloor, 0, 40, 0.6);
   }

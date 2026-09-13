@@ -13,6 +13,7 @@ import { GROUND } from './packs/ground.js';
 import { PLATES } from './packs/plates.js';
 import { STACKING } from './packs/stacking.js';
 import { CANNONADE } from './packs/cannonade.js';
+import { MONORAIL } from './packs/monorail.js';
 import { EXPERT } from './packs/expert.js';
 
 /**
@@ -71,6 +72,7 @@ const PACKS = [
   ...PLATES,
   ...STACKING,
   ...CANNONADE,
+  ...MONORAIL,
   ...EXPERT,
 ];
 

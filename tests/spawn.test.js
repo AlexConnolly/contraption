@@ -120,7 +120,41 @@ describe('every level has room to put a machine down', () => {
     return worst;
   }
 
+  /**
+   * What the rule is really protecting: a machine big enough to be worth
+   * building should not have one side of it inside a wall before you have
+   * touched the controls.
+   *
+   * A level that puts you on a rail has no clear ground at the spawn and never
+   * can have, so it is asked the question that actually matters instead --
+   * whether the thing at the spawn is something you build around or something
+   * you are stuck in. Anything over a metre across is a wall.
+   */
+  const THIN = 1;
+
+  function fattestAtSpawn(level) {
+    const [sx, , sz] = level.spawn;
+    let widest = 0;
+    for (const piece of level.pieces ?? []) {
+      const top = piece.pos[1] + piece.size[1] / 2;
+      const bottom = piece.pos[1] - piece.size[1] / 2;
+      if (top <= level.spawn[1] - 3 || bottom >= level.spawn[1] + 6) continue;
+      const dx = Math.max(0, Math.abs(sx - piece.pos[0]) - piece.size[0] / 2);
+      const dz = Math.max(0, Math.abs(sz - piece.pos[2]) - piece.size[2] / 2);
+      if (Math.max(dx, dz) >= NEEDED) continue;
+      widest = Math.max(widest, Math.min(piece.size[0], piece.size[2]));
+    }
+    return widest;
+  }
+
   for (const level of LEVELS) {
+    if (level.mounted) {
+      it(`${level.id} puts you on a rail rather than in a wall`, () => {
+        expect(fattestAtSpawn(level), `${level.id} has a wall at the spawn`)
+          .toBeLessThanOrEqual(THIN);
+      });
+      continue;
+    }
     it(`${level.id} has 30 m of open ground at the spawn`, () => {
       expect(clearance(level), `${level.id} is boxed in`).toBeGreaterThanOrEqual(NEEDED);
     });
