@@ -642,6 +642,15 @@ will sweep, the circle a turntable will turn, the line a ram will travel, the
 reach of a grabber or a sensor. The radius is measured off whatever is actually
 bolted to the far side of the joint, so a long arm draws a long arc and the
 question is answered by looking. Drag the angle slider and the arc follows it.
+The inspector says the same thing in words — `-35° to 110°`, `Pushes out
+1.80 m` — marked in the same cyan the envelope is drawn in, so the sentence and
+the shape read as one statement.
+
+A part that adds a capability must not delete a puzzle, either. Fifteen levels
+have scenery in the band the all-terrain wheel opened up — a kerb, a loading
+bay, the lip of a quarry — and `tests/no-free-lunch.test.js` drives the dumbest
+machine each one's budget allows straight at it, on both wheels, and fails if
+any of them is finished by holding W that was not before. None is.
 
 ## Layout
 
@@ -667,7 +676,7 @@ src/ui/          design tokens, front end (title, challenges, garage, worlds,
 
 ## Tests
 
-`npm test` runs 1313 tests. The pure logic (orientations, grid placement, body
+`npm test` runs 1315 tests. The pure logic (orientations, grid placement, body
 grouping, key bindings, objectives) is covered directly. On top of that,
 `tests/physics.test.js` builds real machines in a real Rapier world and asserts
 they behave — a rover drives, reverses and steers the correct way; an

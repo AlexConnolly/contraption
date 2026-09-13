@@ -9,6 +9,7 @@ import { estimateGains, firstController, controllerOf } from '../sim/flight.js';
 import { renderPart, renderMachine } from './thumbnails.js';
 import { store } from './progress.js';
 import { bannedParts, banFor } from '../challenges/bans.js';
+import { envelopeOf } from '../studio/envelope.js';
 
 // Said instead of a best time when the machine has pack parts on it.
 const MODDED = '<span>Pack parts &middot; <strong>not on the board</strong></span>';
@@ -362,6 +363,23 @@ export class Hud {
     this.dom.inspectorBody.textContent = message;
   }
 
+  /**
+   * What this part's range comes to, in words, next to the picture of it.
+   *
+   * The studio draws the arc, the circle or the line on the plate, which is
+   * the half that answers "will it clear the load". This is the other half:
+   * the same envelope as a sentence, so the number the sliders are setting is
+   * stated somewhere rather than only implied by a shape on screen.
+   */
+  renderRange(body, placed, blueprint) {
+    if (!blueprint) return;
+    const envelope = envelopeOf(blueprint, placed);
+    if (!envelope) return;
+    const row = el('div', 'insp-range');
+    row.append(el('span', 'insp-range-mark'), el('span', null, envelope.label));
+    body.append(row);
+  }
+
   renderInspector(placed, blueprint) {
     const body = this.dom.inspectorBody;
     body.className = '';
@@ -378,6 +396,7 @@ export class Hud {
     body.append(head, el('p', 'insp-blurb', part.blurb));
 
     this.renderFacing(body, placed, part);
+    this.renderRange(body, placed, blueprint);
     if (part.computer) this.renderComputer(body, placed);
     if (part.flight) this.renderController(body, placed, part, blueprint);
     if (part.actuator) this.renderBinding(body, placed, part, blueprint);

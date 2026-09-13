@@ -1219,3 +1219,28 @@ input[type="range"] { accent-color: var(--amber); }
 @media (max-width: 1180px) {
   .build-root { grid-template-columns: 190px 1fr 250px; }
 }
+
+/* What the selected part's range comes to, in words. The mark matches the
+   colour the studio draws the envelope in, so the sentence and the shape on
+   the plate read as the same statement. */
+.insp-range {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: -6px 0 12px;
+  padding: 7px 10px;
+  background: var(--cyan-dim);
+  border-left: 2px solid var(--cyan);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: .02em;
+  font-variant-numeric: tabular-nums;
+}
+.insp-range-mark {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid var(--cyan);
+  border-radius: 50%;
+}
