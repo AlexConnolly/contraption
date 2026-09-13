@@ -11,7 +11,8 @@ import { SignalBus } from '../src/sim/signals.js';
 import { createWorld, STEP } from '../src/sim/world.js';
 import { Blueprint } from '../src/core/blueprint.js';
 import { IDENTITY_ORIENTATION, yawStep } from '../src/core/orientation.js';
-import { CELL } from '../src/parts/registry.js';
+import { CELL, getPart } from '../src/parts/registry.js';
+import { createPartMesh } from '../src/parts/geometry.js';
 
 beforeAll(async () => { await RAPIER.init(); }, 30000);
 
@@ -246,4 +247,35 @@ describe('running out of rail', () => {
     expect(shut.released).toBe(false);
     expect(shut.along).toBeLessThan(open.along);
   }, 90000);
+});
+
+describe('how the two are drawn', () => {
+  /** The lowest and highest the drawn part reaches, in cells from its centre. */
+  function extent(id) {
+    const box = new THREE.Box3().setFromObject(createPartMesh(getPart(id)));
+    return { low: box.min.y / CELL, high: box.max.y / CELL };
+  }
+
+  it('puts the railhead at the top of the rail cell', () => {
+    // A rail drawn with its steel down near its own middle leaves the
+    // carriage hanging in the air above a track it is in fact sitting on.
+    expect(extent('rail').high).toBeGreaterThan(0.45);
+  });
+
+  it('puts the dolly rollers on the floor of the dolly cell', () => {
+    expect(extent('dolly').low).toBeLessThan(-0.45);
+  });
+
+  it('leaves no daylight worth seeing between the two', () => {
+    // Both colliders are full cells and are already touching, so anything
+    // more than a centimetre or two is a lie about where the parts are.
+    const gap = (0.5 - extent('rail').high) + (extent('dolly').low + 0.5);
+    expect(gap * CELL).toBeLessThan(0.04);
+  });
+
+  it('gives the dolly about as much bulk as a block', () => {
+    const dolly = extent('dolly');
+    const block = extent('block');
+    expect(dolly.high - dolly.low).toBeGreaterThan((block.high - block.low) * 0.9);
+  });
 });

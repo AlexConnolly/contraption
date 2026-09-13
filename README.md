@@ -642,6 +642,11 @@ rail too: a dolly turned one way on a rail turned another would simply refuse
 to move with nothing on screen to say why, so the rail decides and the dolly
 follows.
 
+Both colliders are full cells, so the railhead is drawn at the very top of the
+rail's cell and the dolly's rollers at the very bottom of its own — otherwise
+the carriage hangs a third of a metre in the air above a track it is in fact
+sitting on, which is what the first version did.
+
 It is a prismatic joint, which has one degree of freedom and no rotation at
 all, so a loaded gantry does not sway — measured at 6 mm of wander with a
 two-block boom on it, over five and a half metres of travel.
@@ -731,7 +736,7 @@ src/ui/          design tokens, front end (title, challenges, garage, worlds,
 
 ## Tests
 
-`npm test` runs 1352 tests. The pure logic (orientations, grid placement, body
+`npm test` runs 1356 tests. The pure logic (orientations, grid placement, body
 grouping, key bindings, objectives) is covered directly. On top of that,
 `tests/physics.test.js` builds real machines in a real Rapier world and asserts
 they behave — a rover drives, reverses and steers the correct way; an

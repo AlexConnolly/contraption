@@ -174,54 +174,67 @@ const BUILDERS = {
    * A length of track: two rails on sleepers, running along the part's +Z so
    * the direction arrow and the thing it describes agree.
    */
+  /**
+   * A length of track: ballast, sleepers and two steel rails, running along
+   * the part's +Z so the direction arrow and the thing it describes agree.
+   *
+   * The railhead sits at the very top of the cell and the dolly's rollers at
+   * the very bottom of theirs, because the two colliders are full cells and
+   * are already touching. Drawn any lower, the carriage hangs a third of a
+   * metre in the air above a track it is in fact sitting on.
+   */
   rail(part) {
     const group = new THREE.Group();
     const bed = new THREE.Mesh(
-      new THREE.BoxGeometry(CELL - INSET, CELL * 0.22, CELL),
+      new THREE.BoxGeometry(CELL - INSET, CELL * 0.3, CELL),
       material(part.colour),
     );
-    bed.position.y = -CELL * 0.26;
+    bed.position.y = -CELL * 0.32;
     group.add(bed);
-    const steel = material(0xd8dde3, { metalness: 0.55, roughness: 0.3 });
-    for (const x of [-1, 1]) {
-      const line = new THREE.Mesh(
-        new THREE.BoxGeometry(CELL * 0.12, CELL * 0.2, CELL),
-        steel,
-      );
-      line.position.set(x * CELL * 0.28, -CELL * 0.05, 0);
-      group.add(line);
-    }
     // Sleepers across, so a run of them reads as a track rather than as a
     // pair of stripes.
     for (const z of [-0.3, 0.3]) {
       const sleeper = new THREE.Mesh(
-        new THREE.BoxGeometry(CELL * 0.78, CELL * 0.1, CELL * 0.16),
+        new THREE.BoxGeometry(CELL * 0.84, CELL * 0.14, CELL * 0.18),
         material(0x4c545e),
       );
-      sleeper.position.set(0, -CELL * 0.19, z * CELL);
+      sleeper.position.set(0, -CELL * 0.11, z * CELL);
       group.add(sleeper);
+    }
+    const steel = material(0xd8dde3, { metalness: 0.55, roughness: 0.3 });
+    for (const x of [-1, 1]) {
+      const line = new THREE.Mesh(
+        new THREE.BoxGeometry(CELL * 0.13, CELL * 0.52, CELL),
+        steel,
+      );
+      line.position.set(x * CELL * 0.28, CELL * 0.22, 0);
+      group.add(line);
     }
     return group;
   },
 
-  /** The carriage that runs on it: a body on four small wheels. */
+  /**
+   * The carriage that runs on it: a body filling its cell the way a block
+   * does, on four rollers that reach the floor of that cell and therefore the
+   * head of the rail below.
+   */
   dolly(part) {
     const group = new THREE.Group();
     const body = new THREE.Mesh(
-      new THREE.BoxGeometry(CELL - INSET, CELL * 0.54, CELL - INSET),
+      new THREE.BoxGeometry(CELL - INSET, CELL * 0.72, CELL - INSET),
       material(part.colour, { metalness: 0.3, roughness: 0.5 }),
     );
-    body.position.y = CELL * 0.16;
+    body.position.y = CELL * 0.1;
     group.add(body);
     const steel = material(0xc7ced6, { metalness: 0.6, roughness: 0.25 });
     for (const x of [-1, 1]) {
       for (const z of [-1, 1]) {
         const roller = new THREE.Mesh(
-          new THREE.CylinderGeometry(CELL * 0.15, CELL * 0.15, CELL * 0.12, 12),
+          new THREE.CylinderGeometry(CELL * 0.15, CELL * 0.15, CELL * 0.13, 12),
           steel,
         );
         roller.rotation.z = Math.PI / 2;
-        roller.position.set(x * CELL * 0.28, -CELL * 0.16, z * CELL * 0.26);
+        roller.position.set(x * CELL * 0.28, -CELL * 0.33, z * CELL * 0.26);
         group.add(roller);
       }
     }
