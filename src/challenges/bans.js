@@ -29,6 +29,15 @@ export const BANS = [
     covers: (part) => Boolean(part.radius) && part.joint === 'revolute',
   },
   {
+    id: 'coupling',
+    name: 'No couplings',
+    // Dropping a load exactly where you want it and driving away is the tidy
+    // answer to anything that asks for several things at once. Taking that
+    // away is what turns those into a problem about reach.
+    note: 'Nothing that lets go of itself. Whatever you carry, you keep hold of.',
+    covers: (part) => part.actuator?.kind === 'release',
+  },
+  {
     id: 'grabber',
     name: 'No grabbers',
     note: 'Nothing that latches on. Whatever you move, you move by holding it.',

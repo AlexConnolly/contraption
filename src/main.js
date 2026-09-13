@@ -689,10 +689,18 @@ function simulateStep() {
   state.arena.step(STEP);
   state.machine.update(STEP, bus);
   world.step();
+  // Worked out once and handed to every objective that wants them, rather
+  // than per plate per tick.
+  let props = null;
+  let machinePoints = null;
   const report = state.tracker.update(STEP, {
     propPosition: (id) => state.arena.propPosition(id),
     corePosition: () => state.machine.corePosition(),
+    props: () => (props ??= state.arena.propStates()),
+    machinePoints: () => (machinePoints ??= state.machine.blueprint.list()
+      .map((placed) => state.machine.partWorldPoint(placed))),
   });
+  state.arena.showPlates(report.objectives);
 
   // Some courses have to be flown without touching anything at all.
   if (state.level.noContact && !state.won && !state.crashed && state.machine.contact()) {

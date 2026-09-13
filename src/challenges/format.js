@@ -26,13 +26,16 @@ export const LIMITS = {
   props: 60,
   zones: 12,
   keepout: 12,
+  plates: 12,
   objectives: 8,
   chars: 64 * 1024,
   bytes: 512 * 1024,
 };
 
-const BANS = ['flight', 'wheels', 'grabber'];
-const OBJECTIVE_TYPES = ['propInZone', 'coreInZone', 'propsInZone', 'propThroughHoop'];
+const BANS = ['flight', 'wheels', 'grabber', 'coupling'];
+const OBJECTIVE_TYPES = [
+  'propInZone', 'coreInZone', 'propsInZone', 'propThroughHoop', 'platePressed',
+];
 
 // The world is a box. Nothing a level describes may sit outside it, however
 // enthusiastic the person who built it was.
@@ -107,6 +110,15 @@ export function sanitiseLevel(input, { id } = {}) {
     return out;
   });
 
+  // A plate is a slab of floor that wants something standing on it. Tag 0 --
+  // or no tag at all -- is the neutral one, which takes anything.
+  const plates = list(raw.plates, LIMITS.plates).map((p, i) => ({
+    id: slug(p?.id) || `plate-${i}`,
+    pos: vec(p?.pos, [0, 0.15, 0]),
+    size: size(p?.size, [2, 0.3, 2]),
+    tag: Number.isInteger(Number(p?.tag)) ? clamp(p.tag, 0, 9, 0) : 0,
+  }));
+
   const zones = list(raw.zones, LIMITS.zones).map((z, i) => ({
     id: slug(z?.id) || `zone-${i}`,
     pos: vec(z?.pos, [0, 1, 0]),
@@ -115,6 +127,7 @@ export function sanitiseLevel(input, { id } = {}) {
   }));
 
   const known = new Set([...props.map((p) => p.id), ...zones.map((z) => z.id)]);
+  const plateIds = new Set(plates.map((p) => p.id));
 
   // Nothing puts anything in these yet. They are named rather than assumed so
   // that when stacks and hoops do travel, the objective check already covers
@@ -128,6 +141,7 @@ export function sanitiseLevel(input, { id } = {}) {
     .filter((o) => OBJECTIVE_TYPES.includes(o?.type))
     .filter((o) => (o.prop ? known.has(slug(o.prop)) : true))
     .filter((o) => (o.zone ? known.has(slug(o.zone)) : true))
+    .filter((o) => (o.type === 'platePressed' ? plateIds.has(slug(o.plate)) : true))
     // Same rule for the two that name a stack or a hoop. The format carries
     // neither yet, so an objective asking for one can never be scored — it
     // would sanitise cleanly and produce a level nobody can finish, which is
@@ -144,6 +158,7 @@ export function sanitiseLevel(input, { id } = {}) {
       if (o.zone) out.zone = slug(o.zone);
       if (o.stack) out.stack = slug(o.stack);
       if (o.hoop) out.hoop = slug(o.hoop);
+      if (o.plate) out.plate = slug(o.plate);
       return out;
     });
 
@@ -165,6 +180,7 @@ export function sanitiseLevel(input, { id } = {}) {
       return out;
     }),
     props,
+    plates,
     zones,
     keepout: list(raw.keepout, LIMITS.keepout).map((k, i) => ({
       id: slug(k?.id) || `keepout-${i}`,

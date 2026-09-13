@@ -9,6 +9,27 @@ export function inZone(point, zone) {
 }
 
 /**
+ * How far above a plate something still counts as standing on it.
+ *
+ * Generous enough that a crate resting on the corner of one is down, mean
+ * enough that dangling a crate overhead is not. A plate is a place you put
+ * something, not a place you wave it.
+ */
+const PLATE_REACH = 1.2;
+
+/**
+ * The volume a plate reads: its own footprint, and the air just above the
+ * slab. No wider than the plate, so a near miss is a miss.
+ */
+export function plateZone(plate) {
+  const [w, h, d] = plate.size ?? [2, 0.3, 2];
+  return {
+    pos: [plate.pos[0], plate.pos[1] + h / 2 + PLATE_REACH / 2, plate.pos[2]],
+    size: [w, PLATE_REACH, d],
+  };
+}
+
+/**
  * Whether a point is inside any of a level's no-go zones, and which.
  *
  * Airspace counts. Tall stilts and a long arm are the degenerate answer to
@@ -140,6 +161,33 @@ const CHECKS = {
     const hoop = (level.hoops ?? []).find((h) => h.id === objective.hoop);
     return Boolean(hoop) && throughHoop(hoop, ctx.propPosition(objective.prop));
   },
+  /**
+   * A pressure plate.
+   *
+   * A coloured plate wants cargo of that colour and will not take anything
+   * else, the machine included -- otherwise every colour puzzle has the same
+   * answer, which is to park on it. A neutral plate takes whatever is put on
+   * it, and that is what makes it the interesting one, because the thing you
+   * put on it can be yourself. Three plates and one crate is then a problem
+   * about reach rather than a problem about fetching.
+   *
+   * Any block of the right colour will do. A level with three red crates and
+   * one red plate is not a puzzle about which red crate.
+   */
+  platePressed(objective, level, ctx) {
+    const plate = (level.plates ?? []).find((p) => p.id === objective.plate);
+    if (!plate) return false;
+    const zone = plateZone(plate);
+    for (const prop of ctx.props?.() ?? []) {
+      if (plate.tag && prop.tag !== plate.tag) continue;
+      if (inZone(prop.point, zone)) return true;
+    }
+    if (plate.tag) return false;
+    for (const point of ctx.machinePoints?.() ?? []) {
+      if (inZone(point, zone)) return true;
+    }
+    return false;
+  },
   propAbove(objective, level, ctx) {
     const point = ctx.propPosition(objective.prop);
     return Boolean(point) && point.y >= objective.height;
@@ -212,6 +260,8 @@ export class ObjectiveTracker {
       scoreLabel: scored ? this.level.scored.label : null,
       objectives: this.state.map((entry) => ({
         label: describeObjective(entry.objective),
+        // So the arena can light the plate this line is about.
+        plate: entry.objective.plate,
         done: entry.done,
         count: entry.count,
         of: entry.of,

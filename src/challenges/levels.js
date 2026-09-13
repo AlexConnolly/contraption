@@ -10,6 +10,7 @@ import { WORLDS } from './packs/worlds.js';
 import { JOBS } from './packs/jobs.js';
 import { QUESTIONS } from './packs/questions.js';
 import { GROUND } from './packs/ground.js';
+import { PLATES } from './packs/plates.js';
 import { EXPERT } from './packs/expert.js';
 
 /**
@@ -65,6 +66,7 @@ const PACKS = [
   ...JOBS,
   ...QUESTIONS,
   ...WORLDS,
+  ...PLATES,
   ...EXPERT,
 ];
 

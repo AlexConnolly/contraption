@@ -3,6 +3,7 @@ import { GROUP_WORLD } from './machine.js';
 import { makeRng, randomSeed, between } from './rng.js';
 import { setTag, clearTag } from './tags.js';
 import { gustAt } from './world.js';
+import { tagColour } from '../challenges/palette.js';
 
 // Props are authored with a mass in kilograms; Rapier wants a density.
 function propVolume(prop) {
@@ -82,6 +83,7 @@ export class Arena {
     this.seed = seed ?? randomSeed();
     this.objects = [];
     this.props = new Map();
+    this.plates = new Map();
     this.opponents = new Map();
     this.movers = [];
     this.belts = [];
@@ -154,6 +156,7 @@ export class Arena {
     for (const stack of level.stacks ?? []) this.addStack(stack);
     for (const mover of level.movers ?? []) this.addMover(mover);
     for (const rival of level.opponents ?? []) this.addOpponent(rival);
+    for (const plate of level.plates ?? []) this.addPlate(plate);
     for (const zone of level.zones ?? []) this.addZone(zone);
     for (const zone of level.keepout ?? []) this.addKeepOut(zone);
     for (const wind of level.wind ?? []) this.addWind(wind);
@@ -704,6 +707,64 @@ export class Arena {
     this.objects.push({ mesh });
   }
 
+  /**
+   * A pressure plate: a slab you can drive onto, ringed in the colour of
+   * whatever it wants standing on it. The ring is the whole readout — it lifts
+   * to full brightness while the plate is down, so a machine spanning three of
+   * them can be read at a glance rather than off the objective list.
+   */
+  addPlate(plate) {
+    const colour = tagColour(plate.tag);
+    const [w, h, d] = plate.size;
+    const built = fixedBox(this.RAPIER, this.world, this.scene, {
+      pos: plate.pos,
+      size: plate.size,
+      colour: 0x2b323b,
+    });
+    this.objects.push(built);
+
+    const face = new THREE.Mesh(
+      new THREE.BoxGeometry(w * 0.82, 0.06, d * 0.82),
+      new THREE.MeshBasicMaterial({ color: colour, transparent: true, opacity: 0.35 }),
+    );
+    face.position.set(plate.pos[0], plate.pos[1] + h / 2 + 0.04, plate.pos[2]);
+    this.scene.add(face);
+    this.objects.push({ mesh: face });
+
+    const ring = new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.BoxGeometry(w, h, d)),
+      new THREE.LineBasicMaterial({ color: colour, transparent: true, opacity: 0.5 }),
+    );
+    ring.position.set(plate.pos[0], plate.pos[1], plate.pos[2]);
+    this.scene.add(ring);
+    this.objects.push({ mesh: ring });
+
+    this.plates.set(plate.id, { spec: plate, face, ring });
+  }
+
+  /** Lights the plates that are down. Driven off the objective report. */
+  showPlates(objectives = []) {
+    for (const entry of objectives) {
+      const plate = entry.plate ? this.plates.get(entry.plate) : null;
+      if (!plate) continue;
+      // Lit while something is on it, not only once the hold has run out:
+      // seeing the far end come on as an arm settles is the whole readout.
+      const down = entry.done || entry.progress > 0;
+      plate.face.material.opacity = down ? 0.85 : 0.35;
+      plate.ring.material.opacity = down ? 1 : 0.5;
+    }
+  }
+
+  /** Every loose prop, with the tag it carries and where it is now. */
+  propStates() {
+    const out = [];
+    for (const [id, prop] of this.props) {
+      const t = prop.body.translation();
+      out.push({ id, tag: prop.spec.tag ?? 0, point: { x: t.x, y: t.y, z: t.z } });
+    }
+    return out;
+  }
+
   addZone(zone) {
     const mesh = new THREE.Mesh(
       new THREE.BoxGeometry(zone.size[0], zone.size[1], zone.size[2]),
@@ -786,6 +847,7 @@ export class Arena {
     }
     this.objects = [];
     this.props.clear();
+    this.plates.clear();
     this.opponents.clear();
     this.movers = [];
     this.belts = [];
