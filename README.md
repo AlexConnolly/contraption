@@ -600,6 +600,49 @@ axis-aligned rotations. Turning that into physics is the interesting part:
 
 Machine parts do not collide with each other, only with the world.
 
+### Getting up things
+
+A powered wheel stops at a step about half its own radius — measured, 0.4 m on
+a 0.42 m wheel — and no amount of ballast changes that, because a step taller
+than the axle is a wall to push at rather than a rise to roll up. Weight buys
+grip, and grip was never the problem.
+
+So there is a second wheel. The **All-Terrain Wheel** is three cells across its
+face where a powered wheel is one, and it carries five times the torque,
+because what lifts a machine over a step is the strength to raise its own
+weight onto the edge.
+
+| | powered | all-terrain |
+| --- | --- | --- |
+| step it gets over | 0.4 m | 1.0 m |
+| flat out | 4.1 m/s | 4.2 m/s |
+| cost | 3 | 9 |
+| weight | 1.4 kg | 3.4 kg |
+| cells | 1 | 9 |
+
+It is not free. Nine cells a wheel is a design constraint you can see, and two
+of them on one side cannot sit closer than four cells apart — which makes for a
+long wheelbase, and a long wheelbase is what makes skid steering hard. The
+wheel is not what costs you there, though: a powered wheel on the same chassis
+pivots at 2°/s, and this one manages 15.
+
+The teeth are not decoration. The collider is drawn at the lug tips and the
+carcass inside it, so what bites a step edge on screen is the radius that bites
+it in the solver.
+
+### Seeing what a part will do
+
+Every moving part carries a range: a hinge's limits, a servo's two angles, a
+ram's stroke, a strut's travel, a grabber's reach. All of that used to be a
+number in a panel, and a number does not answer the question anybody is asking,
+which is *will the arm clear the load*. You found out by pressing Play.
+
+Select a part now and it draws its own envelope on the plate — the arc a joint
+will sweep, the circle a turntable will turn, the line a ram will travel, the
+reach of a grabber or a sensor. The radius is measured off whatever is actually
+bolted to the far side of the joint, so a long arm draws a long arc and the
+question is answered by looking. Drag the angle slider and the arc follows it.
+
 ## Layout
 
 ```
@@ -624,7 +667,7 @@ src/ui/          design tokens, front end (title, challenges, garage, worlds,
 
 ## Tests
 
-`npm test` runs 1285 tests. The pure logic (orientations, grid placement, body
+`npm test` runs 1313 tests. The pure logic (orientations, grid placement, body
 grouping, key bindings, objectives) is covered directly. On top of that,
 `tests/physics.test.js` builds real machines in a real Rapier world and asserts
 they behave — a rover drives, reverses and steers the correct way; an

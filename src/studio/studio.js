@@ -11,6 +11,7 @@ import {
 import { Blueprint, occupiedCells } from '../core/blueprint.js';
 import { groupBlueprint } from '../sim/grouping.js';
 import { wouldConnect } from '../sim/connectivity.js';
+import { RangeView } from './envelope.js';
 
 const OK_COLOUR = 0x4ade80;
 const BAD_COLOUR = 0xff5a5a;
@@ -147,6 +148,12 @@ export class Studio {
     );
     this.highlight.visible = false;
     this.root.add(this.highlight);
+
+    // What the selected part will actually do: the arc a joint sweeps, the
+    // line a ram travels, how far a grabber reaches. Every one of those is a
+    // number in the inspector, and a number does not answer "will it clear the
+    // load", which is the only question anybody is asking of it.
+    this.range = new RangeView(this.root);
     this.refreshGhost();
   }
 
@@ -260,6 +267,7 @@ export class Studio {
 
   update() {
     this.updatePlateFade();
+    this.showRange();
     const hit = this.pick();
     this.hoverId = hit?.partId ?? null;
 
@@ -550,12 +558,30 @@ export class Studio {
     }
   }
 
+  /**
+   * The selected part's envelope, kept in step with it.
+   *
+   * Driven off the selection rather than off what is under the pointer,
+   * because the moment it is useful is while a slider is being dragged, and
+   * the pointer is over the slider then. It rebuilds only when the shape
+   * changes, so this costs nothing on the frames where nothing has.
+   */
+  showRange() {
+    const selected = this.selectedId ? this.blueprint.get(this.selectedId) : null;
+    if (!selected) {
+      this.range.hide();
+      return null;
+    }
+    return this.range.show(this.blueprint, selected, this.grouping);
+  }
+
   setVisible(visible) {
     this.root.visible = visible;
     if (!visible) this.clearPointer();
   }
 
   dispose() {
+    this.range.dispose();
     this.scene.remove(this.root);
     disposeTree(this.root);
   }

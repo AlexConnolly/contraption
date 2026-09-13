@@ -332,6 +332,68 @@ const PARTS = [
     blurb: 'Drives on its axle. Bind two sets to opposite keys to steer.',
   },
   {
+    id: 'atv',
+    ports: {
+      in: [{ id: 'throttle', name: 'Throttle', kind: 'number', min: -1, max: 1 }],
+      out: [{ id: 'spin', name: 'Spin rate', kind: 'number' }],
+    },
+    name: 'All-Terrain Wheel',
+    category: 'drive',
+    // Drawn by the wheel builder, which is the same mechanism a parts pack
+    // uses to borrow a shape the game already knows how to draw. The teeth
+    // come from `lugs` below.
+    look: 'wheel',
+    // Three cells across its face and one thick. It has to be big: what stops
+    // a wheel climbing a step is geometry before it is ever power, because a
+    // step taller than the axle is a wall to push at rather than a rise to
+    // roll up.
+    size: [1, 3, 3],
+    // Density, as everywhere: this comes to about 3.4 kg of wheel against the
+    // powered wheel's 1.4. Weight on the driven wheels is not a cost here, it
+    // is half of what grip is made of.
+    mass: 0.63,
+    colour: 0x23282d,
+    // Three times a powered wheel. It is better at everything a wheel does and
+    // the price, the weight and the nine cells it eats are what pay for that.
+    cost: 9,
+    articulated: true,
+    joint: 'revolute',
+    axis: [1, 0, 0],
+    attach: [[-1, 0, 0]],
+    // The collider is the lug tips, and the carcass is drawn inside it, so
+    // what bites a step edge on screen is what bites it in the solver.
+    radius: 0.7,
+    width: 0.44,
+    lugs: 14,
+    friction: 2.0,
+    actuator: {
+      kind: 'motor',
+      port: 'throttle',
+      signal: 'axis',
+      // Geared for pull rather than for pace: it tops out at about the same
+      // speed as a powered wheel because the wheel is so much bigger, not
+      // because it turns any faster.
+      maxSpeed: 6.4,
+      // Five times a powered wheel's, and it needs every bit of it. Torque is
+      // what lifts a machine's own weight over a step, and grip without it
+      // just means the wheels stop rather than slip.
+      //
+      // Measured, on a four-wheel rover with the wheels four cells apart:
+      //
+      //     force   pivot    step    push
+      //        60   26 d/s   1.0 m    30 kg
+      //        90   18       1.0      40
+      //       110   16       1.0      40
+      //       150   12       1.0      50
+      //
+      // Past about a hundred it stops buying climb and starts costing
+      // steering, so this sits at the knee.
+      maxForce: 110,
+      defaultBinding: { mode: 'drive', pos: 'KeyW', neg: 'KeyS', left: 'KeyA', right: 'KeyD' },
+    },
+    blurb: 'Big and toothed. Climbs two blocks where a powered wheel stops at one.',
+  },
+  {
     id: 'suspension',
     ports: {
       out: [{ id: 'compression', name: 'Compression', kind: 'number' }],

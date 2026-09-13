@@ -29,6 +29,9 @@ const COMMANDED = allParts().filter((p) => p.actuator || p.thruster || p.spring)
  */
 const VOICE = {
   wheel: 'drive',
+  // The same voice, and rightly: the sim groups by what a part is, not by
+  // which part it is, so anything with a motor on it already drives the loop.
+  atv: 'drive',
   propeller: 'rotor',
   thruster: 'jet',
   hinge: 'servo',

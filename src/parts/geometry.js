@@ -116,21 +116,47 @@ const BUILDERS = {
 
   wheel(part) {
     const group = new THREE.Group();
+    // A toothed wheel's collider is its lug tips, so the carcass is drawn
+    // inside that and the teeth reach out to it. What bites a step edge on
+    // screen is then the same radius that bites it in the solver.
+    const lugs = part.lugs ?? 0;
+    const carcass = lugs ? part.radius * 0.82 : part.radius;
+
     const tyre = new THREE.Mesh(
-      new THREE.CylinderGeometry(part.radius, part.radius, part.width, 22),
+      new THREE.CylinderGeometry(carcass, carcass, part.width, lugs ? 26 : 22),
       material(part.colour, { roughness: 0.9, metalness: 0.05 }),
     );
     tyre.rotation.z = Math.PI / 2;
     group.add(tyre);
+
+    if (lugs) {
+      const deep = part.radius - carcass;
+      const block = new THREE.BoxGeometry(
+        part.width * 1.02,
+        deep * 2,
+        // Half the gap between teeth, so the tread reads as teeth rather than
+        // as a second, knobblier tyre.
+        ((Math.PI * 2 * carcass) / lugs) * 0.5,
+      );
+      const rubber = material(0x14181c, { roughness: 1, metalness: 0.02 });
+      for (let i = 0; i < lugs; i += 1) {
+        const angle = (i / lugs) * Math.PI * 2;
+        const lug = new THREE.Mesh(block, rubber);
+        lug.position.set(0, Math.cos(angle) * carcass, Math.sin(angle) * carcass);
+        lug.rotation.x = -angle;
+        group.add(lug);
+      }
+    }
+
     const hub = new THREE.Mesh(
-      new THREE.CylinderGeometry(part.radius * 0.5, part.radius * 0.5, part.width * 1.08, 16),
+      new THREE.CylinderGeometry(carcass * 0.5, carcass * 0.5, part.width * 1.08, 16),
       material(0xd8dde3, { metalness: 0.5, roughness: 0.3 }),
     );
     hub.rotation.z = Math.PI / 2;
     group.add(hub);
     for (let i = 0; i < 4; i += 1) {
       const spoke = new THREE.Mesh(
-        new THREE.BoxGeometry(part.width * 1.12, part.radius * 1.5, 0.04),
+        new THREE.BoxGeometry(part.width * 1.12, carcass * 1.5, 0.04),
         material(0xe8edf2, { metalness: 0.4 }),
       );
       spoke.rotation.x = (i * Math.PI) / 4;
