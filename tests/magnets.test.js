@@ -22,6 +22,11 @@ beforeAll(async () => { await RAPIER.init(); }, 30000);
  *
  * They latch when they meet and are not moving much relative to one another,
  * which is what stops a load being welded in mid-air as it is flung past.
+ *
+ * What they must not do is latch onto anything they merely touch. The first
+ * version welded on any contact from any direction, so a load carried past the
+ * tower and brushing its side stuck to it, and so did one nudged into the pile
+ * edge-on. A magnet here means "stacked on", and stacked on has a direction.
  */
 
 const SIDE = 0.8;
@@ -86,6 +91,76 @@ function pile({ n = 3, magnetic = true, jitter = 0, shove = 0 } = {}) {
     bottomX: bottom.x,
   };
 }
+
+/**
+ * Two loads placed by hand, held still, and asked whether they take hold.
+ *
+ * Nothing is dropped and nothing settles: the point is the geometry of the
+ * moment they touch, so the pair is put exactly where the case being asked
+ * about puts them and the world is stepped just long enough to notice.
+ */
+function pair({ apart = [0, SIDE + 0.01, 0], drift = null, seconds = 0.6 } = {}) {
+  const props = [
+    load('low', SIDE / 2 + 0.05),
+    {
+      ...load('high', SIDE / 2 + 0.05 + apart[1]),
+      pos: [apart[0], SIDE / 2 + 0.05 + apart[1], apart[2]],
+    },
+  ];
+  const world = createWorld(RAPIER, { x: 0, y: 0, z: 0 });
+  const arena = new Arena({
+    RAPIER, world, scene: new THREE.Scene(), level: level(props), seed: 2,
+  });
+  // No gravity, so the pair stays exactly where it was put and the answer is
+  // about where they are rather than about how they fell.
+  for (const id of ['low', 'high']) arena.props.get(id).body.setGravityScale(0, true);
+  const high = arena.props.get('high').body;
+  for (let i = 0; i < Math.round(seconds / STEP); i += 1) {
+    if (drift) high.setLinvel({ x: drift[0], y: drift[1], z: drift[2] }, true);
+    arena.step(STEP);
+    world.step();
+  }
+  const welds = arena.welds;
+  arena.dispose();
+  return welds;
+}
+
+describe('what counts as stacked', () => {
+  it('takes hold of a load set down on top of it', () => {
+    expect(pair()).toBe(1);
+  });
+
+  it("forgives one set down a hand's width off centre", () => {
+    expect(pair({ apart: [0.15, SIDE + 0.01, 0] })).toBe(1);
+  });
+
+  it('does not take hold of one merely beside it', () => {
+    // Touching, still, and not on top of anything: two loads side by side on
+    // the floor must stay two loads.
+    expect(pair({ apart: [SIDE + 0.01, 0, 0] })).toBe(0);
+  });
+
+  it('does not take hold of one brushing it corner to corner', () => {
+    expect(pair({ apart: [SIDE - 0.02, SIDE - 0.02, 0] })).toBe(0);
+  });
+
+  it('does not take hold of one perched off the edge', () => {
+    // Up there, but with its middle past the edge of what it is standing on.
+    // That is not a stack, it is a load about to fall off one.
+    expect(pair({ apart: [SIDE * 0.75, SIDE + 0.01, 0] })).toBe(0);
+  });
+
+  it('does not take hold of one being carried past overhead', () => {
+    // Directly above and touching, but travelling sideways at walking pace:
+    // it is going somewhere, not being put down.
+    expect(pair({ drift: [1.6, 0, 0], seconds: 0.3 })).toBe(0);
+  });
+
+  it('does take hold of one being lowered onto it', () => {
+    // Coming down rather than going past, which is the whole difference.
+    expect(pair({ drift: [0, -0.4, 0], seconds: 0.3 })).toBe(1);
+  });
+});
 
 describe('loads that take hold of each other', () => {
   it('stand as a tower once they have settled', () => {

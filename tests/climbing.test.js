@@ -11,6 +11,7 @@ import { createWorld, STEP } from '../src/sim/world.js';
 import { Blueprint } from '../src/core/blueprint.js';
 import { IDENTITY_ORIENTATION, yawStep } from '../src/core/orientation.js';
 import { getPart } from '../src/parts/registry.js';
+import { createPartMesh } from '../src/parts/geometry.js';
 import { partMass } from '../src/ui/hud.js';
 
 beforeAll(async () => { await RAPIER.init(); }, 30000);
@@ -162,4 +163,38 @@ describe('what it costs to fit them', () => {
     expect(stuck).toBeLessThan(6);
     expect(big).toBeGreaterThan(stuck * 2);
   }, 60000);
+});
+
+describe('the teeth', () => {
+  const teeth = () => createPartMesh(getPart('atv')).children
+    .filter((child) => child.name === 'lug');
+
+  it('are there, all the way round', () => {
+    expect(teeth()).toHaveLength(getPart('atv').lugs);
+  });
+
+  it('all point outwards', () => {
+    // Turning a box about X takes its +Y to (0, cos t, sin t). Getting the
+    // sign of that wrong mirrors every tooth except the two at the very top
+    // and bottom, and the ones at the sides end up pointing inwards -- which
+    // is exactly what it did: twelve of the fourteen were wrong, the worst of
+    // them facing nine tenths of the way back into the wheel.
+    const out = new THREE.Vector3();
+    for (const lug of teeth()) {
+      out.set(0, 1, 0).applyQuaternion(lug.quaternion);
+      const radial = lug.position.clone().normalize();
+      expect(out.dot(radial), `a tooth at ${lug.position.toArray()}`).toBeCloseTo(1, 5);
+    }
+  });
+
+  it('stand on the carcass and reach out to the collider', () => {
+    const part = getPart('atv');
+    for (const lug of teeth()) {
+      const from = Math.hypot(lug.position.y, lug.position.z);
+      // What bites a step edge on screen has to be the radius that bites it
+      // in the solver, so the tips land on the collider and not short of it.
+      expect(from).toBeLessThan(part.radius);
+      expect(from + lug.geometry.parameters.height / 2).toBeCloseTo(part.radius, 5);
+    }
+  });
 });

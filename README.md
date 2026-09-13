@@ -628,7 +628,8 @@ pivots at 2°/s, and this one manages 15.
 
 The teeth are not decoration. The collider is drawn at the lug tips and the
 carcass inside it, so what bites a step edge on screen is the radius that bites
-it in the solver.
+it in the solver — and a test walks every tooth and checks it points outwards,
+because the first version had twelve of the fourteen mirrored.
 
 ### Seeing what a part will do
 
@@ -676,7 +677,7 @@ src/ui/          design tokens, front end (title, challenges, garage, worlds,
 
 ## Tests
 
-`npm test` runs 1315 tests. The pure logic (orientations, grid placement, body
+`npm test` runs 1325 tests. The pure logic (orientations, grid placement, body
 grouping, key bindings, objectives) is covered directly. On top of that,
 `tests/physics.test.js` builds real machines in a real Rapier world and asserts
 they behave — a rover drives, reverses and steers the correct way; an

@@ -142,8 +142,13 @@ const BUILDERS = {
       for (let i = 0; i < lugs; i += 1) {
         const angle = (i / lugs) * Math.PI * 2;
         const lug = new THREE.Mesh(block, rubber);
+        lug.name = 'lug';
         lug.position.set(0, Math.cos(angle) * carcass, Math.sin(angle) * carcass);
-        lug.rotation.x = -angle;
+        // Turning a box about X by t takes its +Y to (0, cos t, sin t), which
+        // is where it was just put. Negating this -- which is what it did at
+        // first -- mirrors every tooth but the two at top and bottom, and the
+        // ones at the sides end up pointing very nearly inwards.
+        lug.rotation.x = angle;
         group.add(lug);
       }
     }

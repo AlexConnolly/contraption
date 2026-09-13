@@ -25,6 +25,36 @@ export const ICY = 0.25;
 // they take hold, and how close counts as touching.
 const MAGNET_SETTLE = 0.9;
 const MAGNET_GAP = 0.04;
+// How much of the gap between two loads has to be vertical before one counts
+// as being on the other rather than beside it. Well under half, because a load
+// still settling has not dropped the last few centimetres yet.
+const MAGNET_UPRIGHT = 0.6;
+
+/**
+ * Whether one load is stacked on the other, rather than merely touching it.
+ *
+ * A magnet meant "anything you brush against", which is not what a magnet is
+ * for here. A load carried past the tower and grazing its side stuck to it, so
+ * did one nudged into the pile edge-on, and so did one balanced on a corner
+ * with most of itself hanging over nothing.
+ *
+ * Stacked on has a direction and a footprint: most of the distance between the
+ * two has to be vertical, and the upper one's middle has to be over the lower
+ * one rather than out past its edge. Inside its edge is generous -- for a
+ * ninety-centimetre load that forgives forty-five of placement error, three
+ * times what the tower actually needs -- and outside it is not a stack.
+ */
+function stackedOn(one, other) {
+  const a = one.body.translation();
+  const b = other.body.translation();
+  const rise = Math.abs(a.y - b.y);
+  const stack = (one.spec.size[1] + other.spec.size[1]) / 2;
+  if (rise < stack * MAGNET_UPRIGHT) return false;
+
+  const low = a.y >= b.y ? other : one;
+  const across = Math.hypot(a.x - b.x, a.z - b.z);
+  return across <= Math.min(low.spec.size[0], low.spec.size[2]) / 2;
+}
 // What a load that takes hold of its neighbours is edged in.
 const MAGNET_MARK = 0xf0a825;
 
@@ -854,6 +884,7 @@ export class Arena {
         const b = mate.body.linvel();
         const drift = Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
         if (drift > MAGNET_SETTLE) return;
+        if (!stackedOn(magnet, mate)) return;
 
         let touching = false;
         this.world.contactPair(magnet.collider, other, (manifold) => {
