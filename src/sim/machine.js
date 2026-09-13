@@ -3,7 +3,7 @@ import {
   getPart, partDensity, pistonStroke, separationPush, jointTension, jointFlip,
   servoAngleA, servoAngleB, servoSpeed, shortestTurn, turntableRecentres,
   springTravel, springStiffness, springDamping, padMode, padDamping,
-  turntableSpin, turntableTorque, dollySpeed, CELL,
+  turntableSpin, turntableTorque, dollySpeed, motorSpeed, motorTorque, thrustPower, CELL,
 } from '../parts/registry.js';
 import { PISTON_ROD_TOP, PISTON_REST, wedgeCorners } from '../parts/geometry.js';
 import { orientationQuaternion, applyOrientation } from '../core/orientation.js';
@@ -342,7 +342,7 @@ export class Machine {
           id: a.placed.id,
           offset: offset.toArray(),
           dir,
-          maxThrust: a.part.thruster.maxThrust * (a.placed.config.power ?? 1),
+          maxThrust: a.part.thruster.maxThrust * thrustPower(a.placed, a.part),
           reaction: a.part.thruster.reaction ?? 0,
           spin,
         };
@@ -665,10 +665,15 @@ export class Machine {
           // every step wakes the body every step, which is invisible with one
           // machine and means a parked fleet never sleeps. Zero is still sent
           // once on the way down, so letting go of the throttle still brakes.
-          const want = signal * driveSide(placed.rot) * part.actuator.maxSpeed * power;
-          if (joint && want !== actuator.lastMotor) {
-            joint.configureMotorVelocity(want, part.actuator.maxForce);
+          // Two numbers, not one. Speed is how fast it will go; torque is
+          // whether it will go at all with something heavy in the way.
+          const want = signal * driveSide(placed.rot)
+            * part.actuator.maxSpeed * motorSpeed(placed, part);
+          const grunt = part.actuator.maxForce * motorTorque(placed, part);
+          if (joint && (want !== actuator.lastMotor || grunt !== actuator.lastForce)) {
+            joint.configureMotorVelocity(want, grunt);
             actuator.lastMotor = want;
+            actuator.lastForce = grunt;
           }
           break;
         }
@@ -727,7 +732,7 @@ export class Machine {
           break;
         }
         case 'thrust':
-          this.applyThrust(actuator, signal * power);
+          this.applyThrust(actuator, signal * thrustPower(placed, part));
           break;
         case 'grab':
           this.updateGrab(actuator, signal);

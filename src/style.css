@@ -1290,3 +1290,21 @@ input[type="range"] { accent-color: var(--amber); }
   cursor: default;
   border-color: var(--edge);
 }
+
+/* What a wound-up part is making, and what it now costs. Power is torque
+   times speed and so is the price, so the two belong on the same line. */
+.insp-wound {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: -4px 0 12px;
+  padding: 6px 10px;
+  background: var(--amber-dim);
+  border-left: 2px solid var(--amber);
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--amber-b);
+  font-variant-numeric: tabular-nums;
+}
+.insp-wound-cost { color: var(--amber); font-size: 10px; letter-spacing: .04em; }

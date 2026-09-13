@@ -11,6 +11,7 @@ import { store } from './progress.js';
 import { bannedParts, banFor } from '../challenges/bans.js';
 import { envelopeOf } from '../studio/envelope.js';
 import { DIRECTIONS, aimableDirections, aimNamed } from '../core/aim.js';
+import { partCost } from '../parts/registry.js';
 
 // Said instead of a best time when the machine has pack parts on it.
 /** What each of the three turn keys does, for the button that does it too. */
@@ -419,7 +420,29 @@ export class Hud {
     if (part.flight) this.renderController(body, placed, part, blueprint);
     if (part.actuator) this.renderBinding(body, placed, part, blueprint);
     if (part.sensor) this.renderSensor(body, placed, part);
-    if (part.actuator && (part.actuator.kind === 'motor' || part.actuator.kind === 'thrust')) {
+    // A motor has two numbers and they are different questions: speed is how
+    // fast it will go, torque is whether it will go at all with something
+    // heavy in the way. A nozzle has one.
+    if (part.actuator?.kind === 'motor' && part.powerRange) {
+      this.renderSlider(
+        body, 'Speed', placed.config.power ?? 1,
+        part.powerRange[0], part.powerRange[1], 0.1,
+        (value) => this.h.onConfigChange(placed.id, { power: value }),
+      );
+      this.renderSlider(
+        body, 'Torque', placed.config.torque ?? 1,
+        part.torqueRange[0], part.torqueRange[1], 0.1,
+        (value) => this.h.onConfigChange(placed.id, { torque: value }),
+      );
+      this.renderWound(body, placed, part);
+    } else if (part.actuator?.kind === 'thrust' && part.powerRange) {
+      this.renderSlider(
+        body, 'Power', placed.config.power ?? 1,
+        part.powerRange[0], part.powerRange[1], 0.1,
+        (value) => this.h.onConfigChange(placed.id, { power: value }),
+      );
+      this.renderWound(body, placed, part);
+    } else if (part.actuator && (part.actuator.kind === 'motor' || part.actuator.kind === 'thrust')) {
       this.renderSlider(body, 'Power', placed.config.power ?? 1, 0.1, 1, 0.05, (value) => {
         this.h.onConfigChange(placed.id, { power: value });
       });
@@ -464,6 +487,29 @@ export class Hud {
    * six buttons say it outright and the rotation is worked out. Pointing a
    * thruster down should not be a puzzle.
    */
+  /**
+   * What a wound-up part is now making, and what it now costs.
+   *
+   * Power is torque times speed, and so is the price, so the two are shown
+   * together: wind it up and watch the budget go with it. Without this the
+   * sliders are two numbers with no consequence attached, which is how you end
+   * up over budget with no idea which part did it.
+   */
+  renderWound(body, placed, part) {
+    const cost = partCost(placed, part);
+    if (cost === part.cost) return;
+    const row = el('div', 'insp-wound');
+    const what = part.actuator.kind === 'motor'
+      ? `${(part.actuator.maxSpeed * (placed.config.power ?? 1)).toFixed(0)} rad/s`
+        + ` · ${(part.actuator.maxForce * (placed.config.torque ?? 1)).toFixed(0)} Nm`
+      : `${(part.thruster.maxThrust * (placed.config.power ?? 1)).toFixed(0)} N`;
+    row.append(
+      el('span', null, what),
+      el('span', 'insp-wound-cost', `costs ${cost}, not ${part.cost}`),
+    );
+    body.append(row);
+  }
+
   renderFacing(body, placed, part) {
     const row = el('div', 'row');
     row.append(el('label', null, 'Turn'));

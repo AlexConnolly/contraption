@@ -696,6 +696,37 @@ instead. Select the dolly and the studio draws the run — `5.5 m of rail,
 stopped to open · 2.4 m/s` — so you know which ends will catch you before you
 find out.
 
+### Speed, torque, and what they cost
+
+A motor has two numbers and they are not the same question. **Speed** is how
+fast it will go. **Torque** is whether it will go at all with something heavy
+in the way. There used to be one slider called Power that scaled speed, and
+only ever downwards — so a wheel shoved a sixty-kilo crate thirteen
+centimetres in ten seconds, and a nozzle made 55 N against a ballast block that
+weighs 80, which is why nobody could build a rocket that carried anything.
+
+Both wind a long way up now, and the defaults are unchanged, so nothing already
+built behaves differently.
+
+| | rated | wound right up |
+| --- | --- | --- |
+| wheel, top speed | 4.5 m/s (16 km/h) | 19.5 m/s (70 km/h) |
+| wheel, 60 kg crate in 12 s | 0.3 m | 22 m |
+| one nozzle | 55 N | 440 N — lifts 45 kg |
+| rocket carrying 8 kg | does not leave the ground | 520 m at 164 m/s |
+| rocket carrying 40 kg | — | 172 m at 54 m/s |
+
+What stops that being free is the budget. **Power is torque times speed, so
+that is exactly what it costs**: a wheel at three times the speed and four
+times the torque is twelve times the wheel, and the inspector says so on the
+slider — *33 rad/s · 88 Nm, costs 36, not 3*. A six-wheeler at the top of both
+ranges costs 609, and the largest budget in the game is 240. So the daft end of
+the range lives in fun mode, where there is no budget to spend.
+
+Torque runs into grip in the end. Past what the tyres will hold, more of it
+only spins them — which is the honest answer to "why will it not push", and the
+answer is ballast. Both halves are measured in `tests/power.test.js`.
+
 ### Getting up things
 
 A powered wheel stops at a step about half its own radius — measured, 0.4 m on
@@ -773,7 +804,7 @@ src/ui/          design tokens, front end (title, challenges, garage, worlds,
 
 ## Tests
 
-`npm test` runs 1370 tests. The pure logic (orientations, grid placement, body
+`npm test` runs 1382 tests. The pure logic (orientations, grid placement, body
 grouping, key bindings, objectives) is covered directly. On top of that,
 `tests/physics.test.js` builds real machines in a real Rapier world and asserts
 they behave — a rover drives, reverses and steers the correct way; an

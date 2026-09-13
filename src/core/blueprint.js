@@ -1,5 +1,5 @@
 import { applyOrientation, IDENTITY_ORIENTATION } from './orientation.js';
-import { getPart, findPart } from '../parts/registry.js';
+import { getPart, findPart, partCost } from '../parts/registry.js';
 
 export const BLUEPRINT_VERSION = 1;
 
@@ -71,9 +71,17 @@ export class Blueprint {
     return this.parts.size;
   }
 
+  /**
+   * What the machine costs as it is set, not as its parts come off the shelf.
+   *
+   * A motor wound past what it is rated for costs in proportion to the power
+   * it is now making, which is torque times speed. That is what keeps a
+   * five-times-faster, ten-times-stronger wheel out of a campaign budget and
+   * in fun mode, where there is no budget to keep it out of.
+   */
   cost() {
     let total = 0;
-    for (const placed of this.parts.values()) total += getPart(placed.type).cost;
+    for (const placed of this.parts.values()) total += partCost(placed);
     return total;
   }
 

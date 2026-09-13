@@ -53,8 +53,13 @@ const keys = (...codes) => ({
 /**
  * The dumbest machine that can be built on a given wheel: a slab, a core and
  * four wheels, as big as the budget allows and with nothing clever on it.
+ *
+ * `wound` winds the motors as far as the budget will carry, which is the
+ * question the speed and torque settings raise: power costs in proportion to
+ * itself, so the check is whether what a budget will actually pay for is
+ * enough to drive to the answer.
  */
-function plainRover(type, budget) {
+function plainRover(type, budget, wound = 1) {
   const part = getPart(type);
   const reach = part.size[2] === 3 ? 2 : 1;
   const bp = new Blueprint({ name: type });
@@ -64,8 +69,10 @@ function plainRover(type, budget) {
   }
   bp.place('core', [0, 1, 0]);
   for (const z of [-reach, reach]) {
-    bp.place(type, [2, 0, z], IDENTITY_ORIENTATION);
-    bp.place(type, [-2, 0, z], mirrored);
+    for (const [x, rot] of [[2, IDENTITY_ORIENTATION], [-2, mirrored]]) {
+      const wheel = bp.place(type, [x, 0, z], rot);
+      if (wound > 1) bp.setConfig(wheel.id, { power: wound, torque: wound });
+    }
   }
   // Whatever is left over goes on as ballast, because weight is the first
   // thing anybody reaches for and it must not turn out to be the answer.
@@ -76,8 +83,14 @@ function plainRover(type, budget) {
 }
 
 /** Holds the accelerator down at a level and says whether that finished it. */
-function holdW(level, type, seconds) {
-  const blueprint = plainRover(type, level.budget?.cost ?? 0);
+function holdW(level, type, seconds, wound = 1) {
+  const budget = level.budget?.cost ?? 0;
+  // As wound up as the budget will carry: power costs in proportion to itself,
+  // so this walks down until the machine is affordable.
+  let blueprint = null;
+  for (let turn = wound; turn >= 1 && !blueprint; turn -= 0.5) {
+    blueprint = plainRover(type, budget, turn);
+  }
   if (!blueprint) return { built: false, complete: false };
 
   const world = createWorld(RAPIER, gravityOf(level));
@@ -128,9 +141,13 @@ describe('the levels the new wheel could have changed', () => {
       const seconds = Math.min(level.par ?? 40, 30);
       const plain = holdW(level, 'wheel', seconds);
       const big = holdW(level, 'atv', seconds);
-      if (!big.built) continue;
-      if (big.complete && !plain.complete) {
+      if (big.built && big.complete && !plain.complete) {
         broken.push(`${level.id} is finished by holding W on all-terrain wheels and was not before`);
+      }
+      // And the same again with the motors wound as far as the budget allows.
+      const fast = holdW(level, 'wheel', seconds, 5);
+      if (fast.built && fast.complete && !plain.complete) {
+        broken.push(`${level.id} is finished by holding W on wound-up wheels and was not before`);
       }
     }
     expect(broken).toEqual([]);

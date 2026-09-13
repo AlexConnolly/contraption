@@ -192,6 +192,56 @@ export function shortestTurn(from, to) {
  * being moved. A strut is a spring rather than a motor: nothing drives it, it
  * just carries what is above it and gives when the ground pushes back.
  */
+/**
+ * How hard a part is being wound, and what that costs.
+ *
+ * A motor has two numbers and they are not the same question. Speed is how
+ * fast it will go; torque is whether it will go at all with something heavy in
+ * the way. Until now there was one slider called Power that scaled speed, only
+ * ever downwards, and a wheel could shove a sixty-kilo crate thirteen
+ * centimetres in ten seconds.
+ *
+ * Both now wind a long way up. What stops that being free is the budget:
+ * power is torque times speed, so that is exactly what it costs. A wheel wound
+ * to five times the speed and ten times the torque is fifty times the part,
+ * which no campaign budget will carry and which fun mode -- where there is no
+ * budget at all -- will.
+ */
+/**
+ * A part that does not say what it will take is not wound at all.
+ *
+ * A parts pack written before any of this exists and defines a motor with no
+ * ranges on it. Reaching into one it has not got is how a pack part broke the
+ * whole machine, so the fallback is the one setting that cannot surprise
+ * anybody: rated, and no further.
+ */
+const RATED = [1, 1];
+
+export function motorSpeed(placed, part) {
+  return clampTo(placed?.config?.power, part?.powerRange ?? RATED, 1);
+}
+
+export function motorTorque(placed, part) {
+  return clampTo(placed?.config?.torque, part?.torqueRange ?? RATED, 1);
+}
+
+export function thrustPower(placed, part) {
+  return clampTo(placed?.config?.power, part?.powerRange ?? RATED, 1);
+}
+
+/**
+ * What a part costs as it is set, rather than as it comes.
+ *
+ * Winding a part down never refunds below the part: a wheel is still a wheel.
+ * Winding it up costs in proportion to the power it is now making, which is
+ * the honest rule and the only one that is easy to explain.
+ */
+export function partCost(placed, part = getPart(placed.type)) {
+  const wound = Math.max(1, placed?.config?.power ?? 1)
+    * Math.max(1, placed?.config?.torque ?? 1);
+  return Math.round(part.cost * wound);
+}
+
 /** How fast a dolly runs along its rail, in metres a second. */
 export function dollySpeed(placed, part = getPart('dolly')) {
   return clampTo(placed?.config?.speed, part.speedRange, part.speed);
@@ -326,6 +376,11 @@ const PARTS = [
     // it to 1.6 turned a 14 deg/s pivot back into 61, and cornering from 69
     // to 83, while still hauling everything the campaign asks it to.
     friction: 1.6,
+    // Rated speed and torque are multiplied by the two settings, which both
+    // default to one -- so a wheel as it comes is exactly the wheel it has
+    // always been, and the sliders are what go further.
+    powerRange: [0.1, 5],
+    torqueRange: [0.1, 10],
     actuator: {
       kind: 'motor',
       port: 'throttle',
@@ -371,6 +426,8 @@ const PARTS = [
     width: 0.44,
     lugs: 14,
     friction: 2.0,
+    powerRange: [0.1, 5],
+    torqueRange: [0.1, 10],
     actuator: {
       kind: 'motor',
       port: 'throttle',
@@ -711,6 +768,7 @@ const PARTS = [
     colour: 0xc9d34e,
     cost: 6,
     thruster: { axis: [0, 1, 0], maxThrust: 95, spin: 42, reaction: 9 },
+    powerRange: [0.1, 8],
     actuator: {
       kind: 'thrust',
       port: 'throttle',
@@ -732,6 +790,9 @@ const PARTS = [
     colour: 0xff7a45,
     cost: 5,
     thruster: { axis: [0, 1, 0], maxThrust: 55, spin: 0 },
+    // Eight times rated is 440 N out of one nozzle, which lifts forty-five
+    // kilos -- a rocket that can carry something rather than only itself.
+    powerRange: [0.1, 8],
     actuator: {
       kind: 'thrust',
       port: 'throttle',
