@@ -36,6 +36,7 @@ export function spanner({
     place('block', [x, 0, rail]);
   }
   for (let z = -2; z < rail; z += 1) place('block', [0, 0, z]);
+  place('core', [1, 0, -1]);
   for (const z of [-3, rail]) {
     place('wheel', [arm, 0, z], IDENTITY_ORIENTATION);
     place('wheel', [-arm, 0, z], facingLeft);

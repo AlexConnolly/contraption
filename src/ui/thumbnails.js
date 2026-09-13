@@ -99,6 +99,7 @@ export function renderLevel(RAPIER, level) {
   // take in only as much of the run-up as is needed to read the shape of it.
   const points = [
     ...(level.zones ?? []).map((z) => new THREE.Vector3(...z.pos)),
+    ...(level.plates ?? []).map((p) => new THREE.Vector3(...p.pos)),
     ...(level.props ?? []).map((p) => new THREE.Vector3(...p.pos)),
     ...(level.movers ?? []).map((m) => new THREE.Vector3(0, m.pos[1], m.pos[2])),
   ];

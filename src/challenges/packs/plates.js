@@ -28,7 +28,8 @@ const BLUE = tagColour(3);
 export const PLATES = [
   {
     id: 'two-plates',
-    demands: { steps: 2, flies: false },
+    // One kind of job done twice, not two jobs.
+    demands: { steps: 1, flies: false },
     bans: ['flight'],
     name: 'Two Plates',
     brief: 'Two plates, two crates, and both plates have to be down at the same time.',
@@ -56,7 +57,10 @@ export const PLATES = [
   {
     id: 'short-handed',
     demands: { steps: 2, flies: false },
-    bans: ['flight', 'coupling'],
+    // No no-couplings here on purpose: dropping both crates and standing on
+    // the spare is the intended answer, so taking couplings away would only
+    // make the same solution more fiddly to build.
+    bans: ['flight'],
     name: 'Short Handed',
     brief: 'Three plates, two crates. The third one is neutral, and takes anything at all.',
     hint: 'You are one crate short on purpose. A neutral plate does not care what holds it down, so the last one is yours to stand on — park on it, or reach out and lean on it, and keep the other two down while you do.',
@@ -98,7 +102,7 @@ export const PLATES = [
    */
   {
     id: 'the-span',
-    demands: { steps: 3, flies: false },
+    demands: { steps: 2, flies: false },
     bans: ['flight', 'coupling'],
     name: 'The Span',
     brief: 'Three plates on three pillars, ten metres end to end, and one crate between them.',

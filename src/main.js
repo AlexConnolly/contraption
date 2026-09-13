@@ -15,7 +15,7 @@ import { controllerOf, firstController } from './sim/flight.js';
 import { getPart, findPart } from './parts/registry.js';
 import { loadPacks, usesPacks } from './parts/installed.js';
 import {
-  ObjectiveTracker, withinBudget, withinMassCap, breachedBy,
+  ObjectiveTracker, withinMassCap, breachedBy, buildProblem,
 } from './challenges/objectives.js';
 import { bannedParts, banFor, firstBanned } from './challenges/bans.js';
 import { LEVELS, nextLevel } from './challenges/levels.js';
@@ -165,21 +165,8 @@ function disposeRun() {
 }
 
 function validateBuild() {
-  if (state.blueprint.size === 0) {
-    return { ok: false, reason: 'Nothing built yet. Place a Control Core to start.' };
-  }
-  if (!state.blueprint.list().some((p) => p.type === 'core')) {
-    return { ok: false, reason: 'Add a Control Core — the machine needs one.' };
-  }
-  const budget = withinBudget(state.blueprint, state.level);
-  if (!budget.ok) return { ok: false, reason: budget.reason };
-  // The palette will not let you place one, but a machine can arrive from the
-  // garage or from a design saved before the level banned it.
-  const broken = firstBanned(state.level, state.blueprint);
-  if (broken) {
-    return { ok: false, reason: `${broken.ban.name}: take the ${broken.part.name} off` };
-  }
-  return { ok: true };
+  const problem = buildProblem(state.blueprint, state.level);
+  return problem ? { ok: false, reason: problem } : { ok: true };
 }
 
 /**

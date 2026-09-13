@@ -8,7 +8,7 @@ import { Arena } from '../src/sim/arena.js';
 import { Machine } from '../src/sim/machine.js';
 import { SignalBus } from '../src/sim/signals.js';
 import { createWorld, STEP } from '../src/sim/world.js';
-import { ObjectiveTracker } from '../src/challenges/objectives.js';
+import { ObjectiveTracker, buildProblem } from '../src/challenges/objectives.js';
 import { getLevel } from '../src/challenges/levels.js';
 import { firstBanned } from '../src/challenges/bans.js';
 import { spanner } from '../src/studio/spanner.js';
@@ -82,7 +82,13 @@ describe('The Span is a level somebody could actually finish', () => {
     expect(LEVEL.budget.cost - cost).toBeGreaterThan(60);
   });
 
-  it('is not refused by the level’s own bans', () => {
+  /**
+   * Against the same check the Play button runs, not a looser one. The first
+   * version of this machine had no Control Core on it: it drove perfectly in
+   * the test harness and the game refused to start it.
+   */
+  it('is a machine the game would actually let you run', () => {
+    expect(buildProblem(spanner(), LEVEL)).toBe(null);
     expect(firstBanned(LEVEL, spanner())).toBe(null);
   });
 

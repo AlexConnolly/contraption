@@ -1,3 +1,5 @@
+import { firstBanned } from './bans.js';
+
 export function inZone(point, zone) {
   if (!point) return false;
   const [hx, hy, hz] = zone.size.map((n) => n / 2);
@@ -286,4 +288,28 @@ export function withinBudget(blueprint, level) {
   return cost <= budget
     ? { ok: true, cost, budget }
     : { ok: false, cost, budget, reason: `Over budget: ${cost} / ${budget}` };
+}
+
+/**
+ * Why this machine cannot be run on this level, or null if it can.
+ *
+ * This used to live inside main.js, reading module state, which meant every
+ * test that built a machine was checking a different and more forgiving set of
+ * rules than the game does. A prover that has no Control Core on it passes a
+ * physics test happily and is refused the moment a player presses Play.
+ */
+export function buildProblem(blueprint, level) {
+  if (!blueprint || blueprint.size === 0) {
+    return 'Nothing built yet. Place a Control Core to start.';
+  }
+  if (!blueprint.list().some((p) => p.type === 'core')) {
+    return 'Add a Control Core — the machine needs one.';
+  }
+  const budget = withinBudget(blueprint, level);
+  if (!budget.ok) return budget.reason;
+  // The palette will not let you place one, but a machine can arrive from the
+  // garage or from a design saved before the level banned it.
+  const broken = firstBanned(level, blueprint);
+  if (broken) return `${broken.ban.name}: take the ${broken.part.name} off`;
+  return null;
 }
