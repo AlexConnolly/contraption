@@ -1,6 +1,9 @@
 import {
   describe, it, expect, beforeAll, afterEach,
 } from 'vitest';
+import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { WebSocket } from 'ws';
 import RAPIER from '@dimforge/rapier3d-compat';
 
@@ -62,6 +65,21 @@ async function until(check, { within = 5000, every = 25 } = {}) {
 }
 
 const open = [];
+const folders = [];
+
+/**
+ * A little site on disk for the host to serve, made fresh each time. The real
+ * one is `dist`, which does not exist until `npm run build` has run — and the
+ * tests run first.
+ */
+async function siteFolder() {
+  const root = await mkdtemp(join(tmpdir(), 'contraption-site-'));
+  folders.push(root);
+  await mkdir(join(root, 'assets'), { recursive: true });
+  await writeFile(join(root, 'index.html'), '<!doctype html><title>Contraption</title>');
+  await writeFile(join(root, 'assets', 'app.js'), '// the game would be here');
+  return root;
+}
 
 function connect(port, name) {
   const client = new NetClient({
@@ -84,6 +102,10 @@ afterEach(async () => {
   for (const thing of open.splice(0).reverse()) {
     if (thing.close) await thing.close();
     else thing.dispose();
+  }
+  for (const folder of folders.splice(0)) {
+    await rm(folder, { recursive: true, force: true });
+    await rm(join(folder, '..', 'secret.txt'), { force: true });
   }
 });
 
@@ -391,17 +413,38 @@ describe('the host also serves the game', () => {
   }, 30000);
 
   it('hands out the page and its assets when there is one', async () => {
-    const running = await host({ serve: 'dist' });
+    // A folder made here rather than `dist`: the tests run before the build
+    // does, so anything that reads the build output passes on this machine
+    // and fails in CI, which is exactly what happened.
+    const root = await siteFolder();
+    const running = await host({ serve: root });
+
     const page = await fetch(`http://127.0.0.1:${running.port}/`);
     expect(page.status).toBe(200);
     expect(page.headers.get('content-type')).toMatch(/text\/html/);
-    expect(await page.text()).toMatch(/<canvas|<div id="loading"|Contraption/);
+    expect(await page.text()).toMatch(/Contraption/);
+
+    const asset = await fetch(`http://127.0.0.1:${running.port}/assets/app.js`);
+    expect(asset.status).toBe(200);
+    expect(asset.headers.get('content-type')).toMatch(/javascript/);
+    expect(await asset.text()).toMatch(/the game/);
+  }, 30000);
+
+  it('answers anything that is not a file with the page, because it is one page', async () => {
+    const root = await siteFolder();
+    const running = await host({ serve: root });
+    const deep = await fetch(`http://127.0.0.1:${running.port}/worlds/harbour`);
+    expect(deep.status).toBe(200);
+    expect(await deep.text()).toMatch(/Contraption/);
   }, 30000);
 
   it('refuses to hand out anything above the folder it was given', async () => {
-    const running = await host({ serve: 'dist' });
-    const answer = await fetch(`http://127.0.0.1:${running.port}/../package.json`);
-    expect(await answer.text()).not.toMatch(/"devDependencies"/);
+    const root = await siteFolder();
+    await writeFile(join(root, '..', 'secret.txt'), 'not for the wire');
+    const running = await host({ serve: root });
+    const answer = await fetch(`http://127.0.0.1:${running.port}/../secret.txt`);
+    // Either refused outright or answered with the page; never the file.
+    expect(await answer.text()).not.toMatch(/not for the wire/);
   }, 30000);
 });
 
