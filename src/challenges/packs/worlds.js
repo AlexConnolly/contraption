@@ -26,19 +26,26 @@ export const WORLDS = [
     name: 'Uphill Struggle',
     brief: 'The only way up to the pad is a belt running down it, and it does not get tired.',
     hint: 'Driving straight at it is a tug of war you are losing by default. Go at it with weight over the driven wheels, or take it in stages and stop dead between them — a machine that can hold still on a moving floor has already solved most of this.',
-    spawn: [0, 1.2, -22.0],
+    // Further back than it was: the ramp reaches nearly two metres further
+    // down the yard now, and a run-up at this is worth having.
+    spawn: [0, 1.2, -24.5],
     groundSize: 120,
     budget: { cost: 120 },
     pieces: [
       // The ramp, sloping up towards +z, with its surface running back down.
+      //
+      // Long enough that its foot reaches the ground. At twelve metres it
+      // stopped short and stood on a sheer sixty-centimetre lip -- taller than
+      // a wheel, so nothing could climb it and a crate pushed at it simply
+      // stopped dead, with nothing on screen to say why.
       {
-        pos: [0, 2.0, -1], size: [9, 0.8, 12], rotX: -0.32, colour: 0x9a6b4b,
+        pos: [0, 1.77, -1.78], size: [9, 0.8, 13.6], rotX: -0.32, colour: 0x9a6b4b,
         belt: { dir: [0, -0.31, -0.95], speed: 3 },
       },
       // Walls down both sides of it, so the belt is the route rather than a
       // suggestion.
-      { pos: [-5.2, 2.4, -1], size: [0.6, 5, 12], colour: DARK },
-      { pos: [5.2, 2.4, -1], size: [0.6, 5, 12], colour: DARK },
+      { pos: [-5.2, 2.4, -1.78], size: [0.6, 5, 13.6], colour: DARK },
+      { pos: [5.2, 2.4, -1.78], size: [0.6, 5, 13.6], colour: DARK },
       // The shelf at the top, and a lip so an arriving crate stays arrived.
       { pos: [0, 3.5, 8], size: [9, 0.8, 8], colour: GREY },
       { pos: [0, 4.3, 11.8], size: [9, 0.8, 0.5], colour: DARK },
