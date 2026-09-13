@@ -1,0 +1,4 @@
+{
+  "name": "Scenery",
+  "levels": [{ "name": "Just a field", "spawn": [0, 1, 0] }]
+}

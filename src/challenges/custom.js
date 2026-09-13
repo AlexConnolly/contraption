@@ -1,6 +1,7 @@
 import { getLevel } from './levels.js';
 import { funLevel } from './fun.js';
 import { sanitiseLevel } from './format.js';
+import { downloadedLevel } from './downloaded.js';
 import { store } from '../ui/progress.js';
 
 /**
@@ -33,11 +34,16 @@ export function customLevel(id) {
 }
 
 /**
- * A level by id from anywhere — the campaign or somebody's own work. The one
- * place that has to know both exist, so nothing else does.
+ * A level by id from anywhere — the campaign, a downloaded pack, or somebody's
+ * own work. The one place that has to know all three exist, so nothing else
+ * does.
+ *
+ * `getLevel` is last because it answers for an id it does not recognise by
+ * handing back the first campaign level. Anything that can say "not mine" has
+ * to be asked before the thing that cannot.
  */
 export function resolveLevel(id, { fun = false } = {}) {
-  const level = customLevel(id) ?? getLevel(id);
+  const level = customLevel(id) ?? downloadedLevel(id) ?? getLevel(id);
   // The rules come off here rather than at each of the dozen places that ask
   // one, so a level with fun mode on is simply a level with no rules on it and
   // nothing else in the game has to know.

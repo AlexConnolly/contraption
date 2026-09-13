@@ -11,7 +11,7 @@ import js from '@eslint/js';
 export default [
   js.configs.recommended,
   {
-    files: ['src/**/*.js', 'tests/**/*.js', 'server/**/*.js', '*.config.js'],
+    files: ['src/**/*.js', 'tests/**/*.js', 'server/**/*.js', 'tools/**/*.js', '*.config.js'],
     languageOptions: {
       ecmaVersion: 2023,
       sourceType: 'module',
@@ -60,6 +60,7 @@ export default [
         queueMicrotask: 'readonly',
         DOMException: 'readonly',
         indexedDB: 'readonly',
+        AbortController: 'readonly',
         structuredClone: 'readonly',
       },
     },
