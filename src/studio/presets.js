@@ -1,6 +1,33 @@
 import { Blueprint } from '../core/blueprint.js';
+import { firstBanned } from '../challenges/bans.js';
 import { makeId, tidyLayout } from '../sim/program.js';
 import { IDENTITY_ORIENTATION, yawStep } from '../core/orientation.js';
+
+/**
+ * What a level opens with.
+ *
+ * Finishing a challenge used to throw your machine away. The next level had no
+ * design of its own, so it handed you the stock rover, and ten minutes of
+ * building was gone unless you had thought to save it to the garage first. You
+ * now arrive in whatever you were driving, which is both the sensible starting
+ * point for the next job and the moment to decide whether it is worth keeping.
+ *
+ * A level you have already built something for keeps what you built: coming
+ * back to a half-finished answer and finding last level's machine in its place
+ * would be worse than the problem this solves.
+ */
+export function openingMachine({ stored = null, carried = null, level } = {}) {
+  if (stored) return { blueprint: stored, from: 'stored' };
+  // A bare core is not a machine. Nor is nothing.
+  if (carried && carried.size > 1) {
+    const ban = firstBanned(level, carried);
+    // Over budget comes through: that is something the player can see and
+    // trim. Banned does not, because it could not be run at all.
+    if (!ban) return { blueprint: carried.clone(), from: 'carried' };
+    return { blueprint: starterRover(), from: 'starter', refused: ban.ban };
+  }
+  return { blueprint: starterRover(), from: 'starter' };
+}
 
 // A four-wheel rover that drives on WASD straight away, so a new player has
 // something to test before they have built anything.

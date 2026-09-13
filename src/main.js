@@ -5,7 +5,7 @@ import RAPIER from './sim/rapier.js';
 import { Blueprint } from './core/blueprint.js';
 import { Input } from './core/input.js';
 import { Studio } from './studio/studio.js';
-import { starterRover, quadcopter } from './studio/presets.js';
+import { starterRover, quadcopter, openingMachine } from './studio/presets.js';
 import { crane } from './studio/showpiece.js';
 import { Machine } from './sim/machine.js';
 import { Arena } from './sim/arena.js';
@@ -378,12 +378,25 @@ function respawn() {
 
 function changeLevel(id) {
   saveDesign(true);
+  // What you were driving a moment ago. The design is already in storage under
+  // the level being left, so the copy openingMachine takes is what keeps
+  // editing here from reaching back into it.
+  const carried = state.blueprint;
   state.level = resolveLevel(id);
-  const stored = loadDesign(state.level.id);
-  studio.replaceBlueprint(stored ?? starterRover());
+  const opening = openingMachine({
+    stored: loadDesign(state.level.id),
+    carried,
+    level: state.level,
+  });
+  studio.replaceBlueprint(opening.blueprint);
   hud.setLevel(state.level);
   applyBans();
   if (state.mode === 'test') enterTest(); else refreshReadouts();
+  if (opening.from === 'carried') {
+    hud.toast('Brought your machine with you — save it in the garage to keep it');
+  } else if (opening.refused) {
+    hud.toast(`Left your machine behind — ${opening.refused.name} here`, true);
+  }
 }
 
 // --------------------------------------------------------------------- menu
