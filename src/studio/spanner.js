@@ -1,6 +1,10 @@
 import { Blueprint } from '../core/blueprint.js';
 import { IDENTITY_ORIENTATION, yawStep } from '../core/orientation.js';
 
+// The rotation whose up axis points along +Z, which is the way the machine
+// faces.
+const FORWARD = 2;
+
 /**
  * A machine wide enough to hold down both ends of The Span.
  *
@@ -17,7 +21,7 @@ import { IDENTITY_ORIENTATION, yawStep } from '../core/orientation.js';
  * trick anybody building for this level will end up finding.
  */
 export function spanner({
-  arm = 10, lift = 5, reach = 6, rail = 2,
+  arm = 10, lift = 5, reach = 6, rail = 2, hoist = false,
 } = {}) {
   const bp = new Blueprint({ name: 'Spanner' });
   const place = (...args) => {
@@ -53,5 +57,36 @@ export function spanner({
     for (let z = 1; z <= reach; z += 1) place('block', [x, lift, z]);
   }
 
-  return bp;
+  // The crate half of the job. A fork cannot slide under a crate sitting flat
+  // on the ground -- there is nothing thin enough to get under it -- so the
+  // crate is picked up instead: a grabber low at the front takes hold of it on
+  // the way past, and a ram lifts the pair of them onto the middle pillar.
+  const rig = {};
+  if (hoist) {
+    const ram = place('piston', [0, 1, rail]);
+    bp.setConfig(ram.id, { stroke: 2.4, tension: 6 });
+    rig.ram = ram.id;
+    // A hook that reaches back down in front of the ram. Sitting the grabber
+    // straight on top of the ram puts its face a metre and a half up, which is
+    // over the crate rather than against it; this brings it down to the
+    // crate's own height and takes it by the side on the way past.
+    // Everything the ram carries has to touch the ram and nothing else. Hung
+    // one cell closer, the grabber also sat against the front rail, which
+    // bridges the joint and seizes it solid -- the crate was dragged the whole
+    // way along the floor with the ram straining against its own chassis.
+    place('block', [0, 2, rail]);
+    place('block', [0, 2, rail + 1]);
+    place('block', [0, 2, rail + 2]);
+    // Turned to face forward. A grabber reaches along its own up axis, so one
+    // placed the natural way up takes hold of the sky; this one looks the way
+    // the machine is going and takes the crate on the nose.
+    // Half a metre higher than it needs to be to reach the crate on the
+    // ground, because the ram's full stroke has to end with the crate's
+    // underside above the pillar it is going on to. Slung lower, the crate is
+    // lifted to just under the pillar top and jams against the face of it.
+    const grab = place('grabber', [0, 1, rail + 2], FORWARD);
+    rig.grab = grab.id;
+  }
+
+  return hoist ? { blueprint: bp, ...rig } : bp;
 }

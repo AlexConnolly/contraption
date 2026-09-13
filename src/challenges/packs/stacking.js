@@ -71,7 +71,10 @@ export const STACKING = [
     id: 'stacked-loop',
     demands: { steps: 3, flies: false },
     bans: ['flight'],
-    heightCap: 4,
+    // Six blocks is three metres against a tower of eight. A mast that
+    // telescopes still has to be most of the machine to reach the top of
+    // it, and there is no room left over for anything that is not mast.
+    heightCap: 6,
     name: 'Stacked Loop',
     brief: 'Ten loads on the pad, stacked, with the green one on top and up in the beam.',
     hint: 'You cannot reach the top of this, so stop trying to. Either grow a mast — pistons stack, and each one is a block tall and reaches far more than a block — or work from the bottom: put the green one down first, lift the pile, and post the next load in underneath it. The tower has to be standing at the end, not to have stood at some point.',

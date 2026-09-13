@@ -106,22 +106,26 @@ export const PLATES = [
     bans: ['flight', 'coupling'],
     name: 'The Span',
     brief: 'Three plates on three pillars, ten metres end to end, and one crate between them.',
-    hint: 'Count the plates, then count what you have to put on them. The crate is red and so is the middle plate; the outer two are neutral and will take any part of your machine. Nothing can be dropped off and left, so build one wide thing that reaches both ends at once — a long beam with weight at each end, and a way to get the crate up two metres in the middle.',
+    hint: 'Count the plates, then count what you have to put on them. The crate is red and so is the middle plate; the outer two are neutral and will take any part of your machine. Nothing can be dropped off and left, so build one wide thing that reaches both ends at once — and pick the crate up before you set off, because you will not be turning round to come back for it.',
     spawn: [0, 1.2, -16],
     groundSize: 130,
     budget: { cost: 200 },
     pieces: [
-      { pos: [-5, 1, 6], size: [3, 2, 3.4], colour: DARK },
+      { pos: [-5, 1, 6], size: [3.6, 2, 3.4], colour: DARK },
       { pos: [0, 1, 6], size: [3, 2, 3.4], colour: GREY },
-      { pos: [5, 1, 6], size: [3, 2, 3.4], colour: DARK },
+      { pos: [5, 1, 6], size: [3.6, 2, 3.4], colour: DARK },
     ],
     plates: [
-      { id: 'left', pos: [-5, 2.15, 6], size: [2.4, 0.3, 3.0] },
+      { id: 'left', pos: [-5, 2.15, 6], size: [3.2, 0.3, 3.0] },
       { id: 'middle', pos: [0, 2.15, 6], size: [2.4, 0.3, 3.0], tag: 1 },
-      { id: 'right', pos: [5, 2.15, 6], size: [2.4, 0.3, 3.0] },
+      { id: 'right', pos: [5, 2.15, 6], size: [3.2, 0.3, 3.0] },
     ],
     props: [
-      { id: 'crate', pos: [0, 0.55, -4], size: [1, 1, 1], mass: 4, colour: RED, tag: 1 },
+      // At the start line rather than out on the course. A machine wide enough
+      // to reach both ends of this is not a machine that can go and fetch
+      // something afterwards: it picks the crate up before it has moved, while
+      // it is still square, and carries it.
+      { id: 'crate', pos: [0, 0.55, -14.2], size: [1, 1, 1], mass: 4, colour: RED, tag: 1 },
     ],
     zones: [],
     objectives: [

@@ -47,7 +47,7 @@ function raise(seconds = 14) {
 
 describe('four blocks tall, nine metres of reach', () => {
   it('is inside the cap the level sets', () => {
-    expect(mast().blueprint.height()).toBe(LEVEL.heightCap);
+    expect(mast().blueprint.height()).toBeLessThanOrEqual(LEVEL.heightCap);
     expect(buildProblem(mast().blueprint, LEVEL)).toBe(null);
   });
 

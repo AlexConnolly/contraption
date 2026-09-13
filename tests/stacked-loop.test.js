@@ -60,11 +60,11 @@ function withTower({ n = 10, greenOn = n, jitter = 0 } = {}) {
 }
 
 describe('Stacked Loop holds together as a level', () => {
-  it('asks for a machine no taller than four blocks', () => {
-    expect(LEVEL.heightCap).toBe(4);
+  it('caps how tall the machine may be built', () => {
+    expect(LEVEL.heightCap).toBe(6);
     const tall = new Blueprint();
     tall.place('core', [0, 0, 0]);
-    for (let y = 1; y < 5; y += 1) tall.place('block', [0, y, 0]);
+    for (let y = 1; y <= LEVEL.heightCap; y += 1) tall.place('block', [0, y, 0]);
     expect(buildProblem(tall, LEVEL)).toMatch(/too tall/i);
   });
 
