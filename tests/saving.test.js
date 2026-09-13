@@ -17,7 +17,7 @@ const shelf = new Map();
 globalThis.localStorage = {
   getItem: (key) => shelf.get(key) ?? null,
   setItem: (key, value) => {
-    if (full) throw new DOMException('exceeded the quota', 'QuotaExceededError');
+    if (full) throw new Error('QuotaExceededError: exceeded the quota');
     shelf.set(key, String(value));
   },
   removeItem: (key) => { shelf.delete(key); },

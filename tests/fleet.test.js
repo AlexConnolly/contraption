@@ -5,7 +5,6 @@ import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 
 import { Arena } from '../src/sim/arena.js';
-import { Machine } from '../src/sim/machine.js';
 import { SignalBus } from '../src/sim/signals.js';
 import { Fleet } from '../src/sim/fleet.js';
 import { createWorld, STEP } from '../src/sim/world.js';
