@@ -28,9 +28,10 @@ const GREEN = tagColour(2);
 // grabber at, and driving at one just pushes it round the yard.
 const SIDE = 0.9;
 const RISE = SIDE + 0.02;
-// Magnetic, so they take hold of each other where they meet. Ten loads high is
-// a question about reach; it should not also be a question about whether the
-// sixth one went down four centimetres out.
+// Marked as loads to lift, so they are edged in amber and a player can tell
+// them from scenery at a glance. Ten of them will stand as a tower on their
+// own: measured, a ten-high pile with fifteen centimetres of slop in every
+// placement stands five times out of five and leans twelve centimetres.
 const loadAt = (id, x, z, colour = LOAD, tag = 0) => ({
   id,
   pos: [x, SIDE / 2 + 0.05, z],
@@ -90,7 +91,7 @@ export const STACKING = [
     heightCap: 6,
     name: 'Stacked Loop',
     brief: 'Ten loads on the pad, stacked, with the green one on top and up in the beam.',
-    hint: 'The loads are magnetic — they take hold of each other where they meet, so a load put down roughly right stays put. You cannot reach the top of this, so stop trying to. Either grow a mast — pistons stack, and each one is a block tall and reaches far more than a block — or work from the bottom: put the green one down first, lift the pile, and post the next load in underneath it. The tower has to be standing at the end, not to have stood at some point.',
+    hint: 'A load put down roughly right stays put — the pile is forgiving, so aim for the middle and do not fuss. You cannot reach the top of this, so stop trying to. Either grow a mast — pistons stack, and each one is a block tall and reaches far more than a block — or work from the bottom: put the green one down first, lift the pile, and post the next load in underneath it. The tower has to be standing at the end, not to have stood at some point.',
     spawn: [0, 1.2, -16],
     groundSize: 140,
     budget: { cost: 200 },

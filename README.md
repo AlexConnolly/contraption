@@ -600,6 +600,10 @@ axis-aligned rotations. Turning that into physics is the interesting part:
 
 Machine parts do not collide with each other, only with the world.
 
+A prop marked `magnetic` is one the level means you to pick up with the Magnet
+Grabber, and it is edged in amber so you can tell it from scenery. It is a
+label, not a rule — every prop in the game can be picked up.
+
 ### Getting up things
 
 A powered wheel stops at a step about half its own radius — measured, 0.4 m on
@@ -677,7 +681,7 @@ src/ui/          design tokens, front end (title, challenges, garage, worlds,
 
 ## Tests
 
-`npm test` runs 1325 tests. The pure logic (orientations, grid placement, body
+`npm test` runs 1319 tests. The pure logic (orientations, grid placement, body
 grouping, key bindings, objectives) is covered directly. On top of that,
 `tests/physics.test.js` builds real machines in a real Rapier world and asserts
 they behave — a rover drives, reverses and steers the correct way; an

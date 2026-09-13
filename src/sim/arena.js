@@ -21,41 +21,10 @@ function propVolume(prop) {
  * being broken rather than as a puzzle, so slippery surfaces are painted.
  */
 export const ICY = 0.25;
-// How still two magnetic loads have to be, relative to each other, before
-// they take hold, and how close counts as touching.
-const MAGNET_SETTLE = 0.9;
-const MAGNET_GAP = 0.04;
-// How much of the gap between two loads has to be vertical before one counts
-// as being on the other rather than beside it. Well under half, because a load
-// still settling has not dropped the last few centimetres yet.
-const MAGNET_UPRIGHT = 0.6;
-
-/**
- * Whether one load is stacked on the other, rather than merely touching it.
- *
- * A magnet meant "anything you brush against", which is not what a magnet is
- * for here. A load carried past the tower and grazing its side stuck to it, so
- * did one nudged into the pile edge-on, and so did one balanced on a corner
- * with most of itself hanging over nothing.
- *
- * Stacked on has a direction and a footprint: most of the distance between the
- * two has to be vertical, and the upper one's middle has to be over the lower
- * one rather than out past its edge. Inside its edge is generous -- for a
- * ninety-centimetre load that forgives forty-five of placement error, three
- * times what the tower actually needs -- and outside it is not a stack.
- */
-function stackedOn(one, other) {
-  const a = one.body.translation();
-  const b = other.body.translation();
-  const rise = Math.abs(a.y - b.y);
-  const stack = (one.spec.size[1] + other.spec.size[1]) / 2;
-  if (rise < stack * MAGNET_UPRIGHT) return false;
-
-  const low = a.y >= b.y ? other : one;
-  const across = Math.hypot(a.x - b.x, a.z - b.z);
-  return across <= Math.min(low.spec.size[0], low.spec.size[2]) / 2;
-}
-// What a load that takes hold of its neighbours is edged in.
+// What a load you can pick up is edged in. Amber is the one colour the game
+// has not already spent on telling you off -- red is a keep-out, green is a
+// goal, cyan is a rule -- so here it means "this one you can do something
+// with".
 const MAGNET_MARK = 0xf0a825;
 
 function surfaceMaterial({ colour, belt, friction }) {
@@ -226,11 +195,6 @@ export class Arena {
     this.props = new Map();
     this.plates = new Map();
     this.shots = [];
-    this.magnets = [];
-    this.magnetOf = new Map();
-    this.welded = new Set();
-    this.joints = [];
-    this.welds = 0;
     this.opponents = new Map();
     this.movers = [];
     this.belts = [];
@@ -539,11 +503,10 @@ export class Arena {
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     scene.add(mesh);
-    // Amber edges on anything magnetic. A player has no way to tell a load
-    // that will hold on to its neighbours from an ordinary crate, and amber is
-    // the one colour the game has not already spent on telling you off: red is
-    // a keep-out, green is a goal, cyan is a rule. Here it means "this one
-    // does something".
+    // Amber edges on anything a magnet will take hold of. Every prop in the
+    // game can be picked up, so this is not a rule -- it is a label, put on
+    // the loads a level means you to lift so you are not left wondering
+    // whether the pile in the corner is scenery.
     if (prop.magnetic && !this.headless) {
       const rim = new THREE.LineSegments(
         new THREE.EdgesGeometry(geometry),
@@ -552,13 +515,6 @@ export class Arena {
       mesh.add(rim);
     }
     this.props.set(prop.id, { spec: prop, body, mesh });
-    if (prop.magnetic) {
-      const magnet = {
-        id: prop.id, body, collider, spec: prop,
-      };
-      this.magnets.push(magnet);
-      this.magnetOf.set(collider.handle, magnet);
-    }
     this.objects.push({ body, mesh, collider });
   }
 
@@ -858,80 +814,6 @@ export class Arena {
     return this.shots.filter((s) => !s.fired).length;
   }
 
-  /**
-   * Loads that take hold of each other.
-   *
-   * Stacking is a test of placement accuracy long before it is a test of the
-   * machine, and a tower that comes down because the sixth load went on four
-   * centimetres out is not the puzzle anybody wanted. Magnetic loads latch
-   * where they meet, so the question goes back to being how you get a load up
-   * there rather than how steady your hand was.
-   *
-   * They only latch once they have stopped moving relative to one another.
-   * Without that a load flung past its neighbour welds itself on at whatever
-   * angle it happened to arrive at, and the tower grows sideways.
-   */
-  driveMagnets() {
-    if (this.magnets.length < 2) return;
-    for (const magnet of this.magnets) {
-      this.world.contactPairsWith(magnet.collider, (other) => {
-        const mate = this.magnetOf.get(other.handle);
-        if (!mate || mate.id === magnet.id) return;
-        const pair = magnet.id < mate.id ? `${magnet.id}|${mate.id}` : `${mate.id}|${magnet.id}`;
-        if (this.welded.has(pair)) return;
-
-        const a = magnet.body.linvel();
-        const b = mate.body.linvel();
-        const drift = Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
-        if (drift > MAGNET_SETTLE) return;
-        if (!stackedOn(magnet, mate)) return;
-
-        let touching = false;
-        this.world.contactPair(magnet.collider, other, (manifold) => {
-          for (let i = 0; i < manifold.numContacts(); i += 1) {
-            if (manifold.contactDist(i) <= MAGNET_GAP) {
-              touching = true;
-              return;
-            }
-          }
-        });
-        if (!touching) return;
-        this.weld(magnet, mate, pair);
-      });
-    }
-  }
-
-  /** Locks two loads together exactly where they are. */
-  weld(magnet, mate, pair) {
-    const here = magnet.body.translation();
-    const there = mate.body.translation();
-    const mid = {
-      x: (here.x + there.x) / 2,
-      y: (here.y + there.y) / 2,
-      z: (here.z + there.z) / 2,
-    };
-    const local = (body) => {
-      const t = body.translation();
-      const q = body.rotation();
-      return new THREE.Vector3(mid.x - t.x, mid.y - t.y, mid.z - t.z)
-        .applyQuaternion(new THREE.Quaternion(q.x, q.y, q.z, q.w).invert());
-    };
-    const qa = magnet.body.rotation();
-    const qb = mate.body.rotation();
-    const frame = new THREE.Quaternion(qb.x, qb.y, qb.z, qb.w)
-      .invert()
-      .multiply(new THREE.Quaternion(qa.x, qa.y, qa.z, qa.w));
-    const params = this.RAPIER.JointData.fixed(
-      local(magnet.body), { x: 0, y: 0, z: 0, w: 1 },
-      local(mate.body), {
-        x: frame.x, y: frame.y, z: frame.z, w: frame.w,
-      },
-    );
-    this.joints.push(this.world.createImpulseJoint(params, magnet.body, mate.body, true));
-    this.welded.add(pair);
-    this.welds += 1;
-  }
-
   addMover(spec) {
     const { RAPIER, world, scene } = this;
     const body = world.createRigidBody(
@@ -1003,7 +885,6 @@ export class Arena {
   step(dt) {
     this.elapsed += dt;
     this.driveShots();
-    this.driveMagnets();
     this.driveBelts();
     this.scrollBelts(dt);
     this.driveOpponents();
@@ -1184,12 +1065,6 @@ export class Arena {
       if (entry.body) this.world.removeRigidBody(entry.body);
     }
     this.objects = [];
-    for (const joint of this.joints) this.world.removeImpulseJoint(joint, true);
-    this.joints = [];
-    this.magnets = [];
-    this.magnetOf.clear();
-    this.welded.clear();
-    this.welds = 0;
     this.props.clear();
     this.plates.clear();
     this.shots = [];
