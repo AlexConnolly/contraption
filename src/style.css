@@ -141,7 +141,7 @@ input[type="range"] { accent-color: var(--amber); }
   letter-spacing: .12em;
   text-transform: uppercase;
 }
-.back::before { content: "9"; font-size: 15px; line-height: 1; }
+.back::before { content: "←"; font-size: 14px; line-height: 1; }
 .back:hover { border-color: var(--amber); color: var(--amber); }
 
 /* Play is the point of the screen, so it is the one thing that looks like a
