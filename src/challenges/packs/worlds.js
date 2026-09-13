@@ -291,7 +291,7 @@ export const WORLDS = [
       { pos: [0, 6, 0], size: [50, 26, 30], dir: [1, 0, 0], force: 20, gust: 0.8 },
     ],
     props: [
-      { id: 'payload', pos: [0, 0.75, -13], size: [0.8, 0.8, 0.8], mass: 3, colour: 0x7cc4ff },
+      { id: 'payload', pos: [0, 0.8, -13], size: [0.8, 0.8, 0.8], mass: 3, colour: 0x7cc4ff },
     ],
     zones: [
       { id: 'far-side', pos: [0, 1.2, 13], size: [7, 3, 6], colour: 0x4ade80 },

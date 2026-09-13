@@ -559,3 +559,60 @@
   line-height: 1.5;
 }
 .fe-balance b { color: var(--text); font-weight: 500; }
+
+/* A menu entry that is there but not yet. It stays on the list because
+   knowing what is coming is worth more than a shorter menu. */
+.fe-item.soon { color: var(--dim); border-left-color: var(--edge-soft); }
+.fe-item.soon .g { color: var(--faint); }
+.fe-item.soon .m { color: var(--amber); }
+.fe-item.soon:hover { background: var(--panel); transform: none; border-color: var(--edge); }
+.fe-item.soon:hover .g { color: var(--faint); }
+
+/* The front end's own dialog. The studio's modal belongs to the HUD, which is
+   not on screen while the menu is. */
+.fe-notice {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(7, 10, 15, .72);
+  backdrop-filter: blur(3px);
+}
+
+.fe-notice-panel {
+  max-width: 46ch;
+  display: grid;
+  gap: 14px;
+  justify-items: start;
+  padding: 26px 28px 24px;
+  background: var(--solid);
+  border: 1px solid var(--edge);
+  border-top: 2px solid var(--amber);
+  clip-path: polygon(0 0, calc(100% - var(--notch)) 0, 100% var(--notch), 100% 100%, var(--notch) 100%, 0 calc(100% - var(--notch)));
+}
+
+.fe-notice-panel h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.fe-notice-panel p {
+  margin: 0;
+  color: var(--dim);
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+.fe-mini.lead {
+  background: var(--amber);
+  border-color: var(--amber);
+  color: #10131a;
+  font-weight: 700;
+  padding: 0 18px;
+  height: 32px;
+}
+.fe-mini.lead:hover { background: var(--amber-b); border-color: var(--amber-b); color: #10131a; }

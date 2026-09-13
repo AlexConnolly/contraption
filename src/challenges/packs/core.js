@@ -94,7 +94,9 @@ export const CORE = [
       { pos: [0, 0.9, 3], size: [1, 1.8, 1], colour: DARK },
     ],
     props: [
-      { id: 'payload', pos: [-4, 1.45, 3], size: [0.9, 0.7, 0.9], mass: 4, colour: 0x7cc4ff },
+      // On the pedestal, not in it: the top is at 1.2 and the payload is
+      // 0.7 tall, so its middle is 1.55.
+      { id: 'payload', pos: [-4, 1.55, 3], size: [0.9, 0.7, 0.9], mass: 4, colour: 0x7cc4ff },
     ],
     zones: [
       { id: 'pad', pos: [4, 1.7, 3], size: [2.2, 1.6, 2.2], colour: 0x4ade80 },
@@ -158,10 +160,13 @@ export const CORE = [
       { pos: [0, 0.5, -3.4], size: [7.4, 1, 0.4], colour: DARK },
       { pos: [-3.5, 0.5, 0], size: [0.4, 1, 7.2], colour: DARK },
       { pos: [3.5, 0.5, 0], size: [0.4, 1, 7.2], colour: DARK },
-      // Three belts running away from the bin, one per colour.
-      { pos: [-6, 0.45, 6], size: [2.6, 0.9, 12], colour: 0xd6544a, belt: { dir: [0, 0, 1], speed: 1.6 } },
-      { pos: [0, 0.45, 6], size: [2.6, 0.9, 12], colour: 0x46c46a, belt: { dir: [0, 0, 1], speed: 1.6 } },
-      { pos: [6, 0.45, 6], size: [2.6, 0.9, 12], colour: 0x4a86d6, belt: { dir: [0, 0, 1], speed: 1.6 } },
+      // Three belts running away from the bin, one per colour. They start
+      // past the mouth of the bin at z = 3.6: the middle one used to run from
+      // z = 0, straight through the middle of the bin, with the two crates on
+      // the centre line sitting a third of a metre inside it.
+      { pos: [-6, 0.45, 8], size: [2.6, 0.9, 8], colour: 0xd6544a, belt: { dir: [0, 0, 1], speed: 1.6 } },
+      { pos: [0, 0.45, 8], size: [2.6, 0.9, 8], colour: 0x46c46a, belt: { dir: [0, 0, 1], speed: 1.6 } },
+      { pos: [6, 0.45, 8], size: [2.6, 0.9, 8], colour: 0x4a86d6, belt: { dir: [0, 0, 1], speed: 1.6 } },
       // A lip at the end of each so a delivered crate stays delivered.
       { pos: [-6, 1.3, 12.2], size: [2.6, 0.8, 0.4], colour: DARK },
       { pos: [0, 1.3, 12.2], size: [2.6, 0.8, 0.4], colour: DARK },

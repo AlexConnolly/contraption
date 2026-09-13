@@ -47,6 +47,111 @@ function surfaceMaterial({ colour, belt, friction }) {
   });
 }
 
+/**
+ * The chevron a belt is painted with, drawn once and shared.
+ *
+ * A conveyor with no markings on it is a coloured slab: the crate on it moves
+ * and the belt does not, so what a player sees is a crate sliding about on its
+ * own. The arrows are the only thing that says the floor is what is moving.
+ *
+ * Nothing to draw on in Node, where the sim runs headless in the tests, so the
+ * markings are simply left off.
+ */
+let chevron = null;
+
+function chevronTexture() {
+  if (chevron !== null) return chevron;
+  if (typeof document === 'undefined') {
+    chevron = false;
+    return chevron;
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  const ink = canvas.getContext('2d');
+  ink.lineCap = 'butt';
+  ink.lineJoin = 'miter';
+  // Pointing at the top of the tile, which is the +V end, with a clear gap
+  // below it so a run of them reads as a dashed arrow rather than a zigzag.
+  // Drawn twice: a dark pass under a light one, so the arrow holds its edge
+  // against a pale belt as well as a dark one.
+  const stroke = (width, colour) => {
+    ink.strokeStyle = colour;
+    ink.lineWidth = width;
+    ink.beginPath();
+    ink.moveTo(16, 84);
+    ink.lineTo(64, 34);
+    ink.lineTo(112, 84);
+    ink.stroke();
+  };
+  stroke(30, 'rgba(10, 14, 20, 0.55)');
+  stroke(18, 'rgba(255, 255, 255, 0.95)');
+
+  chevron = new THREE.CanvasTexture(canvas);
+  chevron.wrapS = THREE.ClampToEdgeWrapping;
+  chevron.wrapT = THREE.RepeatWrapping;
+  chevron.anisotropy = 8;
+  return chevron;
+}
+
+/** How much belt one chevron covers. */
+const CHEVRON = 1.4;
+
+/**
+ * Arrows on the top of a belt, laid on as a separate sheet rather than as a
+ * face of the box: the box's own faces would need the texture turned to match
+ * whichever way the belt happens to run, and a sheet can simply be pointed.
+ */
+function beltMarkings(scene, piece, dir, speed) {
+  const base = chevronTexture();
+  if (!base) return null;
+
+  // A right-handed frame with the sheet's V along the belt and its face
+  // pointing up. Taken the other way round it is a reflection, not a rotation,
+  // and the sheet ends up inside out and invisible.
+  const forward = new THREE.Vector3(dir[0], dir[1], dir[2]).normalize();
+  const up = Math.abs(forward.y) > 0.95
+    ? new THREE.Vector3(0, 0, 1)
+    : new THREE.Vector3(0, 1, 0);
+  const right = new THREE.Vector3().crossVectors(forward, up).normalize();
+  const lift = new THREE.Vector3().crossVectors(right, forward).normalize();
+
+  // The box measured along the two directions that matter. No shipped belt is
+  // turned, so this takes the piece's size as it stands.
+  const { size } = piece;
+  const reach = (v) => Math.abs(v.x) * size[0] + Math.abs(v.y) * size[1] + Math.abs(v.z) * size[2];
+  const along = reach(forward);
+  const across = reach(right);
+
+  const texture = base.clone();
+  texture.needsUpdate = true;
+  texture.repeat.set(1, Math.max(1, Math.round(along / CHEVRON)));
+
+  const mesh = new THREE.Mesh(
+    // Short of the edges, so it reads as paint on the belt rather than as a
+    // second surface sitting on top of it.
+    // Capped as well as proportional: on a nine-metre belt, arrows that span
+    // it are squat slabs, and a strip down the middle reads as a lane marking,
+    // which is what a conveyor actually looks like.
+    new THREE.PlaneGeometry(Math.min(across * 0.72, 2.8), along * 0.98),
+    new THREE.MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+      opacity: 0.72,
+      depthWrite: false,
+    }),
+  );
+  mesh.quaternion.setFromRotationMatrix(
+    new THREE.Matrix4().makeBasis(right, forward, lift),
+  );
+  mesh.position
+    .set(piece.pos[0], piece.pos[1], piece.pos[2])
+    .addScaledVector(lift, size[1] / 2 + 0.012);
+  mesh.renderOrder = 1;
+  scene.add(mesh);
+  return { mesh, texture, speed };
+}
+
 function fixedBox(RAPIER, world, scene, piece) {
   const { pos, size, rotX = 0, rotY = 0, colour, belt, friction } = piece;
   const quaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(rotX, rotY, 0));
@@ -99,6 +204,7 @@ export class Arena {
     this.opponents = new Map();
     this.movers = [];
     this.belts = [];
+    this.beltMarks = [];
     this.winds = [];
     this.elapsed = 0;
     this.build();
@@ -155,11 +261,11 @@ export class Arena {
       if (piece.belt) {
         const [dx, dy, dz] = piece.belt.dir;
         const length = Math.hypot(dx, dy, dz) || 1;
-        this.belts.push({
-          collider: built.collider,
-          dir: [dx / length, dy / length, dz / length],
-          speed: piece.belt.speed ?? 2,
-        });
+        const dir = [dx / length, dy / length, dz / length];
+        const speed = piece.belt.speed ?? 2;
+        this.belts.push({ collider: built.collider, dir, speed });
+        const marks = beltMarkings(scene, piece, dir, speed);
+        if (marks) this.beltMarks.push(marks);
       }
     }
     for (const hoop of level.hoops ?? []) this.addHoop(hoop);
@@ -518,6 +624,21 @@ export class Arena {
    * rather than setting it, the same way a belt does, so being leaned on by
    * something heavy actually slows it down instead of being ignored.
    */
+  /**
+   * The arrows travelling along a belt at the belt's own speed.
+   *
+   * Cosmetic, and the one thing that makes a conveyor read as a conveyor.
+   * Scrolled by time rather than set from a clock so that a level which is
+   * paused or stepped by hand looks right.
+   */
+  scrollBelts(dt) {
+    for (const mark of this.beltMarks) {
+      // Down the V axis, because the sheet's V runs along the belt and the
+      // pattern travels the opposite way to the offset.
+      mark.texture.offset.y -= (mark.speed * dt) / CHEVRON;
+    }
+  }
+
   driveOpponents() {
     const REACHED = 1.4;
     // Firm enough to hold its speed against the ground, soft enough that
@@ -853,6 +974,7 @@ export class Arena {
     this.driveShots();
     this.driveMagnets();
     this.driveBelts();
+    this.scrollBelts(dt);
     this.driveOpponents();
     this.driveWind(dt);
     this.driftWind(dt);
@@ -1043,6 +1165,13 @@ export class Arena {
     this.opponents.clear();
     this.movers = [];
     this.belts = [];
+    for (const mark of this.beltMarks) {
+      this.scene.remove(mark.mesh);
+      mark.mesh.geometry.dispose();
+      mark.mesh.material.dispose();
+      mark.texture.dispose();
+    }
+    this.beltMarks = [];
     this.winds = [];
   }
 }

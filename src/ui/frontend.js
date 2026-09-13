@@ -27,6 +27,24 @@ const SVG = {
   build: '<path d="M3 20h18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M5 20V9l5-4 5 4v11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M15 20v-6h4v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>',
 };
 
+/**
+ * Whether the open world is offered yet.
+ *
+ * Off on purpose. Everything behind it works and is tested -- worlds, hosting,
+ * joining, the lot -- but it is not good enough to put in front of somebody as
+ * a finished thing yet: a new world is an empty plain, and there is nothing
+ * shipped to open. Turning this back on is the only change needed; nothing is
+ * torn out and nothing is commented away.
+ */
+export const WORLDS_READY = false;
+
+/** What the Worlds entry on the title screen says and does. */
+export function worldsEntry(ready = WORLDS_READY) {
+  return ready
+    ? { meta: 'Open sandbox', opens: 'worlds' }
+    : { meta: 'Coming soon', opens: null };
+}
+
 function icon(name, size = 18) {
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true">${SVG[name]}</svg>`;
 }
@@ -166,6 +184,11 @@ export class FrontEnd {
   }
 
   show(screen) {
+    // One gate, so there is no second way in when something is switched off.
+    if (screen === 'worlds' && !worldsEntry().opens) {
+      this.show('title');
+      return;
+    }
     this.screen = screen;
     this.root.classList.toggle('title', screen === 'title');
     this.root.classList.toggle('solid', screen !== 'title');
@@ -182,6 +205,33 @@ export class FrontEnd {
     if (screen === 'settings') this.renderSettings();
   }
 
+  /**
+   * A small dialog over the menu. The studio's modal belongs to the HUD, which
+   * is not up while the menu is, so this is the front end's own.
+   */
+  notice({ title, body, ok = 'Right you are' }) {
+    this.root.querySelector('.fe-notice')?.remove();
+
+    const panel = el('div', 'fe-notice-panel');
+    panel.append(el('h2', null, title), el('p', null, body));
+    const button = el('button', 'fe-mini lead', ok);
+    panel.append(button);
+
+    const shade = el('div', 'fe-notice');
+    shade.append(panel);
+    const close = () => {
+      shade.remove();
+      this.root.querySelector('.fe-item')?.focus();
+    };
+    button.addEventListener('click', close);
+    shade.addEventListener('click', (event) => {
+      if (event.target === shade) close();
+    });
+    this.root.append(shade);
+    button.focus();
+    return close;
+  }
+
   backBar(label) {
     const back = el('button', 'fe-back', `${icon('back', 15)} Back`);
     back.addEventListener('click', () => this.show('title'));
@@ -192,6 +242,7 @@ export class FrontEnd {
   // ------------------------------------------------------------------ title
 
   renderTitle() {
+    const worlds = worldsEntry();
     const campaign = LEVELS.filter((l) => l.id !== 'sandbox');
     const solved = store.solvedCount(campaign.map((l) => l.id));
     const next = campaign.find((l) => !store.solved(l.id)) ?? campaign[campaign.length - 1];
@@ -229,8 +280,14 @@ export class FrontEnd {
       {
         label: 'Worlds',
         glyph: 'world',
-        meta: 'Open sandbox',
-        go: () => this.show('worlds'),
+        meta: worlds.meta,
+        soon: !worlds.opens,
+        go: () => (worlds.opens ? this.show(worlds.opens) : this.notice({
+          title: 'Worlds are not ready yet',
+          body: 'An open world you build in, put machines into and leave running, '
+            + 'with other people able to join it. It works — it is just not good '
+            + 'enough to hand you yet. It will be here.',
+        })),
       },
       {
         label: 'Build',
@@ -256,7 +313,7 @@ export class FrontEnd {
     for (const item of items) {
       const button = el(
         'button',
-        `fe-item${item.lead ? ' lead' : ''}${item.exit ? ' exit' : ''}`,
+        `fe-item${item.lead ? ' lead' : ''}${item.exit ? ' exit' : ''}${item.soon ? ' soon' : ''}`,
         `<span class="g">${icon(item.glyph, item.exit ? 14 : 17)}</span>`
         + `<span>${item.label}</span>`
         + `<span class="m">${item.meta}</span>`,

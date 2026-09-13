@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   WORLD_TOOLS, MODE_NAMES, deployAt, swatches,
 } from '../src/ui/sandbox.js';
-import { ago } from '../src/ui/frontend.js';
+import { ago, worldsEntry, WORLDS_READY } from '../src/ui/frontend.js';
 import { MODES } from '../src/world/session.js';
 import { MATERIALS, BLOCK } from '../src/world/terrain.js';
 import { WORLD_LIMITS } from '../src/world/format.js';
@@ -84,5 +84,23 @@ describe('how long ago a world was saved', () => {
 
   it('never reports the future as an age', () => {
     expect(ago(now + 60_000, now)).toBe('just now');
+  });
+});
+
+describe('the Worlds entry on the title screen', () => {
+  it('opens the worlds screen when the open world is ready', () => {
+    expect(worldsEntry(true).opens).toBe('worlds');
+  });
+
+  it('opens nothing at all when it is not, and says why it is there', () => {
+    const entry = worldsEntry(false);
+    expect(entry.opens).toBe(null);
+    expect(entry.meta).toMatch(/coming soon/i);
+  });
+
+  it('is the one switch, so there is no second way in', () => {
+    // `show('worlds')` asks this too rather than trusting the menu, which is
+    // the only reason a feature that is switched off stays switched off.
+    expect(worldsEntry(WORLDS_READY).opens).toBe(WORLDS_READY ? 'worlds' : null);
   });
 });

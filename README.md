@@ -256,6 +256,11 @@ the rover half a metre in three seconds and the drone two and a half. Much past
 
 ## Open world
 
+> **Not offered yet.** The Worlds entry on the title screen says so and explains
+> why. Everything below works and is tested; it is switched off behind
+> `WORLDS_READY` in `src/ui/frontend.js` until it is good enough to hand
+> somebody, and turning it back on is that one line.
+
 The campaign is one level, one machine, one run. Worlds are the other game:
 build the place itself, put as many machines in it as you like, and leave them
 running.
@@ -619,7 +624,7 @@ src/ui/          design tokens, front end (title, challenges, garage, worlds,
 
 ## Tests
 
-`npm test` runs 1278 tests. The pure logic (orientations, grid placement, body
+`npm test` runs 1285 tests. The pure logic (orientations, grid placement, body
 grouping, key bindings, objectives) is covered directly. On top of that,
 `tests/physics.test.js` builds real machines in a real Rapier world and asserts
 they behave — a rover drives, reverses and steers the correct way; an
