@@ -28,6 +28,8 @@ export const FROM_CLIENT = {
   DEPLOY: 'deploy',
   REMOVE: 'remove',
   EDIT: 'edit',
+  // Who may build here. Only the owner is allowed to change it.
+  AUTHORITY: 'authority',
   // How long the round trip is, and where this player is looking. The first
   // decides how far forward a snapshot is carried; the second decides what is
   // worth sending them at all.
@@ -44,6 +46,8 @@ export const FROM_HOST = {
   EDITS: 'edits',
   DENIED: 'denied',
   PONG: 'pong',
+  /** The world's own settings changed — at the moment, only who may build. */
+  WORLD: 'world',
 };
 
 /** Snapshots go out this often. Everything that leads a body forward uses it. */

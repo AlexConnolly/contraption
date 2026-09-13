@@ -323,9 +323,12 @@ lands. Everything a client does to the world is a request: it places the block
 when the host says so, which is what stops four people each being sure they are
 right.
 
-Who may build is the world's own setting. `owner` means the first person to
-join is the only one who can change the place; `open` means anybody can. Either
-way anybody can drive, and no two people can drive the same machine.
+Who may build is the world's own setting, and it is a button in the bar:
+**Only me** means the owner is the only one who can place a block or put a
+machine down; **Anyone builds** opens it to everybody. Only the owner can move
+that switch — otherwise an open world could never be closed again by the person
+who opened it. Either way anybody can drive, no two people can drive the same
+machine, and the fleet list says by name who is in what.
 
 ### Making it feel instant
 
@@ -368,6 +371,33 @@ whose bodies are all asleep is not sent at all beyond one restatement a second,
 and neither is one more than 180 m from where you are looking — so a city
 standing still costs almost nothing, and forty machines all moving at once come
 to 7.6 KB a tick.
+
+### Whether it holds up
+
+The target was a town of five thousand blocks with forty machines in it and
+four people connected, at sixty frames a second. Measured:
+
+| | |
+| --- | --- |
+| 5000 blocks, nothing moving | 0.007 ms a step, 30 chunks |
+| 40 machines parked | 0.05 ms a step, 39 of 40 asleep |
+| 40 machines all driving, town and all | 2.3 ms a step |
+| host tick, 4 players, 40 driving | 1.0 ms, 31 KB/s each |
+
+And pushing past the format's cap of sixty-four machines, to find where the
+simulation itself gives up rather than where the format says to stop:
+
+| machines | bodies | a step | of a frame |
+| ---: | ---: | ---: | ---: |
+| 64 | 320 | 2.0 ms | 12 % |
+| 100 | 500 | 3.2 ms | 19 % |
+| 150 | 750 | 7.1 ms | 43 % |
+| 220 | 1100 | 13.5 ms | 81 % |
+| 300 | 1500 | 17.9 ms | 107 % |
+
+So what breaks first is the cap, and it breaks with about four times the
+headroom still in hand — a number to raise when somebody wants it raised,
+rather than a wall.
 
 ## Sound
 
@@ -589,7 +619,7 @@ src/ui/          design tokens, front end (title, challenges, garage, worlds,
 
 ## Tests
 
-`npm test` runs 1264 tests. The pure logic (orientations, grid placement, body
+`npm test` runs 1278 tests. The pure logic (orientations, grid placement, body
 grouping, key bindings, objectives) is covered directly. On top of that,
 `tests/physics.test.js` builds real machines in a real Rapier world and asserts
 they behave — a rover drives, reverses and steers the correct way; an

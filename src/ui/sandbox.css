@@ -239,3 +239,24 @@ body.in-sandbox.garage .sb-right { top: auto; bottom: 52px; }
   border: 1px solid var(--edge);
   padding: 1px 5px;
 }
+
+/* Who may build here. Amber when it is open, because that is the state worth
+   noticing: somebody who joins can change your town. */
+.sb-who {
+  height: 34px;
+  flex: none;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.sb-who.open { border-color: var(--amber); color: var(--amber); }
+.sb-who[hidden] { display: none !important; }
+
+.sb-row-at.taken {
+  color: var(--cyan);
+  font-family: var(--ui);
+  font-size: 11px;
+  letter-spacing: .02em;
+  text-transform: none;
+}

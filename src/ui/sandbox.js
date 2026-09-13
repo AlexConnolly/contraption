@@ -117,6 +117,14 @@ export class Sandbox {
     this.name.title = 'What this world is called';
     this.name.addEventListener('change', () => this.h.onRename(this.name.value));
 
+    // Who may build here. It only bites once somebody else is in the world,
+    // but it is a property of the world rather than of the session, so it is
+    // set and saved whether or not anybody is hosting yet.
+    this.who = el('button', 'sb-who');
+    this.who.addEventListener('click', () => this.h.onAuthority(
+      this.h.session()?.world.online?.authority === 'open' ? 'owner' : 'open',
+    ));
+
     // Only up when there is somebody else in the world. Offline it would be
     // a permanent reminder of a thing that is not happening.
     this.link = el('div', 'sb-link');
@@ -133,7 +141,7 @@ export class Sandbox {
     actions.append(save, share);
 
     this.top.append(
-      leave, this.modes, this.name, el('span', 'spacer'),
+      leave, this.modes, this.name, this.who, el('span', 'spacer'),
       this.link, this.blockCount, this.fleetCount, actions,
     );
   }
@@ -217,15 +225,20 @@ export class Sandbox {
         'Nothing standing in this world yet. Build one in the garage, then Deploy it.',
       ));
     }
+    const net = this.h.net?.() ?? null;
     for (const member of members) {
       const row = el('button', 'sb-row');
-      const driving = session.controlled()?.id === member.id;
+      const at = net ? net.driverOf(member.id) : (session.controlled()?.id === member.id ? 'you' : null);
       if (member.id === session.selected) row.classList.add('on');
-      if (driving) row.classList.add('driving');
+      if (at === 'you') row.classList.add('driving');
       const where = member.machine.corePosition();
       row.append(
         el('span', 'sb-row-name', member.name || member.id),
-        el('span', 'sb-row-at', `${Math.round(where.x)}, ${Math.round(where.z)}`),
+        el(
+          'span',
+          at && at !== 'you' ? 'sb-row-at taken' : 'sb-row-at',
+          at && at !== 'you' ? at : `${Math.round(where.x)}, ${Math.round(where.z)}`,
+        ),
       );
       row.addEventListener('click', () => this.h.onSelect(member.id));
       this.fleetList.append(row);
@@ -269,6 +282,16 @@ export class Sandbox {
     for (const button of this.mats.children) {
       button.classList.toggle('active', Number(button.dataset.material) === this.material);
     }
+
+    const open = session.world.online?.authority === 'open';
+    const net = this.h.net?.() ?? null;
+    this.who.textContent = open ? 'Anyone builds' : 'Only me';
+    this.who.classList.toggle('open', open);
+    this.who.title = open
+      ? 'Anybody who joins can place blocks and put machines down'
+      : 'Only you can change this world. Anybody who joins can still drive.';
+    // A guest cannot set it, and cannot be shown a control that does nothing.
+    this.who.hidden = Boolean(net) && net.owner !== net.you;
 
     this.left.hidden = session.mode !== 'world';
     this.deployRow.hidden = session.mode !== 'garage';

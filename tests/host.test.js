@@ -270,6 +270,113 @@ describe('building together', () => {
   }, 30000);
 });
 
+describe('who may build here', () => {
+  it("is the owner's to change, and everybody is told", async () => {
+    const world = blankWorld();
+    world.online = { authority: 'owner' };
+    const running = await host({ world });
+    const owner = connect(running.port, 'Ada');
+    const guest = connect(running.port, 'Grace');
+    await owner.connect();
+    await guest.connect();
+    expect(guest.mayBuild).toBe(false);
+
+    owner.askToSetAuthority('open');
+    await until(() => guest.mayBuild);
+    expect(running.session.world.online.authority).toBe('open');
+    expect(guest.session.world.online.authority).toBe('open');
+
+    // And a guest who could not build a moment ago now can.
+    guest.askToEdit([[1, 0, 1, 4]]);
+    await until(() => running.session.counts().blocks === 1);
+  }, 30000);
+
+  it('closes again, which is the half that has to work', async () => {
+    const world = blankWorld();
+    world.online = { authority: 'open' };
+    const running = await host({ world });
+    const owner = connect(running.port, 'Ada');
+    const guest = connect(running.port, 'Grace');
+    await owner.connect();
+    await guest.connect();
+    expect(guest.mayBuild).toBe(true);
+
+    owner.askToSetAuthority('owner');
+    await until(() => !guest.mayBuild);
+
+    let refused = null;
+    guest.h.onDenied = (why) => { refused = why; };
+    guest.askToEdit([[1, 0, 1, 4]]);
+    await until(() => refused !== null);
+    expect(running.session.counts().blocks).toBe(0);
+  }, 30000);
+
+  it("is not a guest's to change, even in a world they may build in", async () => {
+    const world = blankWorld();
+    world.online = { authority: 'open' };
+    const running = await host({ world });
+    const owner = connect(running.port, 'Ada');
+    const guest = connect(running.port, 'Grace');
+    await owner.connect();
+    await guest.connect();
+
+    let refused = null;
+    guest.h.onDenied = (why) => { refused = why; };
+    guest.askToSetAuthority('owner');
+    await until(() => refused !== null);
+    expect(refused).toMatch(/owner/i);
+    expect(running.session.world.online.authority).toBe('open');
+  }, 30000);
+});
+
+describe('who is driving what', () => {
+  it("says so on everybody else's list, by name", async () => {
+    const running = await host();
+    running.session.deploy({ blueprint: rover(), at: [0, 1.2, 0] });
+    const driver = connect(running.port, 'Ada');
+    const watcher = connect(running.port, 'Grace');
+    await driver.connect();
+    await watcher.connect();
+
+    driver.askToControl('v1');
+    await until(() => watcher.driverOf('v1') === 'Ada');
+    expect(driver.driverOf('v1')).toBe('you');
+    expect(watcher.driverOf('v1')).toBe('Ada');
+  }, 30000);
+
+  it('forgets it when they let go', async () => {
+    const running = await host();
+    running.session.deploy({ blueprint: rover(), at: [0, 1.2, 0] });
+    const driver = connect(running.port, 'Ada');
+    const watcher = connect(running.port, 'Grace');
+    await driver.connect();
+    await watcher.connect();
+
+    driver.askToControl('v1');
+    await until(() => watcher.driverOf('v1') === 'Ada');
+    driver.askToControl(null);
+    await until(() => watcher.driverOf('v1') === null);
+  }, 30000);
+
+  it('forgets it when they disappear without letting go', async () => {
+    const running = await host();
+    running.session.deploy({ blueprint: rover(), at: [0, 1.2, 0] });
+    const driver = connect(running.port, 'Ada');
+    const watcher = connect(running.port, 'Grace');
+    await driver.connect();
+    await watcher.connect();
+
+    driver.askToControl('v1');
+    await until(() => watcher.driverOf('v1') === 'Ada');
+    driver.dispose();
+    await until(() => watcher.driverOf('v1') === null);
+
+    // And the machine is free for somebody else to pick up.
+    watcher.askToControl('v1');
+    await until(() => watcher.driving === 'v1');
+  }, 30000);
+});
+
 describe('the host also serves the game', () => {
   it('answers rather than falling over when there is no build to serve', async () => {
     const running = await host({ serve: 'no-such-folder' });

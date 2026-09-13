@@ -167,7 +167,12 @@ export class Host {
     if (!this.players.has(player.id)) return;
     // Whatever they were driving coasts to a stop rather than carrying on
     // under the last keys they happened to be holding when the line dropped.
-    if (player.driving) this.session.fleet.control(null);
+    if (player.driving) {
+      const was = player.driving;
+      player.driving = null;
+      this.session.fleet.control(null);
+      this.broadcast({ type: FROM_HOST.FLEET, driving: { player: player.id, id: null, was } });
+    }
     this.players.delete(player.id);
     if (this.owner === player.id) this.owner = this.players.keys().next().value ?? null;
     this.broadcast({ type: FROM_HOST.LEFT, player: { id: player.id } });
@@ -278,6 +283,19 @@ export class Host {
           if (other.driving === member.id) other.driving = null;
         }
         this.broadcast({ type: FROM_HOST.FLEET, removed: [num] });
+        break;
+      }
+
+      case FROM_CLIENT.AUTHORITY: {
+        // Not `mayBuild`: this is the one thing only the owner decides, or an
+        // open world could never be closed again by the person who opened it.
+        if (this.owner !== player.id) {
+          this.deny(player, 'Only the owner decides who may build here');
+          return;
+        }
+        const wanted = message.authority === 'open' ? 'open' : 'owner';
+        this.session.world.online = { authority: wanted };
+        this.broadcast({ type: FROM_HOST.WORLD, authority: wanted, owner: this.owner });
         break;
       }
 

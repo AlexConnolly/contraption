@@ -87,6 +87,9 @@ export class NetClient {
     this.owner = null;
     this.authority = 'owner';
     this.players = new Map();
+    // Which machine each player has the controls of, so a fleet list can say
+    // who is in what rather than only which one is yours.
+    this.drivers = new Map();
     this.driving = null;
     this.snapshots = 0;
     this.lastSnapshot = 0;
@@ -175,7 +178,14 @@ export class NetClient {
         return undefined;
       case FROM_HOST.LEFT:
         this.players.delete(message.player.id);
+        for (const [id, who] of this.drivers) if (who === message.player.id) this.drivers.delete(id);
         this.h.onPlayers?.([...this.players.values()]);
+        return undefined;
+      case FROM_HOST.WORLD:
+        this.authority = message.authority ?? this.authority;
+        this.owner = message.owner ?? this.owner;
+        if (this.session) this.session.world.online = { authority: this.authority };
+        this.h.onWorld?.(message);
         return undefined;
       case FROM_HOST.FLEET: return this.fleetChanged(message);
       case FROM_HOST.EDITS: return this.edited(message.ops);
@@ -235,11 +245,25 @@ export class NetClient {
   fleetChanged(message) {
     for (const wire of message.added ?? []) this.addVehicle(wire);
     for (const num of message.removed ?? []) this.session?.remove(`v${num}`);
-    if (message.driving && message.driving.player === this.you) {
-      this.driving = message.driving.id;
-      this.session?.control(this.driving, this.keys ?? null);
+    if (message.driving) {
+      const { player, id, was } = message.driving;
+      for (const [vehicle, who] of this.drivers) if (who === player) this.drivers.delete(vehicle);
+      if (id) this.drivers.set(id, player);
+      if (was) this.drivers.delete(was);
+      if (player === this.you) {
+        this.driving = id;
+        this.session?.control(id, this.keys ?? null);
+      }
     }
     this.h.onFleet?.(message);
+  }
+
+  /** Who has the controls of a machine, by name, or null if nobody has. */
+  driverOf(id) {
+    const who = this.drivers.get(id);
+    if (!who) return null;
+    if (who === this.you) return 'you';
+    return this.players.get(who)?.name ?? 'somebody';
   }
 
   edited(ops) {
@@ -305,6 +329,11 @@ export class NetClient {
   /** Block edits as `[x, y, z, material]`, applied when they come back. */
   askToEdit(ops) {
     return this.send({ type: FROM_CLIENT.EDIT, ops });
+  }
+
+  /** Opens the world to everybody, or closes it back to the owner. */
+  askToSetAuthority(authority) {
+    return this.send({ type: FROM_CLIENT.AUTHORITY, authority });
   }
 
   // ---------------------------------------------------------------------- loop

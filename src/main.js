@@ -581,6 +581,7 @@ async function joinWorld(address) {
         sandbox.refresh();
       },
       onPlayers: () => sandbox.refresh(),
+      onWorld: () => sandbox.refresh(),
       onClosed: () => {
         if (state.mode !== 'sandbox') return;
         audio.deny();
@@ -1501,6 +1502,18 @@ async function boot() {
         saveWorld();
       },
       onShare: () => (state.net ? shareAddress() : shareWorld()),
+      onAuthority: (value) => {
+        if (!state.session) return;
+        if (state.net) {
+          state.net.askToSetAuthority(value);
+          return;
+        }
+        state.session.world.online = { authority: value };
+        sandbox.refresh();
+        hud.toast(value === 'open'
+          ? 'Anybody who joins can build here'
+          : 'Only you can build here — others can still drive');
+      },
       onRename: (name) => {
         if (state.net) {
           hud.toast('Only the host can rename this world', true);
