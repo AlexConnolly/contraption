@@ -110,6 +110,7 @@ const survey = new Survey({
 });
 
 const settings = store.settings({
+  fun: 'off',
   camera: 'chase',
   shadows: 'on',
   scanlines: 'on',
@@ -379,13 +380,18 @@ function respawn() {
   snapCamera();
 }
 
+/** Whether the rules are off. One place, so nothing else has to remember. */
+function inFun() {
+  return settings.fun === 'on';
+}
+
 function changeLevel(id) {
   saveDesign(true);
   // What you were driving a moment ago. The design is already in storage under
   // the level being left, so the copy openingMachine takes is what keeps
   // editing here from reaching back into it.
   const carried = state.blueprint;
-  state.level = resolveLevel(id);
+  state.level = resolveLevel(id, { fun: inFun() });
   const opening = openingMachine({
     stored: loadDesign(state.level.id),
     carried,
@@ -1155,14 +1161,15 @@ function simulateStep() {
     // against the same yardstick as everyone else's and does not go on the
     // board. It still counts as a win on screen.
     const modded = usesPacks(state.blueprint);
-    if (!modded) store.recordScore(state.level.id, report.score ?? 0);
+    const fun = Boolean(state.level.fun);
+    if (!modded && !fun) store.recordScore(state.level.id, report.score ?? 0);
     hud.showScore(
       state.level,
       report,
       state.blueprint.cost(),
       state.blueprint,
       nextLevel(state.level.id),
-      { modded },
+      { modded, fun },
     );
     return;
   }
@@ -1170,14 +1177,15 @@ function simulateStep() {
     state.won = true;
     audio.win();
     const modded = usesPacks(state.blueprint);
-    if (!modded) store.recordWin(state.level.id, report.elapsed, state.blueprint.cost());
+    const fun = Boolean(state.level.fun);
+    if (!modded && !fun) store.recordWin(state.level.id, report.elapsed, state.blueprint.cost());
     hud.showWin(
       state.level,
       report,
       state.blueprint.cost(),
       state.blueprint,
       nextLevel(state.level.id),
-      { modded },
+      { modded, fun },
     );
   }
 }
@@ -1294,7 +1302,7 @@ async function boot() {
   loadPacks();
   world = createWorld(RAPIER, gravityOf(state.level));
 
-  state.level = resolveLevel(store.lastLevel() ?? 'first-haul');
+  state.level = resolveLevel(store.lastLevel() ?? 'first-haul', { fun: inFun() });
   const stored = loadDesign(state.level.id);
   state.blueprint = stored ?? starterRover();
 
@@ -1625,8 +1633,19 @@ async function boot() {
         }
         await openWorld(result.world, null);
       },
+      funMode: () => inFun(),
+      onFunMode: (on) => {
+        applySetting('fun', on ? 'on' : 'off');
+        // The level in hand is the old one with the old rules on it, so it has
+        // to be resolved again or the toggle does nothing until you change
+        // course.
+        state.level = resolveLevel(state.level.id, { fun: inFun() });
+        hud.setLevel(state.level);
+        applyBans();
+        refreshReadouts();
+      },
       onPlay: (levelId) => {
-        if (levelId !== state.level.id) changeLevel(levelId);
+        if (levelId !== state.level.id || Boolean(state.level.fun) !== inFun()) changeLevel(levelId);
         leaveMenu();
         // A problem you have not solved opens with a look round it; one you
         // have, you already know, so it drops you straight on the plate.

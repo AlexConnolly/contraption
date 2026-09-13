@@ -105,9 +105,11 @@ describe('levels', () => {
     }
   });
 
-  it('has unique level ids and falls back to the sandbox', () => {
+  it('has unique level ids and falls back to the first course', () => {
     const ids = LEVELS.map((l) => l.id);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(getLevel('nope').id).toBe('sandbox');
+    // There is no Sandbox level any more; fun mode on a real course is what
+    // it was for, so an unknown id lands on the first challenge instead.
+    expect(getLevel('nope').id).toBe(LEVELS[0].id);
   });
 });

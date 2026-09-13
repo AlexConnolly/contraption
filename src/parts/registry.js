@@ -192,6 +192,11 @@ export function shortestTurn(from, to) {
  * being moved. A strut is a spring rather than a motor: nothing drives it, it
  * just carries what is above it and gives when the ground pushes back.
  */
+/** How fast a dolly runs along its rail, in metres a second. */
+export function dollySpeed(placed, part = getPart('dolly')) {
+  return clampTo(placed?.config?.speed, part.speedRange, part.speed);
+}
+
 export function springTravel(placed, part = getPart('suspension')) {
   return clampTo(placed?.config?.travel, part.travelRange, part.travel);
 }
@@ -392,6 +397,51 @@ const PARTS = [
       defaultBinding: { mode: 'drive', pos: 'KeyW', neg: 'KeyS', left: 'KeyA', right: 'KeyD' },
     },
     blurb: 'Big and toothed. Climbs two blocks where a powered wheel stops at one.',
+  },
+  {
+    id: 'rail',
+    name: 'Rail',
+    category: 'structure',
+    // Plain structure. A run of them fuses into the machine like any other
+    // block, and what makes it a track is only that a dolly knows to read it.
+    size: [1, 1, 1],
+    mass: 0.9,
+    colour: 0x6b7684,
+    cost: 2,
+    blurb: 'Track for a dolly. Lay as many end to end as you like.',
+  },
+  {
+    id: 'dolly',
+    ports: {
+      in: [{ id: 'drive', name: 'Drive', kind: 'number', min: -1, max: 1 }],
+      out: [{ id: 'along', name: 'Along the rail', kind: 'number' }],
+    },
+    name: 'Rail Dolly',
+    category: 'manipulator',
+    size: [1, 1, 1],
+    mass: 1.6,
+    colour: 0xe0913a,
+    cost: 5,
+    articulated: true,
+    joint: 'prismatic',
+    // Along the rail. Taken from the rail underneath it at build time rather
+    // than from this, because a dolly turned one way on a rail turned another
+    // is a machine that will not move with nothing on screen to say why.
+    axis: [0, 0, 1],
+    attach: [[0, -1, 0]],
+    carry: [[0, 1, 0]],
+    // Whatever is on it is bolted to it: a prismatic joint has one degree of
+    // freedom and no rotation at all, so a loaded gantry does not sway.
+    speed: 2.4,
+    speedRange: [0.4, 8],
+    actuator: {
+      kind: 'dolly',
+      port: 'drive',
+      signal: 'axis',
+      maxForce: 4000,
+      defaultBinding: { mode: 'axis', pos: 'KeyB', neg: 'KeyV' },
+    },
+    blurb: 'Runs along a rail and carries what is on it. Runs off the end if the end is open.',
   },
   {
     id: 'suspension',

@@ -170,6 +170,64 @@ const BUILDERS = {
     return group;
   },
 
+  /**
+   * A length of track: two rails on sleepers, running along the part's +Z so
+   * the direction arrow and the thing it describes agree.
+   */
+  rail(part) {
+    const group = new THREE.Group();
+    const bed = new THREE.Mesh(
+      new THREE.BoxGeometry(CELL - INSET, CELL * 0.22, CELL),
+      material(part.colour),
+    );
+    bed.position.y = -CELL * 0.26;
+    group.add(bed);
+    const steel = material(0xd8dde3, { metalness: 0.55, roughness: 0.3 });
+    for (const x of [-1, 1]) {
+      const line = new THREE.Mesh(
+        new THREE.BoxGeometry(CELL * 0.12, CELL * 0.2, CELL),
+        steel,
+      );
+      line.position.set(x * CELL * 0.28, -CELL * 0.05, 0);
+      group.add(line);
+    }
+    // Sleepers across, so a run of them reads as a track rather than as a
+    // pair of stripes.
+    for (const z of [-0.3, 0.3]) {
+      const sleeper = new THREE.Mesh(
+        new THREE.BoxGeometry(CELL * 0.78, CELL * 0.1, CELL * 0.16),
+        material(0x4c545e),
+      );
+      sleeper.position.set(0, -CELL * 0.19, z * CELL);
+      group.add(sleeper);
+    }
+    return group;
+  },
+
+  /** The carriage that runs on it: a body on four small wheels. */
+  dolly(part) {
+    const group = new THREE.Group();
+    const body = new THREE.Mesh(
+      new THREE.BoxGeometry(CELL - INSET, CELL * 0.54, CELL - INSET),
+      material(part.colour, { metalness: 0.3, roughness: 0.5 }),
+    );
+    body.position.y = CELL * 0.16;
+    group.add(body);
+    const steel = material(0xc7ced6, { metalness: 0.6, roughness: 0.25 });
+    for (const x of [-1, 1]) {
+      for (const z of [-1, 1]) {
+        const roller = new THREE.Mesh(
+          new THREE.CylinderGeometry(CELL * 0.15, CELL * 0.15, CELL * 0.12, 12),
+          steel,
+        );
+        roller.rotation.z = Math.PI / 2;
+        roller.position.set(x * CELL * 0.28, -CELL * 0.16, z * CELL * 0.26);
+        group.add(roller);
+      }
+    }
+    return group;
+  },
+
   hinge(part) {
     const group = new THREE.Group();
     const body = new THREE.Mesh(

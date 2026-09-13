@@ -41,6 +41,8 @@ const VOICE = {
   grabber: 'latch',
   coupling: 'separate',
   suspension: 'thunk',
+  // A gantry motor is a servo running along a track rather than round a pin.
+  dolly: 'servo',
 };
 
 describe('every commanded part has a voice', () => {

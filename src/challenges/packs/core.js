@@ -8,28 +8,6 @@ import { GREY, DARK } from '../palette.js';
  */
 export const CORE = [
   {
-    id: 'sandbox',
-    name: 'Sandbox',
-    brief: 'No objective. Build whatever you like and see how it behaves.',
-    hint: 'Everything unlocked, no budget. Good for testing a mechanism.',
-    spawn: [0, 1.2, -25.5],
-    groundSize: 160,
-    pieces: [
-      { pos: [10, 0.4, 6], size: [8, 0.8, 8], colour: GREY },
-      { pos: [16, 1.2, 6], size: [8, 0.8, 8], colour: GREY },
-      { pos: [-12, 1, 4], size: [6, 2, 0.6], colour: DARK },
-      { pos: [-6, 0.75, -10], size: [10, 1.5, 1], rotY: 0.4, colour: DARK },
-    ],
-    props: [
-      { id: 'crate-a', pos: [3, 0.5, 2], size: [1, 1, 1], mass: 6, colour: 0xc98b4b },
-      { id: 'crate-b', pos: [-3, 0.5, 2], size: [1.4, 0.7, 1.4], mass: 7, colour: 0xb37a3f },
-      { id: 'ball', pos: [0, 0.6, 6], radius: 0.6, mass: 4, colour: 0xd0574f },
-    ],
-    zones: [],
-    objectives: [],
-  },
-
-  {
     id: 'first-haul',
     demands: { steps: 1, flies: false },
     name: 'First Haul',

@@ -1244,3 +1244,20 @@ input[type="range"] { accent-color: var(--amber); }
   border: 1.5px solid var(--cyan);
   border-radius: 50%;
 }
+
+/* On the brief while the rules are off, so it is answered where the question
+   gets asked rather than only on the menu you came through. */
+.brief-fun {
+  display: inline-block;
+  margin-left: 9px;
+  padding: 2px 7px;
+  vertical-align: middle;
+  background: var(--amber-dim);
+  border: 1px solid var(--amber);
+  color: var(--amber);
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}

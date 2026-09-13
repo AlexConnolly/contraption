@@ -1,4 +1,5 @@
 import { getLevel } from './levels.js';
+import { funLevel } from './fun.js';
 import { sanitiseLevel } from './format.js';
 import { store } from '../ui/progress.js';
 
@@ -35,8 +36,12 @@ export function customLevel(id) {
  * A level by id from anywhere — the campaign or somebody's own work. The one
  * place that has to know both exist, so nothing else does.
  */
-export function resolveLevel(id) {
-  return customLevel(id) ?? getLevel(id);
+export function resolveLevel(id, { fun = false } = {}) {
+  const level = customLevel(id) ?? getLevel(id);
+  // The rules come off here rather than at each of the dozen places that ask
+  // one, so a level with fun mode on is simply a level with no rules on it and
+  // nothing else in the game has to know.
+  return fun ? funLevel(level) : level;
 }
 
 /** The saved level, or null if there was no room to save it. */

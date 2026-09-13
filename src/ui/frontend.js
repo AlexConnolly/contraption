@@ -243,7 +243,7 @@ export class FrontEnd {
 
   renderTitle() {
     const worlds = worldsEntry();
-    const campaign = LEVELS.filter((l) => l.id !== 'sandbox');
+    const campaign = LEVELS;
     const solved = store.solvedCount(campaign.map((l) => l.id));
     const next = campaign.find((l) => !store.solved(l.id)) ?? campaign[campaign.length - 1];
 
@@ -330,10 +330,11 @@ export class FrontEnd {
   // ------------------------------------------------------------- challenges
 
   renderChallenges() {
-    const campaign = LEVELS.filter((l) => l.id !== 'sandbox');
+    const campaign = LEVELS;
     const solved = store.solvedCount(campaign.map((l) => l.id));
     this.backBar('Challenges');
     this.top.append(el('div', 'fe-pill', `SOLVED <b>${solved} / ${campaign.length}</b>`));
+    this.top.append(this.funToggle());
 
     const sheet = el('div', 'fe-sheet');
     sheet.append(el('div', 'fe-head', '<h2>Challenges</h2><p>Pick a problem. The parts budget and the rules are set by the brief.</p>'));
@@ -361,6 +362,31 @@ export class FrontEnd {
       sheet.append(own);
     }
     this.body.append(sheet);
+  }
+
+  /**
+   * The switch that takes the rules off.
+   *
+   * Up here rather than inside each card, because it is a way of playing
+   * rather than a property of a level: turn it on and every course on the
+   * screen becomes the version with nothing stopping you.
+   */
+  funToggle() {
+    const on = this.h.funMode?.() ?? false;
+    const button = el('button', `fe-fun${on ? ' on' : ''}`);
+    button.append(
+      el('span', 'fe-fun-dot'),
+      el('span', null, 'Fun mode'),
+      el('span', 'fe-fun-note', on ? 'Rules off · nothing recorded' : 'Rules as written'),
+    );
+    button.title = on
+      ? 'Every course is playable with no bans, no budget, no clock and no keep-outs. Nothing you do counts.'
+      : 'Turn the rules off: fly where flight is banned, build past the budget, ignore the clock. Nothing will count.';
+    button.addEventListener('click', () => {
+      this.h.onFunMode?.(!on);
+      this.show('challenges');
+    });
+    return button;
   }
 
   /**
@@ -803,8 +829,13 @@ export class FrontEnd {
         prompt('Your pack code', code);
       }
     });
+    // There is no Sandbox level any more, so trying a pack means the first
+    // course with the rules off -- which is what the Sandbox was for.
     const use = el('button', 'fe-mini', 'Try it');
-    use.addEventListener('click', () => this.h.onPlay('sandbox'));
+    use.addEventListener('click', () => {
+      this.h.onFunMode?.(true);
+      this.h.onPlay(LEVELS[0].id);
+    });
     const remove = el('button', 'fe-mini danger', 'Remove');
     remove.addEventListener('click', () => {
       removePack(pack.id);

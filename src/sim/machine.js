@@ -3,11 +3,12 @@ import {
   getPart, partDensity, pistonStroke, separationPush, jointTension, jointFlip,
   servoAngleA, servoAngleB, servoSpeed, shortestTurn, turntableRecentres,
   springTravel, springStiffness, springDamping, padMode, padDamping,
-  turntableSpin, turntableTorque, CELL,
+  turntableSpin, turntableTorque, dollySpeed, CELL,
 } from '../parts/registry.js';
 import { PISTON_ROD_TOP, PISTON_REST, wedgeCorners } from '../parts/geometry.js';
 import { orientationQuaternion, applyOrientation } from '../core/orientation.js';
 import { groupBlueprint } from './grouping.js';
+import { railRun, runningOff } from './rails.js';
 import { driveSide } from './signals.js';
 import { tagOf } from './tags.js';
 import {
@@ -253,6 +254,17 @@ export class Machine {
           anchor, { x: 0, y: 0, z: 0, w: 1 },
           anchor, { x: 0, y: 0, z: 0, w: 1 },
         );
+      } else if (spec.type === 'prismatic' && part.id === 'dolly') {
+        // A dolly takes both its direction and how far it may go from the
+        // track it is standing on. Lay more rail and it runs further; that is
+        // the whole reason to build a gantry out of parts.
+        const run = railRun(this.blueprint, placed);
+        const along = run
+          ? { x: run.axis[0], y: run.axis[1], z: run.axis[2] }
+          : axis;
+        params = RAPIER.JointData.prismatic(anchor, anchor, along);
+        params.limitsEnabled = true;
+        params.limits = run ? [-run.back, run.forward] : [0, 0];
       } else if (spec.type === 'prismatic') {
         params = RAPIER.JointData.prismatic(anchor, anchor, axis);
         params.limitsEnabled = true;
@@ -702,6 +714,18 @@ export class Machine {
         case 'linear':
           this.driveMotor(joint, placed, part, Math.max(0, signal) * pistonStroke(placed, part));
           break;
+        // Driven as a speed rather than to a mark: a gantry is told which way
+        // to go and how fast, and it stops where you let go of the key.
+        case 'dolly': {
+          if (!joint) break;
+          if (this.leftTheRail(actuator)) break;
+          const want = signal * dollySpeed(placed, part) * power;
+          if (want !== actuator.lastMotor) {
+            joint.configureMotorVelocity(want, part.actuator.maxForce);
+            actuator.lastMotor = want;
+          }
+          break;
+        }
         case 'thrust':
           this.applyThrust(actuator, signal * power);
           break;
@@ -730,6 +754,50 @@ export class Machine {
    * away rather than shunting itself backwards — which is what actually
    * happens, and what makes it read as a separation rather than a shrug.
    */
+  /**
+   * A dolly that has run out of rail.
+   *
+   * Reaching an end that is open to the air with the power still on takes the
+   * joint away, and the dolly leaves the track carrying whatever was on it and
+   * whatever speed it had. Put anything at all in the cell past the last
+   * sleeper and that end is a stop instead, and this never fires.
+   */
+  leftTheRail(actuator) {
+    const entry = this.joints.find((j) => j.partId === actuator.placed.id);
+    if (!entry) return false;
+    if (entry.released) return true;
+    const run = entry.run ?? (entry.run = railRun(this.blueprint, actuator.placed));
+    if (!run || (!run.openForward && !run.openBack)) return false;
+    if (!runningOff(run, this.jointTravel(actuator), this.jointRate(actuator))) return false;
+    entry.released = true;
+    this.world.removeImpulseJoint(entry.joint, true);
+    this.events.push('separate');
+    return true;
+  }
+
+  /** How far along its slide a prismatic joint has got, in metres. */
+  jointTravel(actuator) {
+    const spec = this.grouping.joints.find((j) => j.partId === actuator.placed.id);
+    if (!spec) return 0;
+    const child = this.bodies[spec.childBody];
+    const host = this.bodies[spec.hostBody];
+    if (!child || !host) return 0;
+    // Where the moving half sits against where the fixed half thinks it
+    // should, along the one direction it is allowed to move in.
+    const anchor = this.localOf(actuator.placed.cell);
+    const home = worldPointOf(host, anchor);
+    const now = worldPointOf(child, anchor);
+    const run = railRun(this.blueprint, actuator.placed);
+    const axis = run
+      ? new THREE.Vector3(run.axis[0], run.axis[1], run.axis[2])
+      : this.partWorldAxis(actuator.placed, actuator.part.axis ?? [0, 1, 0]);
+    return now.sub(home).dot(
+      axis.applyQuaternion(new THREE.Quaternion(
+        host.rotation().x, host.rotation().y, host.rotation().z, host.rotation().w,
+      )).normalize(),
+    );
+  }
+
   release(actuator) {
     const entry = this.joints.find((j) => j.partId === actuator.placed.id);
     if (!entry || entry.released) return;

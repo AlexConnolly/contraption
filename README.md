@@ -92,6 +92,29 @@ The whole game is drawn from one design system — `src/ui/tokens.css` — so th
 menus, the studio and the node editor share a palette, two typefaces and the
 same cut-corner panels.
 
+## Fun mode
+
+Every challenge is two things bolted together: a job to do, and rules about how
+you may do it. The job is the interesting half. The rules — no flight, a
+budget, a clock, a keep-out, one attempt — are what make it a puzzle rather
+than an errand.
+
+Sometimes you do not want the puzzle. **Fun mode** is a switch at the top of
+the challenge list that takes the rules off and leaves the course: a no-flight
+course becomes flyable, the budget stops counting, the clock stops being a
+clock, keep-outs open, height and weight caps lift, and one-attempt courses let
+you respawn. The objectives stay exactly as they were.
+
+Nothing is recorded. A time set with the rules off is not a time, so the win
+card says *Fun mode — nothing recorded* and no personal best changes hands. The
+brief carries an amber tag while it is on, so half an hour later, wondering why
+nothing is stopping you, the answer is on screen.
+
+There used to be a Sandbox level for this — an empty yard with a couple of
+crates in it, which answered none of the questions people actually had, because
+it had none of the courses in it. It is gone; fun mode on a real course is what
+it was for.
+
 ## Building your own
 
 **Build** opens the same world the studio uses, with the machine put away and
@@ -604,6 +627,33 @@ A prop marked `magnetic` is one the level means you to pick up with the Magnet
 Grabber, and it is edged in amber so you can tell it from scenery. It is a
 label, not a rule — every prop in the game can be picked up.
 
+### Rails and dollies
+
+A **Rail** is plain structure: lay as many end to end as you like, in any
+direction, and they fuse into the machine like any other block. A **Rail Dolly**
+stands on one and runs along it, and whatever you bolt on top of the dolly
+rides with it.
+
+The dolly does not carry its own travel the way a piston carries a stroke. It
+reads the track underneath it, so how far it runs is a fact about the machine —
+lay more rail and it goes further, which is the whole reason to build a gantry
+out of parts instead of setting a slider. It takes its *direction* from the
+rail too: a dolly turned one way on a rail turned another would simply refuse
+to move with nothing on screen to say why, so the rail decides and the dolly
+follows.
+
+It is a prismatic joint, which has one degree of freedom and no rotation at
+all, so a loaded gantry does not sway — measured at 6 mm of wander with a
+two-block boom on it, over five and a half metres of travel.
+
+The ends are the interesting part. Rail that stops in mid air is an **open
+end**: reach it with the power still on and the dolly leaves the track and
+carries on under its own momentum, which is what a runaway gantry does. Put
+anything at all in the cell past the last sleeper and that end is a stop
+instead. Select the dolly and the studio draws the run — `5.5 m of rail,
+stopped to open · 2.4 m/s` — so you know which ends will catch you before you
+find out.
+
 ### Getting up things
 
 A powered wheel stops at a step about half its own radius — measured, 0.4 m on
@@ -681,7 +731,7 @@ src/ui/          design tokens, front end (title, challenges, garage, worlds,
 
 ## Tests
 
-`npm test` runs 1319 tests. The pure logic (orientations, grid placement, body
+`npm test` runs 1352 tests. The pure logic (orientations, grid placement, body
 grouping, key bindings, objectives) is covered directly. On top of that,
 `tests/physics.test.js` builds real machines in a real Rapier world and asserts
 they behave — a rover drives, reverses and steers the correct way; an

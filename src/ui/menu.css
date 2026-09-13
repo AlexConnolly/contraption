@@ -616,3 +616,32 @@
   height: 32px;
 }
 .fe-mini.lead:hover { background: var(--amber-b); border-color: var(--amber-b); color: #10131a; }
+
+/* The switch that takes the rules off. Amber when it is on, because that is
+   the state worth noticing: nothing you do while it is up will count. */
+.fe-fun {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  height: 34px;
+  padding: 0 14px;
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  color: var(--dim);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.fe-fun:hover { border-color: var(--amber); color: var(--text); }
+.fe-fun-dot {
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid var(--faint);
+  border-radius: 50%;
+}
+.fe-fun-note { color: var(--faint); letter-spacing: .06em; }
+.fe-fun.on { border-color: var(--amber); color: var(--amber); background: var(--amber-dim); }
+.fe-fun.on .fe-fun-dot { background: var(--amber); border-color: var(--amber); box-shadow: 0 0 8px var(--amber); }
+.fe-fun.on .fe-fun-note { color: var(--amber-b); }

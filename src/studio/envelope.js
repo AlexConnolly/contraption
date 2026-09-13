@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import {
-  getPart, pistonStroke, servoAngleA, servoAngleB, springTravel, CELL,
+  getPart, pistonStroke, servoAngleA, servoAngleB, springTravel, dollySpeed, CELL,
 } from '../parts/registry.js';
 import { applyOrientation } from '../core/orientation.js';
 import { groupBlueprint } from '../sim/grouping.js';
+import { railRun } from '../sim/rails.js';
 
 /**
  * What a part will actually do, drawn before it does it.
@@ -101,6 +102,34 @@ export function envelopeOf(blueprint, placed, cached = null) {
       axis: vec(turned(part.sensor.axis)),
       length: part.sensor.range,
       label: `Sees ${part.sensor.range} m`,
+    };
+  }
+
+  // A dolly's travel is the track it is standing on, not a number on the
+  // part, so the envelope is the rail run and it grows as you lay more.
+  if (part.id === 'dolly') {
+    const run = railRun(blueprint, placed);
+    if (!run) {
+      return {
+        kind: 'slide',
+        part: part.id,
+        origin: vec(at),
+        axis: vec(turned(part.axis)),
+        from: 0,
+        to: 0,
+        label: 'Not on a rail — it will not move',
+      };
+    }
+    const ends = [run.openBack ? 'open' : 'stopped', run.openForward ? 'open' : 'stopped'];
+    return {
+      kind: 'slide',
+      part: part.id,
+      origin: vec(at),
+      axis: vec(run.axis),
+      from: -run.back,
+      to: run.forward,
+      label: `${run.length.toFixed(1)} m of rail, ${ends.join(' to ')}`
+        + ` · ${dollySpeed(placed, part).toFixed(1)} m/s`,
     };
   }
 

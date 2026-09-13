@@ -13,6 +13,9 @@ import { envelopeOf } from '../studio/envelope.js';
 
 // Said instead of a best time when the machine has pack parts on it.
 const MODDED = '<span>Pack parts &middot; <strong>not on the board</strong></span>';
+// A time set with the rules off is not a time, and the card has to say so
+// rather than quietly not recording it.
+const FUN = '<span>Fun mode &middot; <strong>nothing recorded</strong></span>';
 
 const HELP = {
   studio: [
@@ -321,6 +324,12 @@ export class Hud {
     this.applyBans(level);
     this.dom.viewGoal.textContent = level.brief;
     this.dom.briefTitle.textContent = level.name;
+    // Said on the brief, not only on the menu you came through. Half an hour
+    // later, wondering why the clock is not running, this is where you look.
+    if (level.fun) {
+      const tag = el('span', 'brief-fun', 'Fun mode');
+      this.dom.briefTitle.append(tag);
+    }
     this.dom.briefText.textContent = level.brief;
     this.dom.briefHint.textContent = level.hint ?? '';
   }
@@ -413,6 +422,13 @@ export class Hud {
     if (part.positions) this.renderPositions(body, placed, part);
     if (part.spring) this.renderSpring(body, placed, part);
     if (part.spinRange) this.renderTurntable(body, placed, part);
+    if (part.id === 'dolly') {
+      this.renderSlider(
+        body, 'Speed', placed.config.speed ?? part.speed,
+        part.speedRange[0], part.speedRange[1], 0.2,
+        (value) => this.h.onConfigChange(placed.id, { speed: value }),
+      );
+    }
     if (part.id === 'pressure') this.renderPad(body, placed, part);
 
     const remove = el('button', 'danger', 'Delete part');
@@ -939,7 +955,7 @@ export class Hud {
     list.innerHTML = '';
     this.objectiveRows = [];
     if (report.objectives.length === 0) {
-      list.append(el('li', null, 'Sandbox — no objectives. Go and break something.'));
+      list.append(el('li', null, 'No objectives on this one. Go and break something.'));
       return;
     }
     for (const objective of report.objectives) {
@@ -992,19 +1008,20 @@ export class Hud {
    * better. Same card, because it is the same moment — you are being told how
    * you did and offered the next thing.
    */
-  showScore(level, report, cost, blueprint, next, { modded = false } = {}) {
+  showScore(level, report, cost, blueprint, next, { modded = false, fun = false } = {}) {
     const dom = this.dom;
     dom.winKicker.textContent = 'Time up';
     dom.winTitle.textContent = level.name;
     dom.winClock.textContent = String(report.score ?? 0);
     const best = store.result(level.id)?.bestScore;
-    const record = !modded && (best === undefined || (report.score ?? 0) >= best);
+    const record = !modded && !fun && (best === undefined || (report.score ?? 0) >= best);
     dom.winClock.classList.toggle('beat', record);
     dom.winStats.innerHTML = [
       `<span>${report.scoreLabel ?? 'Score'}</span>`,
       `<span>Cost <strong>${cost}</strong></span>`,
-      modded ? MODDED : (record ? '<span class="beat"><strong>Personal best</strong></span>'
-        : `<span>Best <strong>${best}</strong></span>`),
+      fun ? FUN : (modded ? MODDED
+        : (record ? '<span class="beat"><strong>Personal best</strong></span>'
+          : `<span>Best <strong>${best}</strong></span>`)),
     ].join('');
     this.renderRig(blueprint);
     dom.winNext.textContent = next ? 'Play next challenge' : 'Back to challenges';
@@ -1012,7 +1029,7 @@ export class Hud {
     dom.winNext.focus();
   }
 
-  showWin(level, report, cost, blueprint, next, { modded = false } = {}) {
+  showWin(level, report, cost, blueprint, next, { modded = false, fun = false } = {}) {
     const dom = this.dom;
     dom.winTitle.textContent = level.name;
 
@@ -1021,14 +1038,14 @@ export class Hud {
     dom.winClock.classList.toggle('beat', Boolean(beatPar));
 
     const best = store.result(level.id)?.best;
-    const record = !modded && best !== undefined && report.elapsed <= best + 1e-6;
+    const record = !modded && !fun && best !== undefined && report.elapsed <= best + 1e-6;
     dom.winStats.innerHTML = [
       level.par ? `<span${beatPar ? ' class="beat"' : ''}>Par <strong>${level.par}s</strong></span>` : '',
       `<span>Cost <strong>${cost}</strong></span>`,
       `<span>Parts <strong>${blueprint?.size ?? 0}</strong></span>`,
-      modded ? MODDED
+      fun ? FUN : (modded ? MODDED
         : (record ? '<span class="beat"><strong>Personal best</strong></span>'
-          : (best !== undefined ? `<span>Best <strong>${best.toFixed(1)}s</strong></span>` : '')),
+          : (best !== undefined ? `<span>Best <strong>${best.toFixed(1)}s</strong></span>` : ''))),
     ].filter(Boolean).join('');
 
     this.renderRig(blueprint);
