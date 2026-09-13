@@ -10,7 +10,7 @@ import { Machine } from '../src/sim/machine.js';
 import { SignalBus } from '../src/sim/signals.js';
 import { createWorld, STEP } from '../src/sim/world.js';
 import { Blueprint } from '../src/core/blueprint.js';
-import { IDENTITY_ORIENTATION, yawStep } from '../src/core/orientation.js';
+import { IDENTITY_ORIENTATION, yawStep, pitchStep } from '../src/core/orientation.js';
 import { CELL, getPart } from '../src/parts/registry.js';
 import { createPartMesh } from '../src/parts/geometry.js';
 
@@ -144,21 +144,34 @@ describe('what is at the end of the run', () => {
     expect(run.openBack).toBe(true);
   });
 
+  it('only lets go when it was driven there, not when it merely arrived', () => {
+    const open = {
+      forward: 1.5, back: 1.5, openForward: true, openBack: true,
+    };
+    // Sliding to the end under gravity with nobody touching the controls is
+    // not flying off the end, it is a carriage sitting at the bottom of a
+    // mast. Only what you drove into the buffers leaves them.
+    expect(runningOff(open, 1.5, 4, 0)).toBe(false);
+    expect(runningOff(open, 1.5, 4, 1)).toBe(true);
+    // And not when you are driving the other way out of it.
+    expect(runningOff(open, 1.5, 4, -1)).toBe(false);
+  });
+
   it('only lets go at an open end, and only while still going that way', () => {
     const open = {
       forward: 1.5, back: 1.5, openForward: true, openBack: true,
     };
     const shut = { ...open, openForward: false, openBack: false };
-    // At the end and driving on.
-    expect(runningOff(open, 1.5, 2)).toBe(true);
-    expect(runningOff(open, -1.5, -2)).toBe(true);
+    // At the end and driving on, fast.
+    expect(runningOff(open, 1.5, 4, 1)).toBe(true);
+    expect(runningOff(open, -1.5, -4, -1)).toBe(true);
     // At the end and stopped: parked against the buffers is not falling off.
-    expect(runningOff(open, 1.5, 0)).toBe(false);
+    expect(runningOff(open, 1.5, 0, 1)).toBe(false);
     // At the end, driving, and the end is blocked.
-    expect(runningOff(shut, 1.5, 2)).toBe(false);
+    expect(runningOff(shut, 1.5, 4, 1)).toBe(false);
     // Halfway along at full speed.
-    expect(runningOff(open, 0, 2)).toBe(false);
-    expect(runningOff(null, 0, 2)).toBe(false);
+    expect(runningOff(open, 0, 4, 1)).toBe(false);
+    expect(runningOff(null, 0, 4, 1)).toBe(false);
   });
 });
 
@@ -278,4 +291,67 @@ describe('how the two are drawn', () => {
     const block = extent('block');
     expect(dolly.high - dolly.low).toBeGreaterThan((block.high - block.low) * 0.9);
   });
+});
+
+/** A mast with the rail running up it, and a dolly on the top of the run. */
+function hoist({ speed = 2.4, load = 1, open = true } = {}) {
+  const bp = new Blueprint({ name: 'hoist' });
+  for (let x = -1; x <= 1; x += 1) {
+    for (let z = -1; z <= 1; z += 1) bp.place('block', [x, 0, z]);
+  }
+  bp.place('core', [1, 1, -1]);
+  // A rail runs along its own +Z, so tipping it up makes a vertical run.
+  const upright = pitchStep(IDENTITY_ORIENTATION);
+  for (let y = open ? 3 : 1; y <= 6; y += 1) bp.place('rail', [0, y, 0], upright);
+  const dolly = bp.place('dolly', [0, 7, 0]);
+  bp.setConfig(dolly.id, { speed });
+  for (let i = 0; i < load; i += 1) bp.place('ballast', [0, 8 + i, 0]);
+  return { bp, dolly: bp.get(dolly.id) };
+}
+
+function hold({ seconds = 6, held = [], ...shape } = {}) {
+  const { bp, dolly } = hoist(shape);
+  const world = createWorld(RAPIER, { x: 0, y: -9.81, z: 0 });
+  const scene = new THREE.Scene();
+  const arena = new Arena({
+    RAPIER, world, scene, level: FLOOR, seed: 1,
+  });
+  const machine = new Machine({
+    RAPIER, world, scene, blueprint: bp, spawn: new THREE.Vector3(0, 2, 0), level: FLOOR,
+  });
+  const bus = new SignalBus(keys(...held));
+  // How far it has slid along its own rail, not how far it has moved in the
+  // world: a tall mast leans, and leaning is not sagging.
+  const actuator = machine.actuators.find((a) => a.placed.id === dolly.id);
+  const start = machine.jointTravel(actuator);
+  for (let i = 0; i < Math.round(seconds / STEP); i += 1) {
+    arena.step(STEP);
+    machine.update(STEP, bus);
+    world.step();
+  }
+  const entry = machine.joints.find((j) => j.partId === dolly.id);
+  const out = {
+    slid: Math.abs(machine.jointTravel(actuator) - start),
+    released: Boolean(entry?.released),
+  };
+  machine.dispose();
+  arena.dispose();
+  return out;
+}
+
+describe('a dolly on a vertical rail', () => {
+  it('holds where it was left, carrying a load', () => {
+    // A hoist that sags when you let go of the key is not a hoist. A velocity
+    // motor's second argument is a damping coefficient rather than a maximum
+    // force, so aiming at zero speed under a steady load settles at a creep
+    // instead of stopping -- measured at more than a metre of it. Told to hold
+    // a position instead, it gives four millimetres.
+    const out = hold({ seconds: 6 });
+    expect(out.slid).toBeLessThan(0.05);
+  }, 60000);
+
+  it('does not throw itself off the open end for standing there', () => {
+    const out = hold({ seconds: 8, open: true, load: 3 });
+    expect(out.released).toBe(false);
+  }, 60000);
 });

@@ -723,12 +723,22 @@ export class Machine {
         // to go and how fast, and it stops where you let go of the key.
         case 'dolly': {
           if (!joint) break;
-          if (this.leftTheRail(actuator)) break;
+          if (this.leftTheRail(actuator, signal)) break;
           const want = signal * dollySpeed(placed, part) * power;
-          if (want !== actuator.lastMotor) {
-            joint.configureMotorVelocity(want, part.actuator.maxForce);
-            actuator.lastMotor = want;
+          if (want === actuator.lastMotor) break;
+          actuator.lastMotor = want;
+          if (want === 0) {
+            // Hold where it is rather than merely resisting movement. A
+            // velocity motor's second argument is a damping coefficient, not a
+            // maximum force, so aiming at zero speed under a steady load
+            // settles at a slow creep instead of stopping -- which on a
+            // vertical rail is a hoist that lowers its own load.
+            joint.configureMotorPosition(
+              this.jointTravel(actuator), part.actuator.maxForce, part.actuator.maxForce / 8,
+            );
+            break;
           }
+          joint.configureMotorVelocity(want, part.actuator.maxForce);
           break;
         }
         case 'thrust':
@@ -767,13 +777,14 @@ export class Machine {
    * whatever speed it had. Put anything at all in the cell past the last
    * sleeper and that end is a stop instead, and this never fires.
    */
-  leftTheRail(actuator) {
+  leftTheRail(actuator, drive = 0) {
     const entry = this.joints.find((j) => j.partId === actuator.placed.id);
     if (!entry) return false;
     if (entry.released) return true;
     const run = entry.run ?? (entry.run = railRun(this.blueprint, actuator.placed));
     if (!run || (!run.openForward && !run.openBack)) return false;
-    if (!runningOff(run, this.jointTravel(actuator), this.jointRate(actuator))) return false;
+    const off = runningOff(run, this.jointTravel(actuator), this.jointRate(actuator), drive);
+    if (!off) return false;
     entry.released = true;
     this.world.removeImpulseJoint(entry.joint, true);
     this.events.push('separate');

@@ -689,10 +689,24 @@ all, so a loaded gantry does not sway — measured at 6 mm of wander with a
 two-block boom on it, over five and a half metres of travel.
 
 The ends are the interesting part. Rail that stops in mid air is an **open
-end**: reach it with the power still on and the dolly leaves the track and
-carries on under its own momentum, which is what a runaway gantry does. Put
-anything at all in the cell past the last sleeper and that end is a stop
-instead. Select the dolly and the studio draws the run — `5.5 m of rail,
+end**: fly at it and the dolly goes over the buffers and carries on under its
+own momentum, which is what a runaway gantry does. Put anything at all in the
+cell past the last sleeper and that end is a stop instead.
+
+Three things have to be true before it lets go, and the third is the one that
+matters: the end is open, it is doing more than 2 m/s, and **it is being
+driven that way**. Without that last part a dolly on a vertical rail throws
+itself on the floor for standing still — gravity walks it down the mast, it
+arrives at the bottom with some speed on, and off it goes. Flying off the end
+is something you do on purpose. Drive gently into an open end and it stops
+there like anything else.
+
+A dolly left alone holds where it is, load and all — it targets a position
+rather than a speed of zero, because a velocity motor's second argument in
+Rapier is a damping coefficient and not a maximum force, so aiming at zero
+speed under a steady load settles at a slow creep rather than stopping. On a
+vertical rail that was a hoist lowering its own load: over a metre in six
+seconds, against four millimetres now. Select the dolly and the studio draws the run — `5.5 m of rail,
 stopped to open · 2.4 m/s` — so you know which ends will catch you before you
 find out.
 
@@ -804,7 +818,7 @@ src/ui/          design tokens, front end (title, challenges, garage, worlds,
 
 ## Tests
 
-`npm test` runs 1382 tests. The pure logic (orientations, grid placement, body
+`npm test` runs 1385 tests. The pure logic (orientations, grid placement, body
 grouping, key bindings, objectives) is covered directly. On top of that,
 `tests/physics.test.js` builds real machines in a real Rapier world and asserts
 they behave — a rover drives, reverses and steers the correct way; an

@@ -81,16 +81,29 @@ export function railRun(blueprint, dolly) {
 /** How much of a run is left before an end that lets go. */
 export const LEAVING = 0.02;
 
+/** How fast counts as too fast, in metres a second. */
+export const TOO_FAST = 2;
+
 /**
  * Whether a dolly is running off the end.
  *
- * Both halves have to be true: it is at an end that is open to the air, and it
- * is still going that way. Sitting parked against an open end is not falling
- * off it, or a gantry driven gently to the end of its track would throw itself
- * on the floor.
+ * Three things have to be true at once, and the third is the one that was
+ * missing. It has to be at an end that is open to the air; it has to be moving
+ * that way and moving properly, not creeping; and it has to be *being driven*
+ * that way.
+ *
+ * Without that last part a dolly on a vertical rail throws itself on the floor
+ * for standing still: gravity walks it down to the bottom of the mast, it
+ * arrives at an open end with some speed on, and off it goes. That is not what
+ * anybody means by running off the end. What they mean is flying at the
+ * buffers and going over them, and flying is something you do on purpose.
  */
-export function runningOff(run, travel, rate, { threshold = 0.25 } = {}) {
-  if (!run) return false;
-  if (run.openForward && travel >= run.forward - LEAVING && rate > threshold) return true;
-  return Boolean(run.openBack && travel <= -run.back + LEAVING && rate < -threshold);
+export function runningOff(run, travel, rate, drive = 0, { threshold = TOO_FAST } = {}) {
+  if (!run || !drive) return false;
+  if (run.openForward && drive > 0 && travel >= run.forward - LEAVING && rate > threshold) {
+    return true;
+  }
+  return Boolean(
+    run.openBack && drive < 0 && travel <= -run.back + LEAVING && rate < -threshold,
+  );
 }
