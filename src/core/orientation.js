@@ -98,23 +98,58 @@ export const IDENTITY_ORIENTATION = ORIENTATIONS.findIndex(
   (m) => m[0] === 1 && m[4] === 1 && m[8] === 1,
 );
 
-// Yaw steps about +Y, used by the studio's rotate key.
+/**
+ * The three quarter turns, one about each world axis.
+ *
+ * Applied on the left, which is what makes them world turns rather than turns
+ * in the part's own frame: a key means the same thing whatever the part is
+ * already doing, instead of meaning something different depending on what you
+ * pressed last.
+ *
+ * There are three because a cube has three axes. Two of them generate all
+ * twenty-four rotations, but badly -- from square on, reaching a given one
+ * took three presses on average and five at worst, with only two of the
+ * twenty-four a single press away. With all three and a reverse it is 1.92 and
+ * three, and six are one press away. More to the point, three is a model
+ * somebody can hold in their head and two is a thing you learn by flailing.
+ */
+const QUARTER = {
+  // About +Y: turns it round, the way you point a machine.
+  yaw: [0, 0, -1, 0, 1, 0, 1, 0, 0],
+  // About +X: tips it forward and back.
+  pitch: [1, 0, 0, 0, 0, 1, 0, -1, 0],
+  // About +Z: rolls it onto its side.
+  roll: [0, 1, 0, -1, 0, 0, 0, 0, 1],
+};
+
+export const TURN_AXES = Object.keys(QUARTER);
+
+const quarterIndex = (axis) => ORIENTATIONS.findIndex(
+  (m) => m.every((n, i) => n === QUARTER[axis][i]),
+);
+
+/**
+ * One quarter turn about a world axis, or several. `quarters` of 3 is the same
+ * as one the other way, which is what a reverse key is.
+ */
+export function turnStep(index, axis = 'yaw', quarters = 1) {
+  const step = quarterIndex(axis);
+  if (step < 0) return index;
+  let out = index;
+  for (let n = 0; n < ((quarters % 4) + 4) % 4; n += 1) out = composeOrientation(step, out);
+  return out;
+}
+
 export function yawStep(index) {
-  return composeOrientation(
-    ORIENTATIONS.findIndex((m) =>
-      m.every((n, i) => n === [0, 0, -1, 0, 1, 0, 1, 0, 0][i]),
-    ),
-    index,
-  );
+  return turnStep(index, 'yaw');
 }
 
 export function pitchStep(index) {
-  return composeOrientation(
-    ORIENTATIONS.findIndex((m) =>
-      m.every((n, i) => n === [1, 0, 0, 0, 0, 1, 0, -1, 0][i]),
-    ),
-    index,
-  );
+  return turnStep(index, 'pitch');
+}
+
+export function rollStep(index) {
+  return turnStep(index, 'roll');
 }
 
 // Orientation matrices are orthonormal, so the inverse is the transpose.

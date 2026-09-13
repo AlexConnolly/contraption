@@ -1261,3 +1261,32 @@ input[type="range"] { accent-color: var(--amber); }
   letter-spacing: .12em;
   text-transform: uppercase;
 }
+
+/* Six directions in two rows of three, because most parts care about one
+   direction and finding the rotation that gives it should not be a puzzle. */
+.insp-aim {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  min-width: 0;
+}
+.insp-aim button {
+  height: 26px;
+  padding: 0 4px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.insp-aim button.on {
+  background: var(--amber);
+  border-color: var(--amber);
+  color: #10131a;
+  font-weight: 700;
+}
+.insp-aim button:disabled {
+  opacity: .3;
+  cursor: default;
+  border-color: var(--edge);
+}

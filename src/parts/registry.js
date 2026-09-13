@@ -717,7 +717,7 @@ const PARTS = [
       signal: 'hold',
       defaultBinding: { mode: 'hold', pos: 'Space' },
     },
-    blurb: 'Strong lift out of its top face. Tilt it with T — R only spins it on the spot.',
+    blurb: 'Strong lift out of its top face. Point it with the six buttons rather than hunting for the turn.',
   },
   {
     id: 'thruster',
@@ -738,7 +738,7 @@ const PARTS = [
       signal: 'hold',
       defaultBinding: { mode: 'hold', pos: 'ShiftLeft' },
     },
-    blurb: 'Steady push out of its nozzle. Tilt it with T — R only spins it on the spot.',
+    blurb: 'Steady push out of its nozzle. Point it with the six buttons rather than hunting for the turn.',
   },
   {
     id: 'controller',

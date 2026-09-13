@@ -818,8 +818,10 @@ function worldShortcuts() {
     return;
   }
   if (session.mode === 'garage') {
-    if (input.wasPressed('KeyR')) studio.rotateYaw();
-    if (input.wasPressed('KeyT')) studio.rotatePitch();
+    const back = (input.isDown('ShiftLeft') || input.isDown('ShiftRight')) ? -1 : 1;
+    if (input.wasPressed('KeyR')) studio.turn('yaw', back);
+    if (input.wasPressed('KeyT')) studio.turn('pitch', back);
+    if (input.wasPressed('KeyY')) studio.turn('roll', back);
     if (input.wasPressed('KeyX')) studio.deleteHovered();
     if (input.wasPressed('Delete')) studio.deleteSelected();
     if (input.isDown('ControlLeft') || input.isDown('ControlRight')) {
@@ -1047,8 +1049,16 @@ function handleShortcuts() {
     return;
   }
 
-  if (input.wasPressed('KeyR')) studio.rotateYaw();
-  if (input.wasPressed('KeyT')) studio.rotatePitch();
+  // Three keys for three axes, and Shift for the other way round. Ctrl is
+  // left alone because Ctrl+Y is redo, and a redo that also rolled the part in
+  // your hand would be its own small nightmare.
+  const control = input.isDown('ControlLeft') || input.isDown('ControlRight');
+  const quarters = (input.isDown('ShiftLeft') || input.isDown('ShiftRight')) ? -1 : 1;
+  if (!control) {
+    if (input.wasPressed('KeyR')) studio.turn('yaw', quarters);
+    if (input.wasPressed('KeyT')) studio.turn('pitch', quarters);
+    if (input.wasPressed('KeyY')) studio.turn('roll', quarters);
+  }
   if (input.wasPressed('Digit1')) selectTool('place');
   if (input.wasPressed('Digit2')) selectTool('select');
   if (input.wasPressed('Digit3')) selectTool('delete');
@@ -1388,12 +1398,21 @@ async function boot() {
       refreshInspector();
     },
     onConfigChange: (id, config) => state.blueprint.setConfig(id, config),
-    onTurnPart: (id, how) => {
-      const result = studio.turnPart(id, how);
+    onTurnPart: (id, how, quarters = 1) => {
+      const result = studio.turnPart(id, how, quarters);
       if (!result.ok) {
         audio.deny();
         hud.toast(result.reason ?? 'No room to turn it there', true);
       }
+    },
+    onAimPart: (id, direction) => {
+      const result = studio.aimPart(id, direction);
+      if (!result.ok) {
+        audio.deny();
+        hud.toast(result.reason ?? 'No room to point it that way', true);
+        return;
+      }
+      refreshInspector();
     },
     onDeleteSelected: () => studio.deleteSelected(),
     onOpenProgram: (computerId) => {

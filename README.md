@@ -598,6 +598,43 @@ which is the worst possible moment to start pulling away. The wide whiskers
 still have the panels in view, so they are what tells the difference between
 open corridor and the middle of a gate.
 
+## Turning things round
+
+A blueprint part has one of the 24 axis-aligned rotations, and every turn is
+about a **world** axis — so a key means the same thing whatever the part is
+already doing, rather than something different depending on what you pressed
+last.
+
+There are three turn keys because a cube has three axes, and **Shift** goes the
+other way. There used to be two, which is what made rotating things feel like
+guesswork:
+
+| | mean presses from square on | worst | one press away |
+| --- | ---: | ---: | ---: |
+| two axes | 3.08 | 5 | 2 of 24 |
+| two axes + reverse | 2.17 | 4 | 4 |
+| three axes | 2.50 | 4 | 3 |
+| **three axes + reverse** | **1.92** | **3** | **6** |
+
+Two keys do reach all 24 — the problem was never reachability. It was that
+there is no route you can plan with them, so you press and look, press and
+look.
+
+Better still: almost every part that cares about rotation cares about *one*
+direction — which way a thruster pushes, a wheel drives, a sensor looks, a
+grabber faces, a ram extends, a rail runs. So the inspector has six buttons —
+**Forward, Back, Left, Right, Up, Down** — that say it outright and work the
+rotation out. Of the four turns that all point the right way it picks the one
+nearest where the part already is, so the rest of it does not spin for no
+reason. Pointing a thruster down is one click, not a search.
+
+| | |
+| --- | --- |
+| `R` | turn it round (about up) |
+| `T` | tip it forward (about across) |
+| `Y` | roll it onto its side (about forward) |
+| `Shift` + any | the other way |
+
 ## How a machine is put together
 
 A blueprint is a list of parts on an integer grid, each with one of the 24
@@ -736,7 +773,7 @@ src/ui/          design tokens, front end (title, challenges, garage, worlds,
 
 ## Tests
 
-`npm test` runs 1356 tests. The pure logic (orientations, grid placement, body
+`npm test` runs 1370 tests. The pure logic (orientations, grid placement, body
 grouping, key bindings, objectives) is covered directly. On top of that,
 `tests/physics.test.js` builds real machines in a real Rapier world and asserts
 they behave — a rover drives, reverses and steers the correct way; an

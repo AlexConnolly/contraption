@@ -5,9 +5,9 @@ import {
   applyOrientation,
   orientationQuaternion,
   IDENTITY_ORIENTATION,
-  yawStep,
-  pitchStep,
+  turnStep,
 } from '../core/orientation.js';
+import { aimAt } from '../core/aim.js';
 import { Blueprint, occupiedCells } from '../core/blueprint.js';
 import { groupBlueprint } from '../sim/grouping.js';
 import { wouldConnect } from '../sim/connectivity.js';
@@ -190,13 +190,19 @@ export class Studio {
   // The ghost is rebuilt on a turn as well as on a change of part: a wheel's
   // arrow depends on which side of the machine the rotation puts it, so it is
   // not the same drawing at every rotation.
+  /** Turns the part in hand about one of the three world axes. */
+  turn(axis = 'yaw', quarters = 1) {
+    this.rotation = turnStep(this.rotation, axis, quarters);
+    this.refreshGhost();
+  }
+
   rotateYaw() {
-    this.rotation = yawStep(this.rotation);
+    this.rotation = turnStep(this.rotation, 'yaw');
     this.refreshGhost();
   }
 
   rotatePitch() {
-    this.rotation = pitchStep(this.rotation);
+    this.rotation = turnStep(this.rotation, 'pitch');
     this.refreshGhost();
   }
 
@@ -365,10 +371,34 @@ export class Studio {
    * T keys use before placing, so the controls mean the same thing whether a
    * part is on the plate yet or not.
    */
-  turnPart(id, how) {
+  /**
+   * Turns a part that is already down, about a named world axis. Negative
+   * quarters is the same turn the other way, which is what a reverse key is.
+   */
+  turnPart(id, how, quarters = 1) {
     const placed = this.blueprint.get(id);
     if (!placed) return { ok: false };
-    const next = how === 'pitch' ? pitchStep(placed.rot) : yawStep(placed.rot);
+    const next = turnStep(placed.rot, how === 'pitch' || how === 'roll' ? how : 'yaw', quarters);
+    return this.setRotation(id, next);
+  }
+
+  /**
+   * Points a part a named way -- forward, up, left -- instead of making
+   * somebody find the rotation that does it. Of the four turns that all point
+   * the same way, the one nearest where the part already is, so the rest of it
+   * does not spin for no reason.
+   */
+  aimPart(id, direction) {
+    const placed = this.blueprint.get(id);
+    if (!placed) return { ok: false };
+    const next = aimAt(getPart(placed.type), direction, placed.rot);
+    if (next === null) return { ok: false, reason: 'That part does not point that way' };
+    if (next === placed.rot) return { ok: true };
+    return this.setRotation(id, next);
+  }
+
+  setRotation(id, next) {
+    const placed = this.blueprint.get(id);
     const held = this.checkPlacement(placed.type, placed.cell, next, id);
     if (!held.ok) return held;
     this.snapshot();

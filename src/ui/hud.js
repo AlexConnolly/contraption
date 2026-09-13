@@ -10,8 +10,16 @@ import { renderPart, renderMachine } from './thumbnails.js';
 import { store } from './progress.js';
 import { bannedParts, banFor } from '../challenges/bans.js';
 import { envelopeOf } from '../studio/envelope.js';
+import { DIRECTIONS, aimableDirections, aimNamed } from '../core/aim.js';
 
 // Said instead of a best time when the machine has pack parts on it.
+/** What each of the three turn keys does, for the button that does it too. */
+const TURN_NAMES = {
+  yaw: 'Turn it round',
+  pitch: 'Tip it forward',
+  roll: 'Roll it onto its side',
+};
+
 const MODDED = '<span>Pack parts &middot; <strong>not on the board</strong></span>';
 // A time set with the rules off is not a time, and the card has to say so
 // rather than quietly not recording it.
@@ -22,7 +30,8 @@ const HELP = {
     ['Left click', 'place'],
     ['Right drag', 'orbit'],
     ['Middle drag', 'pan'],
-    ['R / T', 'rotate part'],
+    ['R / T / Y', 'turn · tip · roll'],
+    ['Shift', 'the other way'],
     ['1 2 3', 'place / select / delete'],
     ['X', 'delete hovered'],
     ['Ctrl+Z / Ctrl+Y', 'undo / redo'],
@@ -443,20 +452,47 @@ export class Hud {
    * commonest mistake there is, and the fix used to be deleting it and
    * starting again, which threw away its bindings with it.
    */
+  /**
+   * Which way a part faces, said two ways.
+   *
+   * The three turns are one per axis, because a cube has three and offering
+   * two of them is what made rotating things feel like guesswork -- from
+   * square on, two keys took three presses on average and five at worst to
+   * reach a given rotation. Three with a reverse is 1.92 and three.
+   *
+   * Better still, most parts only care about one direction, so for those the
+   * six buttons say it outright and the rotation is worked out. Pointing a
+   * thruster down should not be a puzzle.
+   */
   renderFacing(body, placed, part) {
     const row = el('div', 'row');
-    row.append(el('label', null, 'Facing'));
+    row.append(el('label', null, 'Turn'));
     const buttons = el('div', 'keybind');
-    for (const [how, label] of [['yaw', 'Turn R'], ['pitch', 'Tip T']]) {
+    for (const [how, label] of [['yaw', 'R'], ['pitch', 'T'], ['roll', 'Y']]) {
       const button = el('button', null, label);
-      button.addEventListener('click', () => this.h.onTurnPart(placed.id, how));
+      button.title = `${TURN_NAMES[how]} — hold Shift for the other way`;
+      button.addEventListener('click', (event) => {
+        this.h.onTurnPart(placed.id, how, event.shiftKey ? -1 : 1);
+      });
       buttons.append(button);
     }
     row.append(buttons);
     body.append(row);
-    if (workingAxis(part)) {
-      body.append(el('p', 'insp-blurb', 'The arrow on it shows which way it faces.'));
+
+    const can = aimableDirections(part);
+    if (can.length === 0) return;
+    const now = aimNamed(part, placed.rot);
+    const aim = el('div', 'row');
+    aim.append(el('label', null, 'Point it'));
+    const pad = el('div', 'insp-aim');
+    for (const direction of DIRECTIONS) {
+      const button = el('button', direction.id === now ? 'on' : null, direction.name);
+      button.disabled = !can.includes(direction.id);
+      button.addEventListener('click', () => this.h.onAimPart(placed.id, direction.dir));
+      pad.append(button);
     }
+    aim.append(pad);
+    body.append(aim);
   }
 
   renderBinding(body, placed, part, blueprint) {
