@@ -254,6 +254,49 @@ starter rover at 19 kg and the quadcopter at 10.3 kg, a 20 N crosswind drifts
 the rover half a metre in three seconds and the drone two and a half. Much past
 60 N and everything simply slides away.
 
+## Open world
+
+The campaign is one level, one machine, one run. Worlds are the other game:
+build the place itself, put as many machines in it as you like, and leave them
+running.
+
+Three things to be doing, and the point is what does **not** change between
+them. The world runs in all three — a city of automated systems that stops
+whenever you open the garage is a diorama, not a city — so the mode only
+decides where the mouse and the keys go.
+
+| Mode | What a click does |
+| --- | --- |
+| World | Places or erases a block against whatever you are looking at, or stands a machine there |
+| Garage | The same studio as the campaign. The world carries on behind it |
+| Play | Takes the controls of the machine you click. Click away to let go |
+
+Blocks are a palette index on a grid, filed into chunks of sixteen cubed. A
+chunk is the unit of everything expensive — one instanced mesh per material,
+one body carrying a collider per block, one entry in a save — so editing a
+block rebuilds that chunk and nothing else. A town of a thousand blocks is
+eight chunks, twenty-one draw calls and a third of a millisecond a step.
+
+Machines put down in a world differ from a machine in a challenge in three
+ways, all of which had to be built:
+
+- They **collide with each other.** Machine colliders sit in a group that
+  never collides with itself, which is what holds one machine together and
+  what made two of them ghosts. The group is opened up and a contact filter
+  puts back the only exclusion ever wanted.
+- They **face where you put them.** The turn goes on the bodies rather than on
+  the colliders inside them, so the thrust, the joints, the wheels and the
+  core's idea of forward all turn with it.
+- They **may sleep.** A challenge machine must never sleep; fifty parked ones
+  costing full solver time for ever is another matter.
+
+Worlds are kept in IndexedDB rather than in the one localStorage key
+everything else shares: that key is rewritten whole on every autosave and
+already carries a thumbnail per machine. Two stores in one transaction — the
+world, and a card saying what it is — so listing worlds does not deserialise a
+town per row. A world also travels as a `CTPW1` code, the same way a level or a
+parts pack does.
+
 ## Sound
 
 Every audio file is **CC0** — Kenney's [Interface Sounds](https://kenney.nl/assets/interface-sounds)
@@ -460,14 +503,18 @@ src/sim/         connectivity, body grouping, signal bus, machine, arena,
 src/studio/      build mode: picking, ghost preview, undo, presets
 src/challenges/  levels, objective tracking, the portable level format
                  and the levels a player has built
-src/ui/          design tokens, front end (title, challenges, garage,
+src/world/       the open world: chunked block store, portable world format,
+                 instanced terrain, block editor, the session that runs it,
+                 IndexedDB world store
+src/ui/          design tokens, front end (title, challenges, garage, worlds,
                  build, settings), save store, thumbnail renderer, palette,
-                 inspector, objectives, win card, node editor, level builder
+                 inspector, objectives, win card, node editor, level builder,
+                 open-world chrome
 ```
 
 ## Tests
 
-`npm test` runs 1191 tests. The pure logic (orientations, grid placement, body
+`npm test` runs 1206 tests. The pure logic (orientations, grid placement, body
 grouping, key bindings, objectives) is covered directly. On top of that,
 `tests/physics.test.js` builds real machines in a real Rapier world and asserts
 they behave — a rover drives, reverses and steers the correct way; an

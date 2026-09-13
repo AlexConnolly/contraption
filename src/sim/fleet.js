@@ -169,6 +169,10 @@ export class Fleet {
     for (const member of this.members.values()) member.machine.syncMeshes();
   }
 
+  setVisible(on) {
+    for (const member of this.members.values()) member.machine.setVisible(on);
+  }
+
   dispose() {
     for (const id of [...this.members.keys()]) this.remove(id);
     this.events?.free();

@@ -146,6 +146,41 @@ describe('putting blocks down', () => {
   });
 });
 
+describe('showing where the next block would go', () => {
+  it('answers the same cell it would place in', () => {
+    const session = open();
+    const ray = downAt(3, 5);
+    expect(session.aimAt(ray).cell).toEqual([3, 0, 5]);
+    session.place(ray);
+    expect(session.aimAt(ray).cell).toEqual([3, 1, 5]);
+    session.dispose();
+  });
+
+  it('points at the block itself when erasing, not the air in front of it', () => {
+    const session = open();
+    session.place(downAt(1, 1));
+    const aim = session.aimAt(downAt(1, 1), 'erase');
+    expect(aim.hit).toEqual([1, 0, 1]);
+    expect(aim.cell).toEqual([1, 1, 1]);
+    session.dispose();
+  });
+
+  it('shows nothing when there is nothing out there', () => {
+    const session = open();
+    expect(session.aimAt({
+      origin: { x: 0, y: 5, z: 0 }, dir: { x: 0, y: 1, z: 0 },
+    })).toBe(null);
+    session.dispose();
+  });
+
+  it('builds no cursor at all with nothing to draw it on', () => {
+    const session = open();
+    expect(session.cursor).toBe(undefined);
+    expect(() => session.hideCursor()).not.toThrow();
+    session.dispose();
+  });
+});
+
 describe('blocks you have placed are solid', () => {
   it('stops a machine that drives into them', () => {
     const session = open();

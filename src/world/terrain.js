@@ -59,6 +59,7 @@ export class Terrain {
     this.box = headless ? null : new THREE.BoxGeometry(BLOCK, BLOCK, BLOCK);
     this.skins = new Map();
     this.builds = 0;
+    this.visible = true;
   }
 
   chunkCount() {
@@ -125,6 +126,7 @@ export class Terrain {
         const mesh = new THREE.InstancedMesh(this.box, this.skin(kind), spots.length);
         mesh.castShadow = true;
         mesh.receiveShadow = true;
+        mesh.visible = this.visible;
         spots.forEach(([x, y, z], i) => {
           put.position.set(x + half, y + half, z + half);
           put.updateMatrix();
@@ -136,6 +138,14 @@ export class Terrain {
       }
     }
     this.built.set(key, { body, meshes });
+  }
+
+  /** Whether the blocks are drawn. They stay solid either way. */
+  setVisible(on) {
+    for (const chunk of this.built.values()) {
+      for (const mesh of chunk.meshes) mesh.visible = on;
+    }
+    this.visible = on;
   }
 
   drop(key) {

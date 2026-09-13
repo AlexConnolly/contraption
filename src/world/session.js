@@ -102,6 +102,7 @@ export class WorldSession {
     this.behind = 0;
     this.accumulator = 0;
     this.objects = [];
+    this.visible = true;
 
     this.terrain = new Terrain({
       RAPIER,
@@ -116,6 +117,7 @@ export class WorldSession {
     });
 
     this.buildGround();
+    this.buildCursor();
     this.terrain.refresh();
     this.restoreVehicles();
   }
@@ -158,6 +160,50 @@ export class WorldSession {
     grid.material.opacity = 0.3;
     this.scene.add(grid);
     this.objects.push(grid);
+  }
+
+  /**
+   * The box that shows where the next block would go.
+   *
+   * Placing blind is the difference between building and guessing: every cell
+   * looks the same from a distance, and a ray that lands on the face you did
+   * not expect puts the block a metre from where you wanted it. Kept out of
+   * `objects` so that hiding the world does not decide whether the cursor is
+   * up -- that is the pointer's business, not the world's.
+   */
+  buildCursor() {
+    if (this.headless) return;
+    const box = new THREE.BoxGeometry(BLOCK, BLOCK, BLOCK);
+    const mesh = new THREE.Mesh(box, new THREE.MeshBasicMaterial({
+      color: 0xf0a825, transparent: true, opacity: 0.2, depthWrite: false,
+    }));
+    mesh.add(new THREE.LineSegments(
+      new THREE.EdgesGeometry(box),
+      new THREE.LineBasicMaterial({ color: 0xffc95c }),
+    ));
+    mesh.visible = false;
+    this.scene.add(mesh);
+    this.cursor = mesh;
+  }
+
+  /**
+   * Where a click would land, shown as well as answered. Erasing highlights
+   * the block that would go rather than the air in front of it, because those
+   * are two different cells and picking the wrong one is the whole problem.
+   */
+  aimAt(ray, mode = 'place') {
+    const aim = this.editor.aim(ray);
+    if (!this.cursor) return aim;
+    const cell = aim && (mode === 'erase' ? aim.hit : aim.cell);
+    this.cursor.visible = Boolean(cell);
+    if (cell) this.cursor.position.set(cell[0] + 0.5, cell[1] + 0.5, cell[2] + 0.5);
+    this.cursor.material.color.set(mode === 'erase' ? 0xf06a5d : 0xf0a825);
+    this.cursor.children[0].material.color.set(mode === 'erase' ? 0xf06a5d : 0xffc95c);
+    return aim;
+  }
+
+  hideCursor() {
+    if (this.cursor) this.cursor.visible = false;
   }
 
   // ----------------------------------------------------------------- vehicles
@@ -274,6 +320,7 @@ export class WorldSession {
 
   setMode(mode) {
     if (!MODES.includes(mode)) return this.mode;
+    this.hideCursor();
     // Only one of the three has your hands on a machine. Leaving it has to
     // give the keys back, or a machine keeps driving under a key you are
     // still holding while you place blocks in front of it.
@@ -306,19 +353,38 @@ export class WorldSession {
    * under load is a client that has drifted away from the host and does not
    * know it.
    */
-  advance(dt) {
+  advance(dt, afterFirstStep = null) {
     this.accumulator += dt;
     let steps = 0;
     while (this.accumulator >= STEP && steps < MAX_SUBSTEPS) {
       this.step();
       this.accumulator -= STEP;
       steps += 1;
+      // A key press must only be seen by the first substep, or one keystroke
+      // bound to a toggle flips it several times in a frame.
+      if (steps === 1 && afterFirstStep) afterFirstStep();
     }
     if (this.accumulator >= STEP) {
       this.behind += this.accumulator;
       this.accumulator = 0;
     }
     return steps;
+  }
+
+  /**
+   * Whether the world is drawn. It goes on running either way.
+   *
+   * The garage is a place you go to rather than a panel you open: the build
+   * plate sits at the origin, which is also where somebody's town is, so the
+   * two cannot be on screen at once. The world carries on running behind it,
+   * which is the part that matters.
+   */
+  setVisible(on) {
+    this.visible = on;
+    if (this.headless) return;
+    this.terrain.setVisible(on);
+    this.fleet.setVisible(on);
+    for (const object of this.objects) object.visible = on;
   }
 
   /** Everything the eye needs, and nothing the simulation does. */
@@ -385,6 +451,14 @@ export class WorldSession {
   dispose() {
     this.fleet.dispose();
     this.terrain.dispose();
+    if (this.cursor) {
+      this.scene.remove(this.cursor);
+      this.cursor.children[0].geometry.dispose();
+      this.cursor.children[0].material.dispose();
+      this.cursor.geometry.dispose();
+      this.cursor.material.dispose();
+      this.cursor = null;
+    }
     for (const object of this.objects) {
       this.scene.remove(object);
       if (object.geometry) object.geometry.dispose();

@@ -867,6 +867,11 @@ export class Machine {
     }
   }
 
+  /** Whether it is drawn. It goes on running either way. */
+  setVisible(on) {
+    for (const group of this.groups) group.visible = on;
+  }
+
   syncMeshes() {
     for (let i = 0; i < this.bodies.length; i += 1) {
       const t = this.bodies[i].translation();

@@ -30,6 +30,10 @@ import { GameAudio } from './ui/audio.js';
 import { store } from './ui/progress.js';
 import { blueprintGroup, renderMachine } from './ui/thumbnails.js';
 import { emptyProgram } from './sim/program.js';
+import { WorldSession } from './world/session.js';
+import { WorldStore, freeName } from './world/worldstore.js';
+import { toWorldCode, fromWorldCode, blankWorld } from './world/format.js';
+import { Sandbox, deployAt } from './ui/sandbox.js';
 
 const STEP = 1 / 60;
 
@@ -97,6 +101,8 @@ let world;
 let editor;
 let frontEnd;
 let builder;
+let sandbox;
+const worlds = new WorldStore();
 const survey = new Survey({
   onCaption: (caption, step, of) => hud.setSurvey(caption, step, of),
   onEnd: () => endCourse(),
@@ -137,8 +143,17 @@ addEventListener('pointerover', (event) => {
 
 // ---------------------------------------------------------------- persistence
 
+// The open world's garage is the same garage, but its work is not this
+// level's work: autosaving it under the current challenge would overwrite
+// whatever you had going there.
+const GARAGE_SLOT = '__world__';
+
+function designSlot() {
+  return state.mode === 'sandbox' ? GARAGE_SLOT : state.level.id;
+}
+
 function saveDesign(quiet = false) {
-  const ok = store.saveDesign(state.level.id, state.blueprint.toJSON());
+  const ok = store.saveDesign(designSlot(), state.blueprint.toJSON());
   if (quiet) return;
   if (ok) audio.confirm(); else audio.deny();
   hud.toast(ok ? 'Design saved' : 'Could not save — storage blocked', !ok);
@@ -486,6 +501,218 @@ function backToBuilder() {
   builder.refresh();
 }
 
+// ----------------------------------------------------------------- open world
+
+/**
+ * The other game. A world instead of a level, as many machines as you put
+ * down instead of one, and nothing to win.
+ *
+ * It is a session of its own rather than a fourth branch of the campaign's
+ * mode switch: `WorldSession` owns its own physics world, its own fleet and
+ * its own clock, and everything below is the wiring between that and the
+ * screen. The campaign's code path is untouched by any of it.
+ */
+async function openWorld(doc, id = null) {
+  if (state.mode === 'test') enterStudio();
+  saveDesign(true);
+  frontEnd.close();
+  if (state.showpiece) state.showpiece.visible = false;
+  state.idling = false;
+  disposeRun();
+  studio.setVisible(false);
+
+  state.mode = 'sandbox';
+  state.worldId = id;
+  state.worldCam = null;
+  state.session = new WorldSession({ RAPIER, scene, world: doc });
+  // The garage in a world keeps its own work, so coming back finds what you
+  // were building rather than whatever the last challenge had on the plate.
+  const kept = store.design(GARAGE_SLOT);
+  if (kept) studio.replaceBlueprint(Blueprint.fromJSON(kept, { bounds: state.blueprint.bounds }));
+
+  sandbox.open();
+  setWorldMode('world');
+  clearInterval(state.worldAutosave);
+  state.worldAutosave = setInterval(() => saveWorld(true), 20000);
+}
+
+function setWorldMode(mode) {
+  const session = state.session;
+  if (!session) return;
+  // Coming out of world-building, remember where you were stood in it.
+  session.hideCursor();
+  if (session.mode === 'world' && mode !== 'world') {
+    state.worldCam = { position: camera.position.clone(), target: controls.target.clone() };
+  }
+  session.setMode(mode);
+  const garage = mode === 'garage';
+
+  studio.setVisible(garage);
+  session.setVisible(!garage);
+  hud.setChromeVisible(garage);
+  if (garage) hud.setMode('studio');
+  // The keyboard only ever reaches a machine, and only in play.
+  input.enabled = mode === 'play';
+  controls.enabled = mode !== 'play' || !session.controlled();
+
+  if (garage) {
+    controls.target.set(0, 1, 0);
+    camera.position.set(7, 6, 9);
+  } else if (mode === 'world') {
+    if (state.worldCam) {
+      camera.position.copy(state.worldCam.position);
+      controls.target.copy(state.worldCam.target);
+    } else {
+      camera.position.set(30, 22, 30);
+      controls.target.set(0, 0, 0);
+    }
+  }
+  sandbox.refresh();
+}
+
+async function saveWorld(quiet = false) {
+  const session = state.session;
+  if (!session) return;
+  const card = await worlds.save(session.snapshot(), { id: state.worldId });
+  if (!card) {
+    if (!quiet) {
+      audio.deny();
+      hud.toast('This browser would not save the world — check its storage settings', true);
+    }
+    return;
+  }
+  state.worldId = card.id;
+  if (quiet) return;
+  audio.confirm();
+  hud.toast(`${card.name} saved`);
+}
+
+async function shareWorld() {
+  const session = state.session;
+  if (!session) return;
+  const code = await toWorldCode(session.snapshot());
+  try {
+    await navigator.clipboard.writeText(code);
+    hud.toast('World code copied');
+  } catch {
+    hud.toast('Clipboard refused — the code is in the box', true);
+    prompt('Your world code', code);
+  }
+}
+
+async function leaveWorld(back = 'worlds') {
+  clearInterval(state.worldAutosave);
+  // While the mode still says sandbox, so the garage's work goes to the
+  // garage's slot rather than over whatever this challenge had on the plate.
+  saveDesign(true);
+  await saveWorld(true);
+  state.session?.dispose();
+  state.session = null;
+  sandbox.close();
+  state.mode = 'studio';
+  studio.setVisible(false);
+  hud.setChromeVisible(false);
+  // Back to the machine this challenge was left with, not the one the world
+  // was being built in.
+  const design = loadDesign(state.level.id);
+  if (design) studio.replaceBlueprint(design);
+  hud.setLevel(state.level);
+  applyBans();
+  openMenu(back);
+}
+
+/** What the mouse does in a world, which depends only on the mode and tool. */
+function worldClick(ray) {
+  const session = state.session;
+  if (!session) return;
+
+  if (session.mode === 'play') {
+    const hit = session.pick(ray);
+    // Clicking away lets go, which is the other half of clicking to take hold.
+    session.control(hit ? hit.id : null, input);
+    controls.enabled = !hit;
+    if (hit) {
+      snapCamera(hit.machine);
+      audio.confirm();
+    }
+    sandbox.refresh();
+    return;
+  }
+  if (session.mode !== 'world') return;
+
+  if (sandbox.tool === 'deploy') {
+    const aim = session.editor.aim(ray);
+    if (!aim) return;
+    const put = session.deploy({
+      blueprint: state.blueprint,
+      at: deployAt(aim.cell),
+      yaw: sandbox.yaw,
+    });
+    if (!put.ok) {
+      audio.deny();
+      hud.toast(put.reason, true);
+      return;
+    }
+    session.select(put.member.id);
+    audio.place();
+    sandbox.refresh();
+    return;
+  }
+
+  const done = sandbox.tool === 'erase' ? session.erase(ray) : session.place(ray);
+  if (!done.ok && done.reason) {
+    audio.deny();
+    hud.toast(done.reason, true);
+    return;
+  }
+  if (done.ok) {
+    if (sandbox.tool === 'erase') audio.remove(); else audio.place();
+    sandbox.refresh();
+  }
+}
+
+function worldShortcuts() {
+  const session = state.session;
+  if (input.wasPressed('Escape')) {
+    // Driving? Let go first. Nobody wants one key that both parks the machine
+    // and throws away the screen.
+    if (session.controlled()) {
+      session.control(null);
+      controls.enabled = true;
+      sandbox.refresh();
+    } else {
+      leaveWorld();
+    }
+    return;
+  }
+  if (input.wasPressed('Tab')) {
+    const order = ['world', 'garage', 'play'];
+    setWorldMode(order[(order.indexOf(session.mode) + 1) % order.length]);
+    return;
+  }
+  if (session.mode === 'garage') {
+    if (input.wasPressed('KeyR')) studio.rotateYaw();
+    if (input.wasPressed('KeyT')) studio.rotatePitch();
+    if (input.wasPressed('KeyX')) studio.deleteHovered();
+    if (input.wasPressed('Delete')) studio.deleteSelected();
+    if (input.isDown('ControlLeft') || input.isDown('ControlRight')) {
+      if (input.wasPressed('KeyZ')) studio.undo();
+      if (input.wasPressed('KeyY')) studio.redo();
+    }
+    return;
+  }
+  if (session.mode !== 'world') return;
+  if (input.wasPressed('Digit1')) sandbox.setTool('place');
+  if (input.wasPressed('Digit2')) sandbox.setTool('erase');
+  if (input.wasPressed('Digit3')) sandbox.setTool('deploy');
+  if (input.wasPressed('KeyR') && sandbox.tool === 'deploy') sandbox.turn();
+  if (input.wasPressed('Delete') && session.selected) {
+    session.remove(session.selected);
+    audio.remove();
+    sandbox.refresh();
+  }
+}
+
 function applySetting(key, value) {
   settings[key] = value;
   store.setSetting(key, value);
@@ -531,11 +758,11 @@ function idleCamera(dt) {
 const chaseTarget = new THREE.Vector3();
 const chaseForward = new THREE.Vector3(0, 0, 1);
 
-function snapCamera() {
-  if (!state.machine) return;
-  const core = state.machine.corePosition();
+function snapCamera(machine = state.machine) {
+  if (!machine) return;
+  const core = machine.corePosition();
   chaseTarget.copy(core);
-  chaseForward.copy(state.machine.coreForward());
+  chaseForward.copy(machine.coreForward());
   camera.position.copy(core)
     .addScaledVector(chaseForward, -8)
     .add(new THREE.Vector3(0, 3.6, 0));
@@ -544,14 +771,17 @@ function snapCamera() {
 }
 
 function updateCamera(dt) {
-  if (state.mode !== 'test' || !state.machine) return;
-  const core = state.machine.corePosition();
+  const machine = state.mode === 'sandbox'
+    ? state.session?.controlled()?.machine ?? null
+    : (state.mode === 'test' ? state.machine : null);
+  if (!machine) return;
+  const core = machine.corePosition();
   chaseTarget.lerp(core, 1 - Math.exp(-dt * 12));
   if (state.cameraMode === 'orbit') {
     controls.target.copy(chaseTarget);
     return;
   }
-  chaseForward.lerp(state.machine.coreForward(), 1 - Math.exp(-dt * 3)).normalize();
+  chaseForward.lerp(machine.coreForward(), 1 - Math.exp(-dt * 3)).normalize();
   const desired = chaseTarget.clone()
     .addScaledVector(chaseForward, -8)
     .add(new THREE.Vector3(0, 3.6, 0));
@@ -589,24 +819,56 @@ function setPointerFromEvent(event) {
   builder?.setPointer(x, y);
 }
 
+// The studio gets the mouse in the campaign's build mode and in a world's
+// garage, which is the same garage.
+function onPlate() {
+  return state.mode === 'studio'
+    || (state.mode === 'sandbox' && state.session?.mode === 'garage');
+}
+
+function takesClicks() {
+  return onPlate() || state.mode === 'build' || state.mode === 'sandbox';
+}
+
+// A ray out of the camera through the pointer, which is what a click on a
+// world means: there is no plate to project onto, only whatever is out there.
+const caster = new THREE.Raycaster();
+
+function rayThrough(event) {
+  const rect = canvas.getBoundingClientRect();
+  caster.setFromCamera(new THREE.Vector2(
+    ((event.clientX - rect.left) / rect.width) * 2 - 1,
+    -((event.clientY - rect.top) / rect.height) * 2 + 1,
+  ), camera);
+  return { origin: caster.ray.origin, dir: caster.ray.direction };
+}
+
 canvas.addEventListener('pointermove', (event) => {
-  if (state.mode !== 'studio' && state.mode !== 'build') return;
+  if (state.mode === 'sandbox' && state.session?.mode === 'world') {
+    state.session.aimAt(rayThrough(event), sandbox.tool === 'erase' ? 'erase' : 'place');
+    return;
+  }
+  if (!onPlate() && state.mode !== 'build') return;
   setPointerFromEvent(event);
 });
 
 canvas.addEventListener('pointerdown', (event) => {
-  if ((state.mode !== 'studio' && state.mode !== 'build') || event.button !== 0) return;
+  if (!takesClicks() || event.button !== 0) return;
   pointerDownAt = { x: event.clientX, y: event.clientY };
 });
 
 canvas.addEventListener('pointerup', (event) => {
-  if ((state.mode !== 'studio' && state.mode !== 'build') || event.button !== 0) return;
+  if (!takesClicks() || event.button !== 0) return;
   if (!pointerDownAt) return;
   const moved = Math.hypot(event.clientX - pointerDownAt.x, event.clientY - pointerDownAt.y);
   pointerDownAt = null;
   // A drag is the camera being moved, not a click on the course.
   if (moved > 5) return;
   setPointerFromEvent(event);
+  if (state.mode === 'sandbox' && state.session?.mode !== 'garage') {
+    worldClick(rayThrough(event));
+    return;
+  }
   if (state.mode === 'build') {
     builder.update();
     builder.click();
@@ -620,16 +882,25 @@ canvas.addEventListener('pointerup', (event) => {
   }
 });
 
-canvas.addEventListener('pointerleave', () => studio?.clearPointer());
+canvas.addEventListener('pointerleave', () => {
+  studio?.clearPointer();
+  state.session?.hideCursor();
+});
 canvas.addEventListener('contextmenu', (event) => event.preventDefault());
 
 function handleShortcuts() {
   if (state.mode === 'build') return;
+  if (editor?.isOpen || frontEnd?.isOpen || hud?.modalIsOpen) return;
+  if (state.mode === 'sandbox') {
+    // A world's name is a text box in its own bar; every letter typed in it
+    // would otherwise also be a shortcut.
+    if (document.activeElement !== sandbox?.name) worldShortcuts();
+    return;
+  }
   if (survey.isRunning) {
     if (input.wasPressed('Escape') || input.wasPressed('Space')) survey.skip();
     return;
   }
-  if (editor?.isOpen || frontEnd?.isOpen || hud?.modalIsOpen) return;
   // Escape drops out of the game and back to the menu.
   if (input.wasPressed('Escape')) {
     openMenu();
@@ -807,7 +1078,24 @@ function frame(now) {
 
   handleShortcuts();
 
-  if (state.mode === 'build') {
+  if (state.mode === 'sandbox' && state.session) {
+    const session = state.session;
+    if (session.mode === 'garage') studio.update();
+    const steps = session.advance(dt, () => input.endFrame());
+    if (steps === 0) input.endFrame();
+    session.sync();
+    const driving = session.controlled();
+    if (driving && session.mode === 'play') audio.update(driving.machine.audioState());
+    else audio.silenceMachine();
+    // The panel reads positions out of the world, so it is redrawn on a slow
+    // beat rather than every frame: sixty rebuilds a second of a list nobody
+    // is looking that hard at is a lot of DOM for no gain.
+    state.worldPanel = (state.worldPanel ?? 0) + dt;
+    if (state.worldPanel > 0.4) {
+      state.worldPanel = 0;
+      sandbox.refresh();
+    }
+  } else if (state.mode === 'build') {
     builder.update();
     if (state.arena) {
       // The course runs while you edit it, so a mover or a belt shows what it
@@ -855,9 +1143,13 @@ function frame(now) {
   else if (state.idling) idleCamera(dt);
   else updateCamera(dt);
   if (controls.enabled && !state.idling && !survey.isRunning) controls.update();
-  const focus = state.mode === 'test' && state.machine
-    ? state.machine.corePosition()
-    : new THREE.Vector3(0, 0, 0);
+  const lit = state.mode === 'sandbox'
+    ? state.session?.controlled()?.machine
+    : (state.mode === 'test' ? state.machine : null);
+  // Shadows are cast from a box around the sun's target, so in a world the
+  // size of a town it has to follow you or half the map is unlit.
+  const focus = lit ? lit.corePosition()
+    : (state.mode === 'sandbox' ? controls.target : new THREE.Vector3(0, 0, 0));
   sun.position.set(focus.x + 14, focus.y + 22, focus.z + 10);
   sun.target.position.copy(focus);
   renderer.render(scene, camera);
@@ -1065,9 +1357,107 @@ async function boot() {
     },
   });
 
+  sandbox = new Sandbox({
+    handlers: {
+      session: () => state.session,
+      onMode: (mode) => setWorldMode(mode),
+      onLeave: () => leaveWorld(),
+      onSave: () => saveWorld(),
+      onShare: () => shareWorld(),
+      onRename: (name) => {
+        state.session?.rename(name);
+        sandbox.refresh();
+      },
+      onMaterial: (index) => state.session?.setMaterial(index) ?? 1,
+      onArmDeploy: () => {
+        // Against no level at all: a world has no budget, no height cap and
+        // nothing banned. What is still true is that a machine needs a core
+        // and needs to be something rather than nothing.
+        const problem = buildProblem(state.blueprint, {});
+        if (problem) {
+          audio.deny();
+          hud.toast(problem, true);
+          return;
+        }
+        setWorldMode('world');
+        sandbox.setTool('deploy');
+        hud.toast('Click where it should stand — R turns it');
+      },
+      onSelect: (id) => {
+        state.session?.select(id);
+        sandbox.refresh();
+      },
+      onControl: (id) => {
+        if (!state.session) return;
+        setWorldMode('play');
+        const member = state.session.control(id, input);
+        controls.enabled = !member;
+        if (member) snapCamera(member.machine);
+        sandbox.refresh();
+      },
+      onFocus: (id) => {
+        const member = state.session?.fleet.get(id);
+        if (!member) return;
+        const at = member.machine.corePosition();
+        controls.target.copy(at);
+        camera.position.set(at.x + 9, at.y + 7, at.z + 9);
+        camera.lookAt(at);
+      },
+      onEdit: (id) => {
+        const member = state.session?.fleet.get(id);
+        if (!member) return;
+        // A copy, so editing it in the garage does not reshape the one
+        // standing in the world under your feet. Deploy puts the new one down.
+        studio.replaceBlueprint(Blueprint.fromJSON(
+          member.machine.blueprint.toJSON(),
+          { bounds: state.blueprint.bounds },
+        ));
+        setWorldMode('garage');
+        hud.toast(`Editing a copy of ${member.name} — Deploy puts the new one down`);
+      },
+      onDelete: (id) => {
+        if (!state.session) return;
+        state.session.remove(id);
+        audio.remove();
+        sandbox.refresh();
+      },
+    },
+  });
+
   frontEnd = new FrontEnd({
     RAPIER,
     handlers: {
+      listWorlds: () => worlds.list(),
+      onNewWorld: async () => {
+        const doc = blankWorld();
+        doc.name = freeName(await worlds.list(), 'New world');
+        await openWorld(doc, null);
+      },
+      onOpenWorld: async (card) => {
+        const doc = await worlds.load(card.id);
+        if (!doc) {
+          hud.toast(`Could not open ${card.name}`, true);
+          return;
+        }
+        await openWorld(doc, card.id);
+      },
+      onDeleteWorld: async (card) => {
+        const sure = await hud.confirm({
+          title: `Delete ${card.name}?`,
+          body: `${card.blocks} blocks and ${card.vehicles} machines. This cannot be undone.`,
+          ok: 'Delete',
+        });
+        if (!sure) return false;
+        return worlds.remove(card.id);
+      },
+      onWorldCode: async (code) => {
+        const result = await fromWorldCode(code);
+        if (!result.ok) {
+          hud.toast(result.reason, true);
+          return;
+        }
+        await openWorld(result.world, null);
+      },
       onPlay: (levelId) => {
         if (levelId !== state.level.id) changeLevel(levelId);
         leaveMenu();

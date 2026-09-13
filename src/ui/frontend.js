@@ -23,11 +23,25 @@ const SVG = {
   tick: '<path d="M4 12.5 9.5 18 20 6.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>',
   back: '<path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>',
   plus: '<path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+  world: '<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3 12h18M12 3c2.6 2.5 4 5.6 4 9s-1.4 6.5-4 9c-2.6-2.5-4-5.6-4-9s1.4-6.5 4-9z" fill="none" stroke="currentColor" stroke-width="1.6"/>',
   build: '<path d="M3 20h18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M5 20V9l5-4 5 4v11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M15 20v-6h4v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>',
 };
 
 function icon(name, size = 18) {
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true">${SVG[name]}</svg>`;
+}
+
+/** How long ago something was saved, in the roughest terms that are still true. */
+export function ago(when, now = Date.now()) {
+  const seconds = Math.max(0, (now - when) / 1000);
+  if (seconds < 90) return 'just now';
+  const minutes = seconds / 60;
+  if (minutes < 90) return `${Math.round(minutes)} min ago`;
+  const hours = minutes / 60;
+  if (hours < 36) return `${Math.round(hours)} hr ago`;
+  const days = hours / 24;
+  if (days < 14) return `${Math.round(days)} days ago`;
+  return `${Math.round(days / 7)} weeks ago`;
 }
 
 function el(tag, className, html) {
@@ -161,6 +175,7 @@ export class FrontEnd {
     if (screen === 'title') this.renderTitle();
     if (screen === 'challenges') this.renderChallenges();
     if (screen === 'garage') this.renderGarage();
+    if (screen === 'worlds') this.renderWorlds();
     if (screen === 'build') this.renderBuild();
     if (screen === 'parts') this.renderParts();
     if (screen === 'pack') this.renderPackEditor();
@@ -210,6 +225,12 @@ export class FrontEnd {
         glyph: 'garage',
         meta: `${store.machines().length} saved`,
         go: () => this.show('garage'),
+      },
+      {
+        label: 'Worlds',
+        glyph: 'world',
+        meta: 'Open sandbox',
+        go: () => this.show('worlds'),
       },
       {
         label: 'Build',
@@ -376,6 +397,80 @@ export class FrontEnd {
   }
 
   // ----------------------------------------------------------------- garage
+
+  // ---------------------------------------------------------------- worlds
+
+  /**
+   * Worlds live in IndexedDB rather than in the one localStorage key, so
+   * unlike every other screen here the list arrives later. The screen is
+   * drawn once saying so and filled in when it comes, which is honest and
+   * keeps the menu from stalling on a disk.
+   */
+  renderWorlds() {
+    this.backBar('Worlds');
+    const sheet = el('div', 'fe-sheet');
+    sheet.append(el('div', 'fe-head', '<h2>Worlds</h2><p>Build a place, put machines in it, and leave them running. Nothing to win.</p>'));
+
+    const grid = el('div', 'fe-grid');
+    const add = el('button', 'fe-card add', `${icon('plus', 26)}<span>Start a new world</span>`);
+    add.addEventListener('click', () => this.h.onNewWorld());
+    const paste = el('button', 'fe-card add', `${icon('back', 22)}<span>Open a world code</span>`);
+    paste.addEventListener('click', async () => {
+      const code = prompt('Paste a world code');
+      if (!code) return;
+      await this.h.onWorldCode(code.trim());
+    });
+    grid.append(add, paste);
+    sheet.append(grid);
+
+    const listed = el('div', 'fe-grid');
+    const waiting = el('p', 'fe-empty', 'Looking for your worlds…');
+    sheet.append(listed, waiting);
+    this.body.append(sheet);
+
+    this.h.listWorlds().then((cards) => {
+      if (this.screen !== 'worlds') return;
+      waiting.remove();
+      if (cards.length === 0) {
+        sheet.append(el('p', 'fe-empty', 'No worlds yet. Start one and put a floor down.'));
+        return;
+      }
+      for (const card of cards) listed.append(this.worldCard(card));
+    });
+  }
+
+  worldCard(card) {
+    const tile = el('button', 'fe-card');
+    const shot = el('div', 'fe-shot world', icon('world', 56));
+
+    const facts = el('div', 'fe-facts');
+    facts.append(
+      el('span', null, `Blocks <b>${card.blocks}</b>`),
+      el('span', null, `Machines <b>${card.vehicles}</b>`),
+      el('span', null, `Saved <b>${ago(card.saved)}</b>`),
+    );
+
+    const meat = el('div', 'fe-meat');
+    meat.append(el('h3', null, card.name), facts);
+
+    const row = el('div', 'fe-row');
+    const open = el('button', 'fe-mini', 'Open');
+    open.addEventListener('click', (event) => {
+      event.stopPropagation();
+      this.h.onOpenWorld(card);
+    });
+    const remove = el('button', 'fe-mini danger', 'Delete');
+    remove.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      if (await this.h.onDeleteWorld(card)) this.show('worlds');
+    });
+    row.append(open, remove);
+    meat.append(row);
+
+    tile.append(shot, meat);
+    tile.addEventListener('click', () => this.h.onOpenWorld(card));
+    return tile;
+  }
 
   renderGarage() {
     this.backBar('Garage');

@@ -1,0 +1,205 @@
+/* ============================================================================
+   The open world's own chrome.
+
+   The campaign's HUD is a brief, a budget and a list of objectives. A sandbox
+   has none of those and has two things the campaign never needs: a material
+   rack, and a list of the machines standing in the world. So it is its own
+   bar rather than a set of exceptions inside the other one, sharing the same
+   tokens and the same cut corner.
+   ========================================================================= */
+
+/* While a world is up, the campaign's furniture is not. The parts rack and
+   the inspector stay, because the garage is the same garage. */
+body.in-sandbox #topbar,
+body.in-sandbox #brief,
+body.in-sandbox #objectives,
+body.in-sandbox #help { display: none !important; }
+
+body.in-sandbox #rail { top: 66px; }
+
+.sb[hidden] { display: none !important; }
+
+.sb-top {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 54px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  background: var(--panel);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--edge);
+  z-index: 20;
+}
+
+.sb-leave { flex: none; }
+
+.sb-name {
+  height: 34px;
+  min-width: 0;
+  width: 210px;
+  padding: 0 11px;
+  color: var(--text);
+  background: var(--solid);
+  border: 1px solid var(--edge);
+  font-family: var(--ui);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .02em;
+}
+.sb-name:focus { outline: none; border-color: var(--amber); }
+
+/* ------------------------------------------------------------- side panels */
+
+.sb-left, .sb-right {
+  position: fixed;
+  z-index: 15;
+  width: 208px;
+  padding: 13px;
+  background: var(--panel);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--edge);
+  clip-path: polygon(0 0, calc(100% - var(--notch)) 0, 100% var(--notch), 100% 100%, var(--notch) 100%, 0 calc(100% - var(--notch)));
+}
+
+.sb-left { left: 12px; top: 66px; bottom: 52px; overflow-y: auto; }
+.sb-left[hidden] { display: none !important; }
+
+/* Down the right, under the parts rack when the garage is open, so the two
+   never fight for the same strip of screen. */
+.sb-right { right: 12px; top: 66px; width: 240px; max-height: 46vh; overflow-y: auto; }
+body.in-sandbox.garage .sb-right { top: auto; bottom: 52px; }
+
+/* -------------------------------------------------------------- the rack */
+
+.sb-mats { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; }
+
+.sb-mat {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  text-align: left;
+  font-size: 12px;
+  letter-spacing: .01em;
+  color: var(--dim);
+}
+.sb-mat i {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  background: var(--swatch);
+  border: 1px solid rgba(0, 0, 0, .5);
+}
+.sb-mat:hover { border-color: var(--edge); background: rgba(255, 255, 255, .04); }
+.sb-mat.active { border-color: var(--amber); color: var(--text); background: var(--amber-dim); }
+
+.sb-left .tools { margin-bottom: 16px; }
+
+/* ------------------------------------------------------------- the fleet */
+
+.sb-fleet { display: flex; flex-direction: column; gap: 3px; }
+
+.sb-empty {
+  margin: 0;
+  color: var(--faint);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.sb-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  height: 30px;
+  padding: 0 9px;
+  border: 1px solid transparent;
+  background: transparent;
+  text-align: left;
+  color: var(--dim);
+}
+.sb-row:hover { border-color: var(--edge); background: rgba(255, 255, 255, .04); }
+.sb-row.on { border-color: var(--amber); color: var(--text); background: var(--amber-dim); }
+.sb-row.driving .sb-row-name::after {
+  content: "·  driving";
+  color: var(--green);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: .1em;
+  margin-left: 7px;
+}
+.sb-row-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12.5px;
+}
+.sb-row-at {
+  flex: none;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.sb-acts { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 11px; }
+.sb-act {
+  flex: 1 1 46%;
+  height: 30px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.sb-act.danger { color: var(--red); }
+.sb-act.danger:hover { border-color: var(--red); }
+
+/* ------------------------------------------------------------------ hint */
+
+.sb-hint {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 14px;
+  font-size: 12px;
+  color: var(--faint);
+  background: linear-gradient(to top, rgba(7, 10, 15, .9), transparent);
+  pointer-events: none;
+  z-index: 14;
+}
+
+@media (max-width: 980px) {
+  .sb-left, .sb-right { width: 168px; }
+  .sb-name { width: 130px; }
+}
+
+/* A world has no picture yet — there is nothing to photograph until it has
+   been built in. The mark stands in for one rather than leaving a grey hole. */
+.fe-shot.world {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--faint);
+  background: radial-gradient(circle at 50% 45%, rgba(240, 168, 37, .1), transparent 62%);
+}
+
+.sb-acts.deploy { margin: 0 0 14px; }
+.sb-act.lead {
+  flex: 1 1 100%;
+  background: var(--amber);
+  border-color: var(--amber);
+  color: #10131a;
+  font-weight: 700;
+}
+.sb-act.lead:hover { background: var(--amber-b); border-color: var(--amber-b); }
