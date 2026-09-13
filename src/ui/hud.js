@@ -35,6 +35,10 @@ const HELP = {
     ['Shift', 'the other way'],
     ['1 2 3', 'place / select / delete'],
     ['X', 'delete hovered'],
+    ['Shift+click', 'add to selection'],
+    ['Ctrl+click', 'select what is attached'],
+    ['G / Ctrl+D', 'move · copy selection'],
+    ['Delete', 'delete selection'],
     ['Ctrl+Z / Ctrl+Y', 'undo / redo'],
     ['Tab', 'test'],
   ],
@@ -399,13 +403,21 @@ export class Hud {
     body.append(row);
   }
 
-  renderInspector(placed, blueprint) {
+  renderInspector(placed, blueprint, selected = 0) {
     const body = this.dom.inspectorBody;
     body.className = '';
     body.innerHTML = '';
     if (!placed) {
       this.clearInspector('Select a part with the Select tool to set its controls.');
       return;
+    }
+    // With several parts chosen the settings below still belong to the last
+    // one clicked, so say how many are held before showing them — otherwise a
+    // panel headed "Powered Wheel" while forty are selected reads as a lie.
+    if (selected > 1) {
+      const many = el('div', 'insp-many', `${selected} parts selected`);
+      body.append(many, el('p', 'insp-blurb',
+        'G moves them, Ctrl+D copies them, Delete removes them. Settings below are the last one picked.'));
     }
     const part = getPart(placed.type);
     const head = el('div', 'insp-head');

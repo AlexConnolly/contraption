@@ -934,7 +934,7 @@ function refreshReadouts() {
 
 function refreshInspector() {
   const selected = studio.selectedId ? state.blueprint.get(studio.selectedId) : null;
-  hud.renderInspector(selected, state.blueprint);
+  hud.renderInspector(selected, state.blueprint, studio.selection?.size ?? 0);
 }
 
 // ----------------------------------------------------------------- interaction
@@ -1005,7 +1005,7 @@ canvas.addEventListener('pointerup', (event) => {
     return;
   }
   studio.update();
-  const result = studio.click();
+  const result = studio.click({ add: event.shiftKey, connected: event.ctrlKey || event.metaKey });
   if (result && result.ok === false) {
     audio.deny();
     if (result.reason) hud.toast(result.reason, true);
@@ -1031,9 +1031,17 @@ function handleShortcuts() {
     if (input.wasPressed('Escape') || input.wasPressed('Space')) survey.skip();
     return;
   }
-  // Escape drops out of the game and back to the menu.
+  // Escape drops out of the game and back to the menu — unless something is
+  // being held, in which case it means "put that down", which is what anybody
+  // mid-drag expects it to mean. Leaving the level while carrying half a
+  // machine would be a surprising way to lose your place.
   if (input.wasPressed('Escape')) {
-    openMenu();
+    if (studio?.drag) {
+      studio.cancelDrag();
+      hud.toast('Put back');
+    } else {
+      openMenu();
+    }
     return;
   }
   if (input.wasPressed('Tab')) {
@@ -1064,6 +1072,17 @@ function handleShortcuts() {
   if (input.wasPressed('Digit3')) selectTool('delete');
   if (input.wasPressed('KeyX')) studio.deleteHovered();
   if (input.wasPressed('Delete')) studio.deleteSelected();
+  if (input.wasPressed('Backspace')) studio.deleteSelected();
+  if (input.wasPressedPlain('KeyG')) {
+    const held = studio.beginDrag('move');
+    if (!held.ok && held.reason) hud.toast(held.reason, true);
+    else hud.toast('Moving — click to put it down, Escape to cancel');
+  }
+  if (input.wasPressedWith('KeyD', 'ctrl')) {
+    const held = studio.beginDrag('clone');
+    if (!held.ok && held.reason) hud.toast(held.reason, true);
+    else hud.toast('Copy held — click to put it down, Escape to cancel');
+  }
   if (input.isDown('ControlLeft') || input.isDown('ControlRight')) {
     if (input.wasPressed('KeyZ') && !studio.undo()) hud.toast('Nothing to undo');
     if (input.wasPressed('KeyY') && !studio.redo()) hud.toast('Nothing to redo');
@@ -1074,7 +1093,8 @@ function selectTool(tool) {
   studio.setTool(tool);
   hud.setActiveTool(tool);
   if (tool !== 'select') {
-    studio.selectedId = null;
+    studio.cancelDrag();
+    studio.select(null);
     refreshInspector();
   }
 }

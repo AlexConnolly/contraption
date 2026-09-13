@@ -85,11 +85,23 @@ export class Blueprint {
     return total;
   }
 
-  canPlace(typeId, cell, rot = IDENTITY_ORIENTATION, ignoreId = null) {
+  /**
+   * Whether a part fits, ignoring one part that is getting out of its own way.
+   *
+   * `ignore` takes a set as well as a single id, because moving a selection is
+   * the same question asked of several parts at once: each one has to clear
+   * everything except the others that are moving with it. Passing them one at
+   * a time would refuse a block of parts sliding one cell along, where every
+   * part lands where its neighbour used to be.
+   */
+  canPlace(typeId, cell, rot = IDENTITY_ORIENTATION, ignore = null) {
+    const ignores = ignore instanceof Set
+      ? (id) => ignore.has(id)
+      : (id) => id === ignore;
     const part = getPart(typeId);
     if (part.unique) {
       for (const placed of this.parts.values()) {
-        if (placed.type === typeId && placed.id !== ignoreId) {
+        if (placed.type === typeId && !ignores(placed.id)) {
           return { ok: false, reason: `Only one ${part.name} allowed` };
         }
       }
@@ -100,7 +112,7 @@ export class Blueprint {
         return { ok: false, reason: 'Outside the build area' };
       }
       const occupant = this.occupancy.get(key(c));
-      if (occupant && occupant !== ignoreId) {
+      if (occupant && !ignores(occupant)) {
         return { ok: false, reason: 'Something is already there' };
       }
     }

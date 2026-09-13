@@ -9,6 +9,9 @@ import {
 } from '../core/orientation.js';
 import { aimAt } from '../core/aim.js';
 import { Blueprint, occupiedCells } from '../core/blueprint.js';
+import {
+  canCloneGroup, canMoveGroup, cloneGroup, connectedTo, groupExtent, moveGroup, removeGroup,
+} from '../core/group.js';
 import { groupBlueprint } from '../sim/grouping.js';
 import { wouldConnect } from '../sim/connectivity.js';
 import { RangeView } from './envelope.js';
@@ -37,11 +40,19 @@ export class Studio {
     this.tool = 'place';
     this.partType = 'block';
     this.rotation = IDENTITY_ORIENTATION;
+    // `selectedId` is the part the inspector talks about — the last one
+    // clicked. `selection` is everything that a move, copy or delete applies
+    // to, and holds that same part when only one is picked, so the two never
+    // disagree about what is chosen.
     this.selectedId = null;
+    this.selection = new Set();
     this.hoverId = null;
     this.targetCell = null;
     this.valid = false;
     this.reason = '';
+    // A move or a copy in progress: the selection is drawn as a ghost at an
+    // offset and nothing is committed until the next click.
+    this.drag = null;
 
     this.undoStack = [];
     this.redoStack = [];
@@ -154,7 +165,236 @@ export class Studio {
     // number in the inspector, and a number does not answer "will it clear the
     // load", which is the only question anybody is asking of it.
     this.range = new RangeView(this.root);
+
+    // The selection, drawn twice: an outline around every chosen part so you
+    // can see what is chosen, and a ghost of the whole lot while it is being
+    // moved or copied so you can see where it would land before letting go.
+    this.selectionMarks = new THREE.Group();
+    this.root.add(this.selectionMarks);
+    this.groupGhost = new THREE.Group();
+    this.groupGhost.visible = false;
+    this.root.add(this.groupGhost);
+    this.groupBox = new THREE.LineSegments(
+      new THREE.BufferGeometry(),
+      new THREE.LineBasicMaterial({ color: OK_COLOUR }),
+    );
+    this.groupGhost.add(this.groupBox);
+
     this.refreshGhost();
+  }
+
+  // ------------------------------------------------------------- selection
+
+  selectedIds() {
+    return [...this.selection];
+  }
+
+  /**
+   * Chooses a part, or adds it to what is already chosen.
+   *
+   * Adding toggles rather than only adding, because the way anybody fixes an
+   * over-wide selection is by shift-clicking the part they did not mean.
+   */
+  select(id, { add = false } = {}) {
+    if (!id) {
+      this.selection.clear();
+      this.selectedId = null;
+    } else if (add) {
+      if (this.selection.has(id)) {
+        this.selection.delete(id);
+        if (this.selectedId === id) this.selectedId = this.selectedIds().at(-1) ?? null;
+      } else {
+        this.selection.add(id);
+        this.selectedId = id;
+      }
+    } else {
+      this.selection = new Set([id]);
+      this.selectedId = id;
+    }
+    this.markSelection();
+    this.onChange({ reason: 'select' });
+    return this.selectedIds();
+  }
+
+  /** This part and everything touching it, which is how a row gets picked. */
+  selectConnected(id) {
+    if (!id) return this.selectedIds();
+    this.selection = new Set(connectedTo(this.blueprint, id));
+    this.selectedId = id;
+    this.markSelection();
+    this.onChange({ reason: 'select' });
+    return this.selectedIds();
+  }
+
+  /** Drops any ids whose parts have gone, so a selection cannot go stale. */
+  pruneSelection() {
+    for (const id of [...this.selection]) {
+      if (!this.blueprint.get(id)) this.selection.delete(id);
+    }
+    if (this.selectedId && !this.blueprint.get(this.selectedId)) {
+      this.selectedId = this.selectedIds().at(-1) ?? null;
+    }
+  }
+
+  /** An outline around every selected part. Rebuilt only when it changes. */
+  markSelection() {
+    for (const child of [...this.selectionMarks.children]) {
+      this.selectionMarks.remove(child);
+      child.geometry?.dispose();
+      child.material?.dispose();
+    }
+    if (this.selection.size < 2) return;
+    for (const id of this.selection) {
+      const placed = this.blueprint.get(id);
+      if (!placed) continue;
+      const part = getPart(placed.type);
+      const mark = new THREE.LineSegments(
+        new THREE.EdgesGeometry(new THREE.BoxGeometry(
+          part.size[0] * CELL + 0.05, part.size[1] * CELL + 0.05, part.size[2] * CELL + 0.05,
+        )),
+        new THREE.LineBasicMaterial({ color: 0x7dd3fc }),
+      );
+      mark.position.set(placed.cell[0] * CELL, placed.cell[1] * CELL, placed.cell[2] * CELL);
+      const q = orientationQuaternion(placed.rot);
+      mark.quaternion.set(q.x, q.y, q.z, q.w);
+      this.selectionMarks.add(mark);
+    }
+  }
+
+  // ------------------------------------------------- moving and copying it
+
+  /**
+   * Picks the selection up. Nothing changes until it is put down, so this is
+   * safe to start by accident and cancel.
+   *
+   * The offset is taken from how far the pointer travels across the grid
+   * rather than from what is under it, so the selection moves exactly as far
+   * as the hand does and does not jump when the cursor crosses its own parts.
+   */
+  beginDrag(kind = 'move') {
+    if (this.selection.size === 0) return { ok: false, reason: 'Nothing selected' };
+    if (kind === 'clone') {
+      const can = canCloneGroup(this.blueprint, this.selectedIds(), [0, 0, 0]);
+      // A copy at no offset always overlaps the originals, so only the
+      // complaints that do not depend on where it lands are worth raising now.
+      if (!can.ok && /only be one/i.test(can.reason ?? '')) return can;
+    }
+    this.drag = {
+      kind,
+      ids: this.selectedIds(),
+      from: this.pointerCell ? [...this.pointerCell] : null,
+      delta: [0, 0, 0],
+      valid: false,
+      reason: '',
+    };
+    this.buildGroupGhost();
+    return { ok: true };
+  }
+
+  cancelDrag() {
+    this.drag = null;
+    this.groupGhost.visible = false;
+    this.clearGroupGhost();
+  }
+
+  clearGroupGhost() {
+    for (const child of [...this.groupGhost.children]) {
+      if (child === this.groupBox) continue;
+      this.groupGhost.remove(child);
+      disposeTree(child);
+    }
+  }
+
+  buildGroupGhost() {
+    this.clearGroupGhost();
+    if (!this.drag) return;
+    for (const id of this.drag.ids) {
+      const placed = this.blueprint.get(id);
+      if (!placed) continue;
+      const ghost = makeGhost(getPart(placed.type), placed.rot);
+      ghost.position.set(placed.cell[0] * CELL, placed.cell[1] * CELL, placed.cell[2] * CELL);
+      const q = orientationQuaternion(placed.rot);
+      ghost.quaternion.set(q.x, q.y, q.z, q.w);
+      this.groupGhost.add(ghost);
+    }
+    const box = groupExtent(this.blueprint, this.drag.ids);
+    this.groupBox.geometry.dispose();
+    this.groupBox.geometry = box
+      ? new THREE.EdgesGeometry(new THREE.BoxGeometry(
+        box.size[0] * CELL + 0.06, box.size[1] * CELL + 0.06, box.size[2] * CELL + 0.06,
+      ))
+      : new THREE.BufferGeometry();
+    if (box) {
+      this.groupBox.position.set(
+        ((box.min[0] + box.max[0]) / 2) * CELL,
+        ((box.min[1] + box.max[1]) / 2) * CELL,
+        ((box.min[2] + box.max[2]) / 2) * CELL,
+      );
+      this.groupBox.quaternion.identity();
+    }
+  }
+
+  /** Where the held selection would land, and whether it may. */
+  aimDrag(cell) {
+    if (!this.drag) return;
+    if (cell && !this.drag.from) this.drag.from = [...cell];
+    if (cell && this.drag.from) {
+      this.drag.delta = [0, 1, 2].map((i) => cell[i] - this.drag.from[i]);
+    }
+    const check = this.drag.kind === 'clone'
+      ? canCloneGroup(this.blueprint, this.drag.ids, this.drag.delta)
+      : canMoveGroup(this.blueprint, this.drag.ids, this.drag.delta);
+    this.drag.valid = check.ok;
+    this.drag.reason = check.reason ?? '';
+    this.groupGhost.visible = true;
+    this.groupGhost.position.set(
+      this.drag.delta[0] * CELL, this.drag.delta[1] * CELL, this.drag.delta[2] * CELL,
+    );
+    this.groupBox.material.color.setHex(check.ok ? OK_COLOUR : BAD_COLOUR);
+  }
+
+  /** Puts the selection down. Refuses rather than dropping it somewhere bad. */
+  commitDrag() {
+    if (!this.drag) return { ok: false };
+    const { kind, ids, delta } = this.drag;
+    if (!this.drag.valid) return { ok: false, reason: this.drag.reason };
+
+    this.snapshot();
+    const out = kind === 'clone'
+      ? cloneGroup(this.blueprint, ids, delta)
+      : moveGroup(this.blueprint, ids, delta);
+    if (!out.ok) {
+      this.undoStack.pop();
+      return out;
+    }
+    // A copy leaves you holding the copy, so pressing it again walks along
+    // instead of piling a second one onto the first.
+    this.selection = new Set(kind === 'clone' ? out.ids : ids);
+    this.selectedId = this.selectedIds().at(-1) ?? null;
+    this.cancelDrag();
+    this.rebuild();
+    this.markSelection();
+    this.onChange({ reason: kind });
+    return out;
+  }
+
+  /** Throws the whole selection away. */
+  deleteSelection() {
+    if (this.selection.size === 0) return { ok: false };
+    this.snapshot();
+    const out = removeGroup(this.blueprint, this.selectedIds());
+    if (!out.ok) {
+      this.undoStack.pop();
+      return out;
+    }
+    this.selection.clear();
+    this.selectedId = null;
+    this.hoverId = null;
+    this.cancelDrag();
+    this.rebuild();
+    this.markSelection();
+    this.onChange({ reason: 'delete' });
+    return out;
   }
 
   refreshGhost() {
@@ -276,6 +516,20 @@ export class Studio {
     this.showRange();
     const hit = this.pick();
     this.hoverId = hit?.partId ?? null;
+    // The cell the pointer is over, kept whether or not anything is being
+    // dragged, because a drag has to know where it started from.
+    this.pointerCell = hit
+      ? [0, 1, 2].map((i) => hit.cell[i] + hit.normal[i])
+      : this.pointerCell ?? null;
+
+    // A held selection owns the frame: the placement ghost and the hover
+    // outline would both be answering a question nobody is asking.
+    if (this.drag) {
+      this.ghostHolder.visible = false;
+      this.highlight.visible = false;
+      this.aimDrag(hit ? this.pointerCell : null);
+      return;
+    }
 
     if (!hit) {
       this.targetCell = null;
@@ -333,11 +587,22 @@ export class Studio {
     this.highlight.visible = true;
   }
 
-  click() {
+  /**
+   * A click means whatever is being held at the time.
+   *
+   * Putting a held selection down comes before every other reading of a click,
+   * including the place tool: while something is in hand that is the only
+   * thing a click can sensibly be about.
+   */
+  click({ add = false, connected = false } = {}) {
+    if (this.drag) return this.commitDrag();
     if (this.tool === 'place') return this.placeHere();
     if (this.tool === 'delete') return this.deleteHovered();
-    this.selectedId = this.hoverId;
-    this.onChange({ reason: 'select' });
+    if (connected) {
+      this.selectConnected(this.hoverId);
+      return { ok: true };
+    }
+    this.select(this.hoverId, { add });
     return { ok: true };
   }
 
@@ -434,21 +699,17 @@ export class Studio {
     if (!this.hoverId) return { ok: false };
     this.snapshot();
     this.blueprint.remove(this.hoverId);
-    if (this.selectedId === this.hoverId) this.selectedId = null;
+    this.selection.delete(this.hoverId);
+    if (this.selectedId === this.hoverId) this.selectedId = this.selectedIds().at(-1) ?? null;
     this.hoverId = null;
     this.rebuild();
     this.onChange({ reason: 'delete' });
     return { ok: true };
   }
 
+  /** Kept as the name the rest of the game calls, now meaning all of it. */
   deleteSelected() {
-    if (!this.selectedId) return { ok: false };
-    this.snapshot();
-    this.blueprint.remove(this.selectedId);
-    this.selectedId = null;
-    this.rebuild();
-    this.onChange({ reason: 'delete' });
-    return { ok: true };
+    return this.deleteSelection();
   }
 
   snapshot() {
@@ -480,7 +741,8 @@ export class Studio {
     this.blueprint.parts = restored.parts;
     this.blueprint.occupancy = restored.occupancy;
     this.blueprint.name = restored.name;
-    if (this.selectedId && !this.blueprint.get(this.selectedId)) this.selectedId = null;
+    this.cancelDrag();
+    this.pruneSelection();
     this.rebuild();
   }
 
@@ -543,6 +805,8 @@ export class Studio {
       }
     }
     this.grouping = grouping;
+    this.pruneSelection();
+    this.markSelection();
     this.applyHints();
   }
 
