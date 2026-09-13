@@ -11,7 +11,7 @@ import js from '@eslint/js';
 export default [
   js.configs.recommended,
   {
-    files: ['src/**/*.js', 'tests/**/*.js', '*.config.js'],
+    files: ['src/**/*.js', 'tests/**/*.js', 'server/**/*.js', '*.config.js'],
     languageOptions: {
       ecmaVersion: 2023,
       sourceType: 'module',

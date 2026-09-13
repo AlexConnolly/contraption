@@ -236,7 +236,7 @@ export class WorldSession {
    * shape because somebody moved a wheel in the garage.
    */
   deploy({
-    blueprint, at, yaw = 0, name = null, owner = null,
+    blueprint, at, yaw = 0, name = null, owner = null, num = 0,
   }) {
     if (this.fleet.list().length >= WORLD_LIMITS.vehicles) {
       return { ok: false, reason: `Only ${WORLD_LIMITS.vehicles} machines fit in one world` };
@@ -250,6 +250,10 @@ export class WorldSession {
       yaw,
       name: name || blueprint.name,
       owner,
+      // A machine joining a world somebody else is hosting keeps the number it
+      // arrived with: a snapshot says which machine it is describing by number
+      // and the two ends have to mean the same one.
+      num,
     });
     return { ok: true, member };
   }
@@ -305,15 +309,36 @@ export class WorldSession {
     return this.editor.material;
   }
 
+  /**
+   * What a click would change, without changing it.
+   *
+   * Offline the answer is applied on the spot. Online it is sent, and the
+   * world changes when it comes back — so the two have to be able to ask the
+   * question without doing anything about it, or the online path would be a
+   * second copy of the aiming rules that could drift from this one.
+   */
+  planEdit(ray, mode = 'place') {
+    const aim = this.editor.aim(ray);
+    if (!aim) return null;
+    if (mode === 'erase') return aim.hit ? [aim.hit[0], aim.hit[1], aim.hit[2], 0] : null;
+    return [aim.cell[0], aim.cell[1], aim.cell[2], this.editor.material];
+  }
+
+  applyEdit(op) {
+    return this.world.blocks.set(op[0], op[1], op[2], op[3]);
+  }
+
   place(ray) {
     if (this.world.blocks.count() >= WORLD_LIMITS.blocks) {
       return { ok: false, reason: 'This world is full — take something away first' };
     }
-    return this.editor.place(ray) ? { ok: true } : { ok: false, reason: null };
+    const op = this.planEdit(ray, 'place');
+    return op && this.applyEdit(op) ? { ok: true, op } : { ok: false, reason: null };
   }
 
   erase(ray) {
-    return this.editor.remove(ray) ? { ok: true } : { ok: false, reason: null };
+    const op = this.planEdit(ray, 'erase');
+    return op && this.applyEdit(op) ? { ok: true, op } : { ok: false, reason: null };
   }
 
   // -------------------------------------------------------------------- modes

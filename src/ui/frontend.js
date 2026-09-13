@@ -420,8 +420,22 @@ export class FrontEnd {
       if (!code) return;
       await this.h.onWorldCode(code.trim());
     });
-    grid.append(add, paste);
+    const join = el('button', 'fe-card add', `${icon('world', 24)}<span>Join somebody's world</span>`);
+    join.title = 'Somebody running `npm run host` on your network';
+    join.addEventListener('click', async () => {
+      const address = prompt(
+        'Address of the host — somebody running `npm run host`',
+        this.h.suggestHost(),
+      );
+      if (!address) return;
+      await this.h.onJoin(address.trim());
+    });
+    grid.append(add, paste, join);
     sheet.append(grid);
+
+    sheet.append(el('p', 'fe-note', 'Worlds you build are your own. To play in one together, '
+      + 'somebody runs <code>npm run host</code> and everybody else joins their address — '
+      + 'their machine runs the world and is the last word on what happens in it.'));
 
     const listed = el('div', 'fe-grid');
     const waiting = el('p', 'fe-empty', 'Looking for your worlds…');

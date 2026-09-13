@@ -297,6 +297,41 @@ world, and a card saying what it is — so listing worlds does not deserialise a
 town per row. A world also travels as a `CTPW1` code, the same way a level or a
 parts pack does.
 
+### Playing in one together
+
+```
+npm run build
+npm run host -- --port 7777 --world my-town.json
+```
+
+Everybody else opens `http://<that machine>:7777/` and presses **Join
+somebody's world**. A browser cannot listen on a port, so hosting is a small
+Node process; it also serves the built game, so whoever joins is running the
+host's build rather than whatever their tab had open.
+
+The host runs the same `WorldSession` the browser runs, headless. That is the
+whole design rather than an economy: there is one simulation in this codebase
+and both ends run it, so a machine cannot behave one way for the person driving
+it and another way for everybody watching.
+
+Rapier is not deterministic across machines, and the host and the browser do
+not even run the same wasm build, so this cannot be lockstep on inputs. It is:
+everybody simulates, the host is the truth, and the truth goes out twenty times
+a second as a packed buffer of every body's position and rotation. Control
+traffic — joining, deploying, editing a block — is JSON, because it is rare and
+changes shape every time a feature lands. Everything a client does to the world
+is a request: it places the block when the host says so, which is what stops
+four people each being sure they are right.
+
+Who may build is the world's own setting. `owner` means the first person to
+join is the only one who can change the place; `open` means anybody can. Either
+way anybody can drive, and no two people can drive the same machine.
+
+What is not there yet is the part that makes it feel instant. Right now a
+client shows what the host last said, flat, so on a slow link the lag is
+visible and honest. Prediction, smoothed correction and snapshot interpolation
+are the next stage, and they should be measured against how this feels.
+
 ## Sound
 
 Every audio file is **CC0** — Kenney's [Interface Sounds](https://kenney.nl/assets/interface-sounds)
@@ -506,6 +541,9 @@ src/challenges/  levels, objective tracking, the portable level format
 src/world/       the open world: chunked block store, portable world format,
                  instanced terrain, block editor, the session that runs it,
                  IndexedDB world store
+src/net/         the wire: message shapes, packed snapshots, the client
+server/          the host: a headless authoritative world that also serves
+                 the built game
 src/ui/          design tokens, front end (title, challenges, garage, worlds,
                  build, settings), save store, thumbnail renderer, palette,
                  inspector, objectives, win card, node editor, level builder,
@@ -514,7 +552,7 @@ src/ui/          design tokens, front end (title, challenges, garage, worlds,
 
 ## Tests
 
-`npm test` runs 1206 tests. The pure logic (orientations, grid placement, body
+`npm test` runs 1244 tests. The pure logic (orientations, grid placement, body
 grouping, key bindings, objectives) is covered directly. On top of that,
 `tests/physics.test.js` builds real machines in a real Rapier world and asserts
 they behave — a rover drives, reverses and steers the correct way; an

@@ -117,6 +117,11 @@ export class Sandbox {
     this.name.title = 'What this world is called';
     this.name.addEventListener('change', () => this.h.onRename(this.name.value));
 
+    // Only up when there is somebody else in the world. Offline it would be
+    // a permanent reminder of a thing that is not happening.
+    this.link = el('div', 'sb-link');
+    this.link.hidden = true;
+
     this.blockCount = el('div', 'readout', 'BLOCKS <strong>0</strong>');
     this.fleetCount = el('div', 'readout', 'MACHINES <strong>0</strong>');
 
@@ -129,7 +134,7 @@ export class Sandbox {
 
     this.top.append(
       leave, this.modes, this.name, el('span', 'spacer'),
-      this.blockCount, this.fleetCount, actions,
+      this.link, this.blockCount, this.fleetCount, actions,
     );
   }
 
@@ -253,6 +258,7 @@ export class Sandbox {
     const session = this.h.session();
     if (!session) return;
     const counts = session.counts();
+    this.showLink(this.h.net?.() ?? null);
 
     for (const button of this.modes.children) {
       button.classList.toggle('active', button.dataset.mode === session.mode);
@@ -274,6 +280,23 @@ export class Sandbox {
     this.fleetCount.innerHTML = `MACHINES <strong>${counts.vehicles}</strong>`;
     this.renderFleet(session);
     this.hint.textContent = this.hintFor(session);
+  }
+
+  /** Who else is here, and whether the world is still arriving. */
+  showLink(net) {
+    this.link.hidden = !net;
+    if (!net) return;
+    const here = net.players.size;
+    const who = `${here} HERE`;
+    if (!net.connected) {
+      this.link.className = 'sb-link bad';
+      this.link.innerHTML = '<b>OFFLINE</b>';
+      return;
+    }
+    this.link.className = net.quiet ? 'sb-link bad' : 'sb-link';
+    this.link.innerHTML = net.quiet
+      ? '<b>NO SIGNAL</b>'
+      : `<b>${who}</b>${net.mayBuild ? '' : ' · VISITING'}`;
   }
 
   hintFor(session) {

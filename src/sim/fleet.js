@@ -82,9 +82,15 @@ export class Fleet {
    */
   deploy({
     blueprint, spawn, yaw = 0, level = null, name = null, owner = null, canSleep = true,
+    num = 0,
   }) {
-    const id = `v${this.nextId}`;
-    this.nextId += 1;
+    // A machine's number is given by whoever is in charge of the world. On a
+    // host that is the host; on a client it is whatever number arrived with
+    // it, because the two have to agree about which machine a snapshot is
+    // describing.
+    const number = num || this.nextId;
+    this.nextId = Math.max(this.nextId, number) + 1;
+    const id = `v${number}`;
     const machine = new Machine({
       RAPIER: this.RAPIER,
       world: this.world,
@@ -101,6 +107,7 @@ export class Fleet {
 
     const member = {
       id,
+      num: number,
       name: name ?? blueprint.name,
       owner,
       yaw,

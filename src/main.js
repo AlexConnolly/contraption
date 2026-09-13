@@ -34,6 +34,7 @@ import { WorldSession } from './world/session.js';
 import { WorldStore, freeName } from './world/worldstore.js';
 import { toWorldCode, fromWorldCode, blankWorld } from './world/format.js';
 import { Sandbox, deployAt } from './ui/sandbox.js';
+import { NetClient, wsAddress } from './net/client.js';
 
 const STEP = 1 / 60;
 
@@ -536,11 +537,88 @@ async function openWorld(doc, id = null) {
   state.worldAutosave = setInterval(() => saveWorld(true), 20000);
 }
 
+/**
+ * Somebody else's world.
+ *
+ * A browser cannot listen on a port, so joining means reaching a host process
+ * — `npm run host` — which is the authority on everything in there. The
+ * session the game gets is built out of what the host sends and behaves like
+ * any other; what changes is that nothing this end does to the world happens
+ * straight away. Every edit is a request, and the world changes when it comes
+ * back.
+ */
+async function joinWorld(address) {
+  const url = wsAddress(address);
+  if (!url) {
+    hud.toast('That does not look like an address — try localhost:7777', true);
+    return;
+  }
+  if (state.mode === 'test') enterStudio();
+  saveDesign(true);
+  frontEnd.close();
+  if (state.showpiece) state.showpiece.visible = false;
+  state.idling = false;
+  disposeRun();
+  studio.setVisible(false);
+  hud.setChromeVisible(false);
+  hud.toast(`Reaching ${url}…`);
+
+  const net = new NetClient({
+    url,
+    name: store.settings({ handle: '' }).handle || 'Player',
+    make: (world) => new WorldSession({ RAPIER, scene, world }),
+    handlers: {
+      onDenied: (why) => {
+        audio.deny();
+        hud.toast(why, true);
+        sandbox.refresh();
+      },
+      onFleet: (message) => {
+        if (message.driving?.player === net.you && message.driving.id) {
+          const member = net.session?.fleet.get(message.driving.id);
+          if (member) snapCamera(member.machine);
+        }
+        sandbox.refresh();
+      },
+      onPlayers: () => sandbox.refresh(),
+      onClosed: () => {
+        if (state.mode !== 'sandbox') return;
+        audio.deny();
+        hud.toast('The host closed the connection', true);
+        sandbox.refresh();
+      },
+    },
+  });
+
+  let session;
+  try {
+    session = await net.connect();
+  } catch (error) {
+    hud.toast(error.message, true);
+    openMenu('worlds');
+    return;
+  }
+
+  state.mode = 'sandbox';
+  state.net = net;
+  state.session = session;
+  state.worldId = null;
+  state.worldCam = null;
+  const kept = store.design(GARAGE_SLOT);
+  if (kept) studio.replaceBlueprint(Blueprint.fromJSON(kept, { bounds: state.blueprint.bounds }));
+  sandbox.open();
+  setWorldMode('world');
+  hud.toast(`Joined ${session.world.name}`);
+}
+
 function setWorldMode(mode) {
   const session = state.session;
   if (!session) return;
   // Coming out of world-building, remember where you were stood in it.
   session.hideCursor();
+  // Leaving play has to tell the host too, or it goes on driving under keys
+  // this end has stopped sending.
+  if (mode !== 'play' && state.net && state.net.driving) state.net.askToControl(null);
   if (session.mode === 'world' && mode !== 'world') {
     state.worldCam = { position: camera.position.clone(), target: controls.target.clone() };
   }
@@ -587,6 +665,17 @@ async function saveWorld(quiet = false) {
   hud.toast(`${card.name} saved`);
 }
 
+/** The address somebody else would type to join the world you are in. */
+async function shareAddress() {
+  const url = state.net?.url ?? '';
+  try {
+    await navigator.clipboard.writeText(url);
+    hud.toast('Address copied — anyone on your network can join with it');
+  } catch {
+    prompt('The address of this world', url);
+  }
+}
+
 async function shareWorld() {
   const session = state.session;
   if (!session) return;
@@ -605,7 +694,10 @@ async function leaveWorld(back = 'worlds') {
   // While the mode still says sandbox, so the garage's work goes to the
   // garage's slot rather than over whatever this challenge had on the plate.
   saveDesign(true);
-  await saveWorld(true);
+  // Somebody else's world is not ours to write down.
+  if (!state.net) await saveWorld(true);
+  state.net?.dispose();
+  state.net = null;
   state.session?.dispose();
   state.session = null;
   sandbox.close();
@@ -629,6 +721,13 @@ function worldClick(ray) {
   if (session.mode === 'play') {
     const hit = session.pick(ray);
     // Clicking away lets go, which is the other half of clicking to take hold.
+    if (state.net) {
+      state.net.askToControl(hit ? hit.id : null);
+      controls.enabled = !hit;
+      if (hit) audio.confirm();
+      sandbox.refresh();
+      return;
+    }
     session.control(hit ? hit.id : null, input);
     controls.enabled = !hit;
     if (hit) {
@@ -643,6 +742,16 @@ function worldClick(ray) {
   if (sandbox.tool === 'deploy') {
     const aim = session.editor.aim(ray);
     if (!aim) return;
+    if (state.net) {
+      state.net.askToDeploy({
+        blueprint: state.blueprint,
+        at: deployAt(aim.cell),
+        yaw: sandbox.yaw,
+        name: state.blueprint.name,
+      });
+      audio.place();
+      return;
+    }
     const put = session.deploy({
       blueprint: state.blueprint,
       at: deployAt(aim.cell),
@@ -656,6 +765,16 @@ function worldClick(ray) {
     session.select(put.member.id);
     audio.place();
     sandbox.refresh();
+    return;
+  }
+
+  // Online, a click is a request: the world changes when the host says so.
+  if (state.net) {
+    const op = session.planEdit(ray, sandbox.tool === 'erase' ? 'erase' : 'place');
+    if (op) {
+      state.net.askToEdit([op]);
+      if (sandbox.tool === 'erase') audio.remove(); else audio.place();
+    }
     return;
   }
 
@@ -677,7 +796,8 @@ function worldShortcuts() {
     // Driving? Let go first. Nobody wants one key that both parks the machine
     // and throws away the screen.
     if (session.controlled()) {
-      session.control(null);
+      if (state.net) state.net.askToControl(null);
+      else session.control(null);
       controls.enabled = true;
       sandbox.refresh();
     } else {
@@ -707,7 +827,8 @@ function worldShortcuts() {
   if (input.wasPressed('Digit3')) sandbox.setTool('deploy');
   if (input.wasPressed('KeyR') && sandbox.tool === 'deploy') sandbox.turn();
   if (input.wasPressed('Delete') && session.selected) {
-    session.remove(session.selected);
+    if (state.net) state.net.askToRemove(session.selected);
+    else session.remove(session.selected);
     audio.remove();
     sandbox.refresh();
   }
@@ -1081,6 +1202,10 @@ function frame(now) {
   if (state.mode === 'sandbox' && state.session) {
     const session = state.session;
     if (session.mode === 'garage') studio.update();
+    // The keys go to the host every frame, held or not: "nothing pressed" is
+    // as much a fact as "W", and a host that never hears it keeps driving on
+    // the last thing it did hear.
+    if (state.net) state.net.sendInput(input);
     const steps = session.advance(dt, () => input.endFrame());
     if (steps === 0) input.endFrame();
     session.sync();
@@ -1360,11 +1485,23 @@ async function boot() {
   sandbox = new Sandbox({
     handlers: {
       session: () => state.session,
+      net: () => state.net,
       onMode: (mode) => setWorldMode(mode),
       onLeave: () => leaveWorld(),
-      onSave: () => saveWorld(),
-      onShare: () => shareWorld(),
+      onSave: () => {
+        if (state.net) {
+          hud.toast('You are a guest here — the host keeps this world', true);
+          return;
+        }
+        saveWorld();
+      },
+      onShare: () => (state.net ? shareAddress() : shareWorld()),
       onRename: (name) => {
+        if (state.net) {
+          hud.toast('Only the host can rename this world', true);
+          sandbox.refresh();
+          return;
+        }
         state.session?.rename(name);
         sandbox.refresh();
       },
@@ -1390,6 +1527,11 @@ async function boot() {
       onControl: (id) => {
         if (!state.session) return;
         setWorldMode('play');
+        if (state.net) {
+          state.net.askToControl(id);
+          sandbox.refresh();
+          return;
+        }
         const member = state.session.control(id, input);
         controls.enabled = !member;
         if (member) snapCamera(member.machine);
@@ -1417,7 +1559,8 @@ async function boot() {
       },
       onDelete: (id) => {
         if (!state.session) return;
-        state.session.remove(id);
+        if (state.net) state.net.askToRemove(id);
+        else state.session.remove(id);
         audio.remove();
         sandbox.refresh();
       },
@@ -1450,6 +1593,12 @@ async function boot() {
         if (!sure) return false;
         return worlds.remove(card.id);
       },
+      onJoin: (address) => joinWorld(address),
+      // The most likely host is whoever served this page: opening the address
+      // your friend sent you and pressing Join should just work.
+      suggestHost: () => (location.protocol.startsWith('http') && location.host
+        && !location.host.startsWith('localhost:517')
+        ? location.host : 'localhost:7777'),
       onWorldCode: async (code) => {
         const result = await fromWorldCode(code);
         if (!result.ok) {
@@ -1515,8 +1664,14 @@ async function boot() {
       editor,
       builder,
       frontEnd,
+      sandbox,
+      worlds,
       openMenu,
       leaveMenu,
+      openWorld,
+      joinWorld,
+      leaveWorld,
+      setWorldMode,
       // One pass of the keyboard shortcuts, for checks that cannot rely on the
       // frame loop running.
       shortcuts() {
