@@ -23,7 +23,10 @@ const GREEN = tagColour(2);
 
 // Loads are square and a little under a metre, so ten of them is a tower about
 // eight metres tall — four times what the machine may be built to.
-const SIDE = 0.8;
+// Tall enough that a grabber meets a load's side rather than passing over the
+// top of it. At 80 cm a load's roof is below every height anybody mounts a
+// grabber at, and driving at one just pushes it round the yard.
+const SIDE = 0.9;
 const RISE = SIDE + 0.02;
 // Magnetic, so they take hold of each other where they meet. Ten loads high is
 // a question about reach; it should not also be a question about whether the
@@ -110,8 +113,8 @@ export const STACKING = [
       // The pad the tower has to stand on, and the beam across the top of it.
       // Narrow enough that a load parked beside the tower is not on the pad,
       // wide enough for the quarter-metre a ten-high tower leans by.
-      { id: 'pad', pos: [0, 4, 0], size: [1.8, 8, 1.8], colour: 0x4ade80 },
-      { id: 'beam', pos: [0, 7.8, 0], size: [3.2, 1, 3.2], colour: 0x35d0e0 },
+      { id: 'pad', pos: [0, 4.5, 0], size: [1.9, 9, 1.9], colour: 0x4ade80 },
+      { id: 'beam', pos: [0, 8.78, 0], size: [3.2, 1.1, 3.2], colour: 0x35d0e0 },
     ],
     objectives: [
       {

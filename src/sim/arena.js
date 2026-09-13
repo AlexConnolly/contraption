@@ -25,6 +25,8 @@ export const ICY = 0.25;
 // they take hold, and how close counts as touching.
 const MAGNET_SETTLE = 0.9;
 const MAGNET_GAP = 0.04;
+// What a load that takes hold of its neighbours is edged in.
+const MAGNET_MARK = 0xf0a825;
 
 function surfaceMaterial({ colour, belt, friction }) {
   if (friction !== undefined && friction < ICY) {
@@ -401,6 +403,18 @@ export class Arena {
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     scene.add(mesh);
+    // Amber edges on anything magnetic. A player has no way to tell a load
+    // that will hold on to its neighbours from an ordinary crate, and amber is
+    // the one colour the game has not already spent on telling you off: red is
+    // a keep-out, green is a goal, cyan is a rule. Here it means "this one
+    // does something".
+    if (prop.magnetic && !this.headless) {
+      const rim = new THREE.LineSegments(
+        new THREE.EdgesGeometry(geometry),
+        new THREE.LineBasicMaterial({ color: MAGNET_MARK }),
+      );
+      mesh.add(rim);
+    }
     this.props.set(prop.id, { spec: prop, body, mesh });
     if (prop.magnetic) {
       const magnet = {
