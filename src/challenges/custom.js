@@ -39,11 +39,12 @@ export function resolveLevel(id) {
   return customLevel(id) ?? getLevel(id);
 }
 
+/** The saved level, or null if there was no room to save it. */
 export function saveCustomLevel(level, { id } = {}) {
   const at = id ?? newId();
   const clean = sanitiseLevel(level, { id: at });
-  store.saveCustomLevel({ id: at, name: clean.name, level: clean });
-  return clean;
+  const written = store.saveCustomLevel({ id: at, name: clean.name, level: clean });
+  return written ? clean : null;
 }
 
 export function deleteCustomLevel(id) {

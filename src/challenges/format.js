@@ -118,6 +118,9 @@ export function sanitiseLevel(input, { id } = {}) {
     if (Number.isFinite(Number(p?.radius))) out.radius = clamp(p.radius, 0.1, 20, 0.5);
     else out.size = size(p?.size, [1, 1, 1]);
     if (p?.ccd) out.ccd = true;
+    // Loads that take hold of each other where they meet, so a tower is a
+    // question about reach rather than about placement accuracy.
+    if (p?.magnetic) out.magnetic = true;
     if (Number.isFinite(Number(p?.friction))) out.friction = clamp(p.friction, 0, 4, 0.85);
     if (Number.isInteger(Number(p?.tag))) out.tag = clamp(p.tag, 0, 9, 0);
     return out;

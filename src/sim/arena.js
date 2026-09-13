@@ -21,6 +21,10 @@ function propVolume(prop) {
  * being broken rather than as a puzzle, so slippery surfaces are painted.
  */
 export const ICY = 0.25;
+// How still two magnetic loads have to be, relative to each other, before
+// they take hold, and how close counts as touching.
+const MAGNET_SETTLE = 0.9;
+const MAGNET_GAP = 0.04;
 
 function surfaceMaterial({ colour, belt, friction }) {
   if (friction !== undefined && friction < ICY) {
@@ -85,6 +89,11 @@ export class Arena {
     this.props = new Map();
     this.plates = new Map();
     this.shots = [];
+    this.magnets = [];
+    this.magnetOf = new Map();
+    this.welded = new Set();
+    this.joints = [];
+    this.welds = 0;
     this.opponents = new Map();
     this.movers = [];
     this.belts = [];
@@ -393,6 +402,13 @@ export class Arena {
     mesh.receiveShadow = true;
     scene.add(mesh);
     this.props.set(prop.id, { spec: prop, body, mesh });
+    if (prop.magnetic) {
+      const magnet = {
+        id: prop.id, body, collider, spec: prop,
+      };
+      this.magnets.push(magnet);
+      this.magnetOf.set(collider.handle, magnet);
+    }
     this.objects.push({ body, mesh, collider });
   }
 
@@ -677,6 +693,79 @@ export class Arena {
     return this.shots.filter((s) => !s.fired).length;
   }
 
+  /**
+   * Loads that take hold of each other.
+   *
+   * Stacking is a test of placement accuracy long before it is a test of the
+   * machine, and a tower that comes down because the sixth load went on four
+   * centimetres out is not the puzzle anybody wanted. Magnetic loads latch
+   * where they meet, so the question goes back to being how you get a load up
+   * there rather than how steady your hand was.
+   *
+   * They only latch once they have stopped moving relative to one another.
+   * Without that a load flung past its neighbour welds itself on at whatever
+   * angle it happened to arrive at, and the tower grows sideways.
+   */
+  driveMagnets() {
+    if (this.magnets.length < 2) return;
+    for (const magnet of this.magnets) {
+      this.world.contactPairsWith(magnet.collider, (other) => {
+        const mate = this.magnetOf.get(other.handle);
+        if (!mate || mate.id === magnet.id) return;
+        const pair = magnet.id < mate.id ? `${magnet.id}|${mate.id}` : `${mate.id}|${magnet.id}`;
+        if (this.welded.has(pair)) return;
+
+        const a = magnet.body.linvel();
+        const b = mate.body.linvel();
+        const drift = Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+        if (drift > MAGNET_SETTLE) return;
+
+        let touching = false;
+        this.world.contactPair(magnet.collider, other, (manifold) => {
+          for (let i = 0; i < manifold.numContacts(); i += 1) {
+            if (manifold.contactDist(i) <= MAGNET_GAP) {
+              touching = true;
+              return;
+            }
+          }
+        });
+        if (!touching) return;
+        this.weld(magnet, mate, pair);
+      });
+    }
+  }
+
+  /** Locks two loads together exactly where they are. */
+  weld(magnet, mate, pair) {
+    const here = magnet.body.translation();
+    const there = mate.body.translation();
+    const mid = {
+      x: (here.x + there.x) / 2,
+      y: (here.y + there.y) / 2,
+      z: (here.z + there.z) / 2,
+    };
+    const local = (body) => {
+      const t = body.translation();
+      const q = body.rotation();
+      return new THREE.Vector3(mid.x - t.x, mid.y - t.y, mid.z - t.z)
+        .applyQuaternion(new THREE.Quaternion(q.x, q.y, q.z, q.w).invert());
+    };
+    const qa = magnet.body.rotation();
+    const qb = mate.body.rotation();
+    const frame = new THREE.Quaternion(qb.x, qb.y, qb.z, qb.w)
+      .invert()
+      .multiply(new THREE.Quaternion(qa.x, qa.y, qa.z, qa.w));
+    const params = this.RAPIER.JointData.fixed(
+      local(magnet.body), { x: 0, y: 0, z: 0, w: 1 },
+      local(mate.body), {
+        x: frame.x, y: frame.y, z: frame.z, w: frame.w,
+      },
+    );
+    this.joints.push(this.world.createImpulseJoint(params, magnet.body, mate.body, true));
+    this.welded.add(pair);
+    this.welds += 1;
+  }
+
   addMover(spec) {
     const { RAPIER, world, scene } = this;
     const body = world.createRigidBody(
@@ -748,6 +837,7 @@ export class Arena {
   step(dt) {
     this.elapsed += dt;
     this.driveShots();
+    this.driveMagnets();
     this.driveBelts();
     this.driveOpponents();
     this.driveWind(dt);
@@ -927,6 +1017,12 @@ export class Arena {
       if (entry.body) this.world.removeRigidBody(entry.body);
     }
     this.objects = [];
+    for (const joint of this.joints) this.world.removeImpulseJoint(joint, true);
+    this.joints = [];
+    this.magnets = [];
+    this.magnetOf.clear();
+    this.welded.clear();
+    this.welds = 0;
     this.props.clear();
     this.plates.clear();
     this.shots = [];

@@ -25,8 +25,18 @@ const GREEN = tagColour(2);
 // eight metres tall — four times what the machine may be built to.
 const SIDE = 0.8;
 const RISE = SIDE + 0.02;
+// Magnetic, so they take hold of each other where they meet. Ten loads high is
+// a question about reach; it should not also be a question about whether the
+// sixth one went down four centimetres out.
 const loadAt = (id, x, z, colour = LOAD, tag = 0) => ({
-  id, pos: [x, SIDE / 2 + 0.05, z], size: [SIDE, SIDE, SIDE], mass: 3, friction: 1.1, colour, tag,
+  id,
+  pos: [x, SIDE / 2 + 0.05, z],
+  size: [SIDE, SIDE, SIDE],
+  mass: 3,
+  friction: 1.1,
+  magnetic: true,
+  colour,
+  tag,
 });
 
 export const STACKING = [
@@ -77,7 +87,7 @@ export const STACKING = [
     heightCap: 6,
     name: 'Stacked Loop',
     brief: 'Ten loads on the pad, stacked, with the green one on top and up in the beam.',
-    hint: 'You cannot reach the top of this, so stop trying to. Either grow a mast — pistons stack, and each one is a block tall and reaches far more than a block — or work from the bottom: put the green one down first, lift the pile, and post the next load in underneath it. The tower has to be standing at the end, not to have stood at some point.',
+    hint: 'The loads are magnetic — they take hold of each other where they meet, so a load put down roughly right stays put. You cannot reach the top of this, so stop trying to. Either grow a mast — pistons stack, and each one is a block tall and reaches far more than a block — or work from the bottom: put the green one down first, lift the pile, and post the next load in underneath it. The tower has to be standing at the end, not to have stood at some point.',
     spawn: [0, 1.2, -16],
     groundSize: 140,
     budget: { cost: 200 },

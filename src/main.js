@@ -917,7 +917,27 @@ async function boot() {
       enterStudio();
       showCourse();
     },
-    onSave: () => saveDesign(),
+    // Save puts the machine in the garage. It used to save the design for
+    // this level, which is already autosaved every half second, so the button
+    // duplicated something invisible and did not do the one thing a player
+    // pressing Save while building a machine is asking for.
+    onSave: () => {
+      const name = prompt('Name this machine', state.blueprint.name || 'New machine');
+      if (!name) return;
+      const saved = store.saveMachine({
+        name: name.slice(0, 28),
+        blueprint: state.blueprint.toJSON(),
+        thumb: renderMachine(state.blueprint),
+      });
+      if (saved) {
+        state.blueprint.name = saved.name;
+        audio.confirm();
+        hud.toast(`${saved.name} saved to the garage`);
+      } else {
+        audio.deny();
+        hud.toast('No room left to save — clear some machines from the garage', true);
+      }
+    },
     onLoad: () => {
       const design = loadDesign(state.level.id);
       if (!design) {
@@ -1028,6 +1048,10 @@ async function boot() {
       onToast: (message, bad) => hud.toast(message, bad),
       onSave: (level, id) => {
         const saved = saveCustomLevel(level, { id });
+        if (!saved) {
+          hud.toast('No room left to save that level', true);
+          return null;
+        }
         return { id: saved.id };
       },
       onTestPlay: (level) => tryDraft(level),
@@ -1053,11 +1077,13 @@ async function boot() {
       },
       onExit: () => { saveDesign(true); location.reload(); },
       onSaveMachine: (name) => {
-        store.saveMachine({
+        const saved = store.saveMachine({
           name,
           blueprint: state.blueprint.toJSON(),
           thumb: renderMachine(state.blueprint),
         });
+        if (!saved) hud.toast('No room left to save — clear some machines first', true);
+        return Boolean(saved);
       },
       suggestName: () => state.blueprint.name || 'New machine',
       onLoadMachine: (id) => {

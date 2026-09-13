@@ -146,8 +146,11 @@ export const store = {
     };
     if (existing >= 0) data.machines[existing] = { ...data.machines[existing], ...entry };
     else data.machines.unshift(entry);
-    write(data);
-    return entry;
+    // Null rather than the entry when there was no room. Everything the game
+    // remembers is one key rewritten whole, and every saved machine carries a
+    // thumbnail inside it, so the quota is genuinely reachable -- and a garage
+    // that reports a save it never made is the worst way to find that out.
+    return write(data) ? entry : null;
   },
 
   // ---------------------------------------------------------------- levels
@@ -167,8 +170,7 @@ export const store = {
     const record = { id: id ?? newId(), name, level, at: Date.now() };
     if (at >= 0) data.levels[at] = { ...data.levels[at], ...record };
     else data.levels.unshift(record);
-    write(data);
-    return record;
+    return write(data) ? record : null;
   },
 
   deleteCustomLevel(id) {

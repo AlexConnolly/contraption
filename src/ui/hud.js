@@ -1103,7 +1103,7 @@ export class Hud {
     add('Your machines');
     const saved = store.machines();
     if (saved.length === 0) {
-      grid.append(el('div', 'picker-empty', 'Nothing saved yet. Save a machine from the garage and it will be here.'));
+      grid.append(el('div', 'picker-empty', 'Nothing saved yet. Press Save while you are building and it will be here.'));
     }
     for (const machine of saved) {
       const blueprint = this.h.blueprintOf(machine);
