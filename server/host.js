@@ -46,6 +46,23 @@ const SNAPSHOT_EVERY = 3;
 /** Ticks one wake-up may run before the host admits it is behind. */
 const MAX_CATCHUP = 8;
 
+/**
+ * How far a player is sent the world around them.
+ *
+ * A city is mostly somewhere else. Sending somebody the far side of it costs
+ * bandwidth on machines they cannot see, and they have a copy of the world
+ * running locally that will do a perfectly good job of them until they get
+ * close enough for it to matter.
+ */
+const INTEREST = 180;
+
+/**
+ * A machine that is not moving is still re-stated this often, so a client
+ * that drifted, missed a correction or has only just come within range is put
+ * right within a second rather than never.
+ */
+const RESTATE = 60;
+
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -89,14 +106,16 @@ function remoteKeyboard() {
 }
 
 export class Host {
-  constructor({ session, name = 'A world' }) {
+  constructor({ session, name = 'A world', now = performance.now() }) {
     this.session = session;
     this.name = name;
     this.players = new Map();
     this.nextPlayer = 1;
     this.owner = null;
     this.tick = 0;
-    this.started = performance.now();
+    // Taken rather than read, so a test can run the clock by hand and get the
+    // same answer every time.
+    this.started = now;
     this.behind = 0;
   }
 
@@ -116,6 +135,10 @@ export class Host {
       socket,
       keys: remoteKeyboard(),
       driving: null,
+      // Where they are looking, and when each machine was last described to
+      // them. Both are per player, because what is worth sending is.
+      focus: null,
+      told: new Map(),
     };
     this.nextPlayer += 1;
     this.players.set(player.id, player);
@@ -165,12 +188,6 @@ export class Host {
     }
   }
 
-  blast(buffer) {
-    for (const player of this.players.values()) {
-      if (player.socket.readyState === 1) player.socket.send(buffer, { binary: true });
-    }
-  }
-
   deny(player, why) {
     this.send(player, { type: FROM_HOST.DENIED, reason: why });
   }
@@ -190,6 +207,20 @@ export class Host {
       case FROM_CLIENT.INPUT:
         player.keys.take(message);
         break;
+
+      case FROM_CLIENT.PING:
+        // Straight back, with their own clock reading untouched: the round
+        // trip is theirs to measure and the two clocks are never compared.
+        this.send(player, { type: FROM_HOST.PONG, at: message.at });
+        break;
+
+      case FROM_CLIENT.FOCUS: {
+        const at = message.at;
+        if (Array.isArray(at) && at.length === 3 && at.every(Number.isFinite)) {
+          player.focus = at;
+        }
+        break;
+      }
 
       case FROM_CLIENT.CONTROL: {
         const id = message.id ? String(message.id) : null;
@@ -286,12 +317,48 @@ export class Host {
 
   // --------------------------------------------------------------------- loop
 
+  /**
+   * What is worth telling this player about right now.
+   *
+   * Anything moving near them, plus anything at all that has not been
+   * described to them for a second. The second half is what makes the first
+   * half safe: a machine that stops, or that they have only just come within
+   * range of, is put right within a second instead of never.
+   */
+  visibleTo(player) {
+    const out = [];
+    for (const member of this.session.fleet.list()) {
+      const due = this.tick - (player.told.get(member.num) ?? -RESTATE) >= RESTATE;
+      const awake = member.machine.bodies.some((body) => !body.isSleeping());
+      if (!awake && !due) continue;
+      if (player.focus && !due) {
+        const at = member.machine.bodies[0].translation();
+        const far = Math.hypot(
+          at.x - player.focus[0], at.y - player.focus[1], at.z - player.focus[2],
+        );
+        if (far > INTEREST) continue;
+      }
+      player.told.set(member.num, this.tick);
+      out.push(member);
+    }
+    return out;
+  }
+
   step() {
     this.session.step();
     for (const player of this.players.values()) player.keys.endFrame();
     this.tick += 1;
-    if (this.tick % SNAPSHOT_EVERY === 0 && this.players.size > 0) {
-      this.blast(Buffer.from(encodeSnapshot(snapshotOf(this.session))));
+    if (this.tick % SNAPSHOT_EVERY !== 0) return;
+    for (const player of this.players.values()) {
+      if (player.socket.readyState !== 1) continue;
+      const only = this.visibleTo(player);
+      // Nothing has moved and nothing is due: the cheapest snapshot is the one
+      // that is not sent.
+      if (only.length === 0) continue;
+      player.socket.send(
+        Buffer.from(encodeSnapshot(snapshotOf(this.session, { only }))),
+        { binary: true },
+      );
     }
   }
 
@@ -311,6 +378,45 @@ export class Host {
     for (let i = 0; i < run; i += 1) this.step();
     return run;
   }
+}
+
+/**
+ * Wires one connection to the host.
+ *
+ * Kept separate from the socket server so that the lag harness can drive the
+ * same code over a fake link. If joining were written twice, the version
+ * being measured would not be the version being played.
+ */
+export function attach(host, socket, log = () => {}) {
+  let player = null;
+  socket.on('message', (data, binary) => {
+    if (binary) return;
+    const text = data.toString();
+    if (!player) {
+      let hello;
+      try {
+        hello = JSON.parse(text);
+      } catch {
+        socket.close();
+        return;
+      }
+      if (hello?.type !== FROM_CLIENT.HELLO) {
+        socket.close();
+        return;
+      }
+      player = host.join(socket, hello.name);
+      log(`${player.name} joined (${host.players.size} here)`);
+      return;
+    }
+    host.handle(player, text);
+  });
+  socket.on('close', () => {
+    if (!player) return;
+    host.leave(player);
+    log(`${player.name} left (${host.players.size} here)`);
+  });
+  socket.on('error', () => socket.close());
+  return () => player;
 }
 
 // ------------------------------------------------------------ serving the game
@@ -374,36 +480,7 @@ export async function startHost({
   const server = createServer(staticHandler(serve));
   const sockets = new WebSocketServer({ server });
 
-  sockets.on('connection', (socket) => {
-    let player = null;
-    socket.on('message', (data, binary) => {
-      if (binary) return;
-      const text = data.toString();
-      if (!player) {
-        let hello;
-        try {
-          hello = JSON.parse(text);
-        } catch {
-          socket.close();
-          return;
-        }
-        if (hello?.type !== FROM_CLIENT.HELLO) {
-          socket.close();
-          return;
-        }
-        player = host.join(socket, hello.name);
-        log(`${player.name} joined (${host.players.size} here)`);
-        return;
-      }
-      host.handle(player, text);
-    });
-    socket.on('close', () => {
-      if (!player) return;
-      host.leave(player);
-      log(`${player.name} left (${host.players.size} here)`);
-    });
-    socket.on('error', () => socket.close());
-  });
+  sockets.on('connection', (socket) => attach(host, socket, log));
 
   await new Promise((resolve) => server.listen(port, resolve));
 

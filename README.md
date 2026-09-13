@@ -317,20 +317,57 @@ it and another way for everybody watching.
 Rapier is not deterministic across machines, and the host and the browser do
 not even run the same wasm build, so this cannot be lockstep on inputs. It is:
 everybody simulates, the host is the truth, and the truth goes out twenty times
-a second as a packed buffer of every body's position and rotation. Control
-traffic — joining, deploying, editing a block — is JSON, because it is rare and
-changes shape every time a feature lands. Everything a client does to the world
-is a request: it places the block when the host says so, which is what stops
-four people each being sure they are right.
+a second as a packed buffer. Control traffic — joining, deploying, editing a
+block — is JSON, because it is rare and changes shape every time a feature
+lands. Everything a client does to the world is a request: it places the block
+when the host says so, which is what stops four people each being sure they are
+right.
 
 Who may build is the world's own setting. `owner` means the first person to
 join is the only one who can change the place; `open` means anybody can. Either
 way anybody can drive, and no two people can drive the same machine.
 
-What is not there yet is the part that makes it feel instant. Right now a
-client shows what the host last said, flat, so on a slow link the lag is
-visible and honest. Prediction, smoothed correction and snapshot interpolation
-are the next stage, and they should be measured against how this feels.
+### Making it feel instant
+
+Putting every body exactly where the host last said it was is correct and
+horrible: on a hundred-millisecond link the machine answers the accelerator a
+tenth of a second late and then jerks twenty times a second as it is dragged
+back. Three things take that away, in order of how much they matter.
+
+**Velocity, not just position.** The snapshot carries how each body is moving.
+A client fed that carries on under its own physics between snapshots and
+arrives at nearly the right place by itself. Without it, a machine somebody
+else is driving has no local reason to move at all.
+
+**Lead.** What arrived is where things were half a round trip ago. The round
+trip is measured, not guessed, and each body is carried forward by it — so what
+you see is where things are now, not where they were.
+
+**A gentle blend.** Whatever error is left is closed over several snapshots, so
+a correction is a drift rather than a jump. The machine in your hands gets the
+gentlest blend of all, because a correction you feel through the controls is
+much worse than one you only see. Past three metres it is not drift, it is
+somewhere else, and it is put where it belongs in one step.
+
+`tests/laglink.js` runs both ends in one process over a link that delays,
+jitters and stalls on purpose, with the clock turned by hand, so the numbers
+repeat. On 100 ms each way with 40 ms of jitter and a 5 % retransmit rate:
+
+| | put where the host said | with all of the above |
+| --- | --- | --- |
+| watching somebody drive | 0.43 m out, 1.31 m shifted at once | 0.20 m out, 0.19 m |
+| driving it yourself | 0.41 m out, 0.49 m shifted at once | 0.19 m out, 0.15 m |
+
+Better on both counts at once, which a smoothing does not usually buy — it is
+the velocity and the lead that do it, and the blending only has to tidy up.
+
+What is sent is trimmed to match. A rotation goes as its three smallest parts
+and two bits saying which was left out: seven bytes instead of sixteen, and
+four thousandths of a degree of error. Velocities go as sixteenths. A machine
+whose bodies are all asleep is not sent at all beyond one restatement a second,
+and neither is one more than 180 m from where you are looking — so a city
+standing still costs almost nothing, and forty machines all moving at once come
+to 7.6 KB a tick.
 
 ## Sound
 
@@ -552,7 +589,7 @@ src/ui/          design tokens, front end (title, challenges, garage, worlds,
 
 ## Tests
 
-`npm test` runs 1244 tests. The pure logic (orientations, grid placement, body
+`npm test` runs 1264 tests. The pure logic (orientations, grid placement, body
 grouping, key bindings, objectives) is covered directly. On top of that,
 `tests/physics.test.js` builds real machines in a real Rapier world and asserts
 they behave — a rover drives, reverses and steers the correct way; an

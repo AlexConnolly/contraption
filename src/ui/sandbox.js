@@ -296,7 +296,7 @@ export class Sandbox {
     this.link.className = net.quiet ? 'sb-link bad' : 'sb-link';
     this.link.innerHTML = net.quiet
       ? '<b>NO SIGNAL</b>'
-      : `<b>${who}</b>${net.mayBuild ? '' : ' · VISITING'}`;
+      : `<b>${who}</b> · ${net.ping} MS${net.mayBuild ? '' : ' · VISITING'}`;
   }
 
   hintFor(session) {

@@ -299,6 +299,20 @@ describe('the host also serves the game', () => {
 });
 
 describe('a host that is not going to work', () => {
+  it('says so when it speaks another version of the game', async () => {
+    const running = await host();
+    // A host one version along: everything else works, and the snapshots are
+    // unreadable. Better to be told at the door than to join a world that
+    // never moves.
+    const real = running.host.send.bind(running.host);
+    running.host.send = (player, message) => {
+      if (message && message.type === 'welcome') real(player, { ...message, protocol: 99 });
+      else real(player, message);
+    };
+    const client = connect(running.port, 'Ada');
+    await expect(client.connect()).rejects.toThrow(/different version/);
+  }, 30000);
+
   it('says so rather than hanging when there is nothing listening', async () => {
     const client = new NetClient({
       url: 'ws://127.0.0.1:1/',

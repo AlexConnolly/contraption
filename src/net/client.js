@@ -1,7 +1,8 @@
 import { Blueprint } from '../core/blueprint.js';
 import {
-  FROM_CLIENT, FROM_HOST, decodeSnapshot, applySnapshot, inputWire,
+  FROM_CLIENT, FROM_HOST, decodeSnapshot, inputWire, SNAPSHOT_PERIOD, PROTOCOL,
 } from './protocol.js';
+import { correct, Trip } from './correction.js';
 
 /**
  * The other end of the wire.
@@ -26,6 +27,12 @@ const QUIET = 3000;
 
 /** What `npm run host` listens on unless told otherwise. */
 export const DEFAULT_PORT = 7777;
+
+/** How often the round trip is measured, in frames of input. */
+const PING_EVERY = 30;
+
+/** How far the view has to move before the host is told where to look. */
+const FOCUS_STEP = 8;
 
 /**
  * What a person typed, turned into something a socket will take.
@@ -61,6 +68,11 @@ export class NetClient {
     handlers = {},
     WebSocketImpl = globalThis.WebSocket,
     now = () => Date.now(),
+    // Overrides for how hard corrections are applied. The defaults are the
+    // measured ones; this exists so the lag harness can compare them against
+    // putting every body exactly where the host said, which is what the
+    // smoothing has to beat.
+    tuning = null,
   }) {
     this.url = url;
     this.name = name;
@@ -79,6 +91,11 @@ export class NetClient {
     this.snapshots = 0;
     this.lastSnapshot = 0;
     this.state = 'idle';
+    this.trip = new Trip();
+    this.tuning = tuning;
+    this.sincePing = 0;
+    this.focus = null;
+    this.correction = { worst: 0, average: 0, snapped: 0 };
   }
 
   get connected() {
@@ -135,7 +152,11 @@ export class NetClient {
     if (typeof data !== 'string') {
       const snap = decodeSnapshot(data instanceof ArrayBuffer ? new Uint8Array(data) : data);
       if (!snap || !this.session) return;
-      applySnapshot(this.session, snap);
+      this.correction = correct(this.session, snap, {
+        mine: this.driving,
+        lead: this.trip.lead(SNAPSHOT_PERIOD),
+        ...this.tuning,
+      });
       this.snapshots += 1;
       this.lastSnapshot = this.now();
       return;
@@ -161,11 +182,24 @@ export class NetClient {
       case FROM_HOST.DENIED:
         this.h.onDenied?.(message.reason);
         return undefined;
+      case FROM_HOST.PONG:
+        this.trip.add(this.now() - message.at);
+        return undefined;
       default: return undefined;
     }
   }
 
   welcomed(message) {
+    // A host on another version speaks a snapshot this cannot read. Said now,
+    // plainly, rather than as a world that joins and then never moves.
+    if (message.protocol !== PROTOCOL) {
+      this.state = 'gone';
+      this.settle.reject(new Error(
+        'That host is running a different version of the game — both ends need the same build',
+      ));
+      this.socket.close();
+      return;
+    }
     this.you = message.you;
     this.owner = message.owner;
     this.authority = message.authority ?? 'owner';
@@ -224,7 +258,32 @@ export class NetClient {
   sendInput(input) {
     this.keys = input;
     if (!this.connected) return false;
+    this.sincePing += 1;
+    if (this.sincePing >= PING_EVERY) {
+      this.sincePing = 0;
+      this.send({ type: FROM_CLIENT.PING, at: this.now() });
+    }
     return this.send({ type: FROM_CLIENT.INPUT, ...inputWire(input) });
+  }
+
+  /**
+   * Where this player is looking, so the host can stop sending them the far
+   * side of a city. Told only when it has actually moved: a world is mostly
+   * somebody standing still.
+   */
+  lookingAt(point) {
+    if (!this.connected || !point) return false;
+    const moved = !this.focus || Math.hypot(
+      point.x - this.focus[0], point.y - this.focus[1], point.z - this.focus[2],
+    ) > FOCUS_STEP;
+    if (!moved) return false;
+    this.focus = [point.x, point.y, point.z];
+    return this.send({ type: FROM_CLIENT.FOCUS, at: this.focus });
+  }
+
+  /** The round trip, in milliseconds, for anything that wants to show it. */
+  get ping() {
+    return Math.round(this.trip.rtt);
   }
 
   askToControl(id) {

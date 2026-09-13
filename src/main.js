@@ -1210,6 +1210,11 @@ function frame(now) {
     if (steps === 0) input.endFrame();
     session.sync();
     const driving = session.controlled();
+    // Where this player is, so the host can stop describing the far side of
+    // a city to them.
+    if (state.net) {
+      state.net.lookingAt(driving ? driving.machine.corePosition() : controls.target);
+    }
     if (driving && session.mode === 'play') audio.update(driving.machine.audioState());
     else audio.silenceMachine();
     // The panel reads positions out of the world, so it is redrawn on a slow

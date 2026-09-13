@@ -152,7 +152,10 @@ export class Fleet {
     const member = id ? this.members.get(id) : null;
     this.driving = member ? member.id : null;
     if (member) {
-      member.bus = new SignalBus(input);
+      // A machine handed the controls before anybody has pressed anything --
+      // which is what happens the moment a host grants a request -- still
+      // needs a keyboard to read, even if it is one nothing is ever down on.
+      member.bus = new SignalBus(input ?? IDLE_KEYS);
       // Taking the controls has to wake it, or the first key does nothing.
       for (const body of member.machine.bodies) body.wakeUp();
     }

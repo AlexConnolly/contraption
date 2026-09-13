@@ -18,7 +18,7 @@
  * shape of any of this.
  */
 
-export const PROTOCOL = 1;
+export const PROTOCOL = 2;
 
 /** Sent by whoever joined. */
 export const FROM_CLIENT = {
@@ -28,6 +28,11 @@ export const FROM_CLIENT = {
   DEPLOY: 'deploy',
   REMOVE: 'remove',
   EDIT: 'edit',
+  // How long the round trip is, and where this player is looking. The first
+  // decides how far forward a snapshot is carried; the second decides what is
+  // worth sending them at all.
+  PING: 'ping',
+  FOCUS: 'focus',
 };
 
 /** Sent by whoever is in charge. */
@@ -38,15 +43,71 @@ export const FROM_HOST = {
   FLEET: 'fleet',
   EDITS: 'edits',
   DENIED: 'denied',
+  PONG: 'pong',
 };
+
+/** Snapshots go out this often. Everything that leads a body forward uses it. */
+export const SNAPSHOT_PERIOD = 3 / 60;
 
 const SNAPSHOT_TAG = 1;
 // tag, protocol, tick, elapsed, vehicle count.
 const HEADER = 1 + 1 + 4 + 4 + 2;
 // number, body count.
 const VEHICLE = 2 + 1;
-// Three for where it is, four for which way up.
-const BODY = 7 * 4;
+// Where it is, which way up it is, and how it is moving. See below for why
+// the first is the only one still sent as plain floats.
+const BODY = 12 + 7 + 6 + 6;
+
+/**
+ * How a quaternion is packed, and why it is the smallest thing here.
+ *
+ * A unit quaternion has three degrees of freedom, not four: whichever
+ * component is largest can always be worked out from the other three, and its
+ * sign does not matter because q and -q are the same rotation. So only the
+ * three smallest are sent, each of which is at most 1/sqrt(2), plus two bits
+ * saying which one was left out.
+ *
+ * Sixteen bits over that range is about two hundredths of a degree, which is
+ * far below what anybody can see, and it turns sixteen bytes into seven.
+ */
+const SMALLEST = 0.7071067811865476;
+const QUAT_SCALE = 32767 / SMALLEST;
+
+/** Velocity to a sixty-fourth of a metre a second, over plus or minus 512. */
+const VEL_SCALE = 64;
+
+const clampInt16 = (n) => Math.max(-32768, Math.min(32767, Math.round(n)));
+
+export function packQuat(view, at, q) {
+  let largest = 0;
+  for (let i = 1; i < 4; i += 1) if (Math.abs(q[i]) > Math.abs(q[largest])) largest = i;
+  // Sent as though the largest component were positive, which is free: the
+  // rotation is the same either way.
+  const flip = q[largest] < 0 ? -1 : 1;
+  view.setUint8(at, largest);
+  let put = at + 1;
+  for (let i = 0; i < 4; i += 1) {
+    if (i === largest) continue;
+    view.setInt16(put, clampInt16(q[i] * flip * QUAT_SCALE), true);
+    put += 2;
+  }
+}
+
+export function unpackQuat(view, at) {
+  const largest = view.getUint8(at) & 3;
+  const out = [0, 0, 0, 0];
+  let got = at + 1;
+  let sum = 0;
+  for (let i = 0; i < 4; i += 1) {
+    if (i === largest) continue;
+    const value = view.getInt16(got, true) / QUAT_SCALE;
+    out[i] = value;
+    sum += value * value;
+    got += 2;
+  }
+  out[largest] = Math.sqrt(Math.max(0, 1 - sum));
+  return out;
+}
 
 /**
  * Every machine's every body, as the host currently has it.
@@ -56,17 +117,31 @@ const BODY = 7 * 4;
  * bodies by `groupBlueprint`, which is a pure function of the blueprint, so
  * two people running the same design get the same bodies in the same order.
  * That is what makes an index enough.
+ *
+ * Velocity goes with the pose, and it is what buys most of the smoothness.
+ * Without it a client watching somebody else drive has no idea the machine is
+ * moving, so it stands still and is dragged forward twenty times a second. Fed
+ * the velocity, it carries on under its own physics between snapshots and the
+ * correction has almost nothing left to do.
  */
-export function snapshotOf(session) {
+export function snapshotOf(session, { only = null } = {}) {
+  const members = only ?? session.fleet.list();
   return {
     tick: session.tick,
     elapsed: session.elapsed,
-    vehicles: session.fleet.list().map((member) => ({
+    vehicles: members.map((member) => ({
       num: member.num,
       bodies: member.machine.bodies.map((body) => {
         const t = body.translation();
         const r = body.rotation();
-        return { p: [t.x, t.y, t.z], q: [r.x, r.y, r.z, r.w] };
+        const v = body.linvel();
+        const w = body.angvel();
+        return {
+          p: [t.x, t.y, t.z],
+          q: [r.x, r.y, r.z, r.w],
+          v: [v.x, v.y, v.z],
+          w: [w.x, w.y, w.z],
+        };
       }),
     })),
   };
@@ -91,7 +166,11 @@ export function encodeSnapshot(snap) {
     at += VEHICLE;
     for (const body of vehicle.bodies) {
       for (let i = 0; i < 3; i += 1) view.setFloat32(at + i * 4, body.p[i], true);
-      for (let i = 0; i < 4; i += 1) view.setFloat32(at + 12 + i * 4, body.q[i], true);
+      packQuat(view, at + 12, body.q);
+      for (let i = 0; i < 3; i += 1) {
+        view.setInt16(at + 19 + i * 2, clampInt16((body.v?.[i] ?? 0) * VEL_SCALE), true);
+        view.setInt16(at + 25 + i * 2, clampInt16((body.w?.[i] ?? 0) * VEL_SCALE), true);
+      }
       at += BODY;
     }
   }
@@ -122,9 +201,16 @@ export function decodeSnapshot(buffer) {
     for (let b = 0; b < bodies; b += 1) {
       out.push({
         p: [view.getFloat32(at, true), view.getFloat32(at + 4, true), view.getFloat32(at + 8, true)],
-        q: [
-          view.getFloat32(at + 12, true), view.getFloat32(at + 16, true),
-          view.getFloat32(at + 20, true), view.getFloat32(at + 24, true),
+        q: unpackQuat(view, at + 12),
+        v: [
+          view.getInt16(at + 19, true) / VEL_SCALE,
+          view.getInt16(at + 21, true) / VEL_SCALE,
+          view.getInt16(at + 23, true) / VEL_SCALE,
+        ],
+        w: [
+          view.getInt16(at + 25, true) / VEL_SCALE,
+          view.getInt16(at + 27, true) / VEL_SCALE,
+          view.getInt16(at + 29, true) / VEL_SCALE,
         ],
       });
       at += BODY;
@@ -138,36 +224,6 @@ export function isSnapshot(data) {
   const bytes = data?.buffer ?? data;
   if (!bytes || typeof bytes === 'string') return false;
   return new Uint8Array(bytes, data.byteOffset ?? 0, 1)[0] === SNAPSHOT_TAG;
-}
-
-/**
- * Puts a snapshot onto a world.
- *
- * Stage three is honest about the lag rather than hiding it: what the host
- * says is where things are, full stop. Everything a client simulates between
- * snapshots is thrown away every fiftieth of a second, which looks exactly as
- * rough as it is — and that is the point, because the next stage is the one
- * that makes it feel instant, and it should be obvious what it bought.
- */
-export function applySnapshot(session, snap) {
-  let moved = 0;
-  for (const vehicle of snap.vehicles) {
-    const member = session.fleet.get(`v${vehicle.num}`);
-    if (!member) continue;
-    const bodies = member.machine.bodies;
-    if (bodies.length !== vehicle.bodies.length) continue;
-    for (let i = 0; i < bodies.length; i += 1) {
-      const { p, q } = vehicle.bodies[i];
-      bodies[i].setTranslation({ x: p[0], y: p[1], z: p[2] }, true);
-      bodies[i].setRotation({
-        x: q[0], y: q[1], z: q[2], w: q[3],
-      }, true);
-      moved += 1;
-    }
-  }
-  session.elapsed = snap.elapsed;
-  session.tick = snap.tick;
-  return moved;
 }
 
 /** A machine on the wire: enough to build the same one at the other end. */

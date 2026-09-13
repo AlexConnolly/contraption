@@ -4,9 +4,10 @@ import {
 import RAPIER from '@dimforge/rapier3d-compat';
 
 import {
-  PROTOCOL, encodeSnapshot, decodeSnapshot, snapshotOf, applySnapshot,
-  isSnapshot, inputWire, keyboardFrom, vehicleWire,
+  PROTOCOL, encodeSnapshot, decodeSnapshot, snapshotOf,
+  isSnapshot, inputWire, keyboardFrom, vehicleWire, packQuat, unpackQuat,
 } from '../src/net/protocol.js';
+import { correct } from '../src/net/correction.js';
 import { wsAddress, DEFAULT_PORT } from '../src/net/client.js';
 import { WorldSession } from '../src/world/session.js';
 import { Blueprint } from '../src/core/blueprint.js';
@@ -45,8 +46,8 @@ describe('packing a snapshot', () => {
     const sent = snap([{
       num: 3,
       bodies: [
-        { p: [1.5, 2.25, -3.5], q: [0, 0.5, 0, 0.5] },
-        { p: [-40, 0, 12], q: [1, 0, 0, 0] },
+        { p: [1.5, 2.25, -3.5], q: [0, 0, 0, 1], v: [2.5, 0, -1.25], w: [0, 4, 0] },
+        { p: [-40, 0, 12], q: [1, 0, 0, 0], v: [0, 0, 0], w: [0, 0, 0] },
       ],
     }]);
     const back = decodeSnapshot(new Uint8Array(encodeSnapshot(sent)));
@@ -55,7 +56,11 @@ describe('packing a snapshot', () => {
     expect(back.vehicles).toHaveLength(1);
     expect(back.vehicles[0].num).toBe(3);
     expect(back.vehicles[0].bodies[0].p).toEqual([1.5, 2.25, -3.5]);
-    expect(back.vehicles[0].bodies[1].q).toEqual([1, 0, 0, 0]);
+    expect(back.vehicles[0].bodies[0].v).toEqual([2.5, 0, -1.25]);
+    expect(back.vehicles[0].bodies[0].w).toEqual([0, 4, 0]);
+    // A quaternion is packed as its three smallest parts, so it comes back
+    // very close rather than exactly -- and q and -q are the same rotation.
+    expect(Math.abs(back.vehicles[0].bodies[1].q[0])).toBeCloseTo(1, 4);
   });
 
   it('carries an empty world without complaining', () => {
@@ -66,14 +71,18 @@ describe('packing a snapshot', () => {
   it('is small enough to send at twenty a second', () => {
     const many = Array.from({ length: 40 }, (_, i) => ({
       num: i + 1,
-      bodies: Array.from({ length: 6 }, () => ({ p: [0, 0, 0], q: [0, 0, 0, 1] })),
+      bodies: Array.from({ length: 6 }, () => ({
+        p: [0, 0, 0], q: [0, 0, 0, 1], v: [0, 0, 0], w: [0, 0, 0],
+      })),
     }));
     const bytes = encodeSnapshot(snap(many)).byteLength;
-    // Forty machines of six bodies each, twenty times a second, is what the
-    // sixth stage has to hold up. Under 7 KB a tick is 135 KB/s to each
-    // player, which is a broadband number rather than a LAN-only one.
-    expect(bytes).toBeLessThan(7000);
-    expect(bytes).toBe(12 + 40 * 3 + 40 * 6 * 28);
+    // Forty machines of six bodies each is the worst case the sixth stage has
+    // to hold up, and it only happens when all forty are moving at once. At
+    // 7.6 KB a tick, twenty times a second, that is 152 KB/s to each player;
+    // a city standing still costs almost nothing, because a machine that is
+    // asleep is not sent.
+    expect(bytes).toBeLessThan(8000);
+    expect(bytes).toBe(12 + 40 * 3 + 40 * 6 * 31);
   });
 
   it('knows a snapshot from a message', () => {
@@ -82,9 +91,64 @@ describe('packing a snapshot', () => {
   });
 });
 
+describe('packing which way up a thing is', () => {
+  const roundTrip = (q) => {
+    const view = new DataView(new ArrayBuffer(7));
+    packQuat(view, 0, q);
+    return unpackQuat(view, 0);
+  };
+
+  /** The angle between two rotations, which is the only error that matters. */
+  const apart = (a, b) => {
+    const dot = Math.abs(a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3]);
+    return 2 * Math.acos(Math.min(1, dot));
+  };
+
+  it('fits a rotation into seven bytes instead of sixteen', () => {
+    const view = new DataView(new ArrayBuffer(7));
+    expect(() => packQuat(view, 0, [0, 0, 0, 1])).not.toThrow();
+  });
+
+  it('comes back within a fiftieth of a degree, whichever way it points', () => {
+    // Spread over the whole sphere rather than round one axis, because the
+    // component that is dropped is whichever is largest and every one of the
+    // four has to be droppable.
+    const angles = [0, 0.4, 1.1, 2.2, 3.0, -0.7, -2.5];
+    const axes = [[1, 0, 0], [0, 1, 0], [0, 0, 1], [1, 1, 1], [1, -2, 0.5]];
+    let worst = 0;
+    for (const a of angles) {
+      for (const axis of axes) {
+        // Normalised first. What comes out of this is always a unit
+        // quaternion, so feeding it one that is not makes the comparison
+        // measure the difference in length rather than the packing.
+        const n = Math.hypot(...axis);
+        const half = a / 2;
+        const s = Math.sin(half) / n;
+        const q = [axis[0] * s, axis[1] * s, axis[2] * s, Math.cos(half)];
+        worst = Math.max(worst, apart(q, roundTrip(q)));
+      }
+    }
+    // Measured: 0.00007 radians, which is four thousandths of a degree.
+    expect(worst).toBeLessThan(0.0004);
+  });
+
+  it('treats a rotation and its negative as the same, because they are', () => {
+    const q = [0.5, -0.5, 0.5, 0.5];
+    const flipped = q.map((n) => -n);
+    expect(apart(roundTrip(q), roundTrip(flipped))).toBeLessThan(1e-6);
+  });
+
+  it('always comes back as a unit quaternion', () => {
+    for (const q of [[0, 0, 0, 1], [1, 0, 0, 0], [0.5, 0.5, 0.5, 0.5]]) {
+      const back = roundTrip(q);
+      expect(Math.hypot(...back)).toBeCloseTo(1, 4);
+    }
+  });
+});
+
 describe('a snapshot that arrived damaged', () => {
   const good = () => new Uint8Array(encodeSnapshot(snap([{
-    num: 1, bodies: [{ p: [0, 1, 2], q: [0, 0, 0, 1] }],
+    num: 1, bodies: [{ p: [0, 1, 2], q: [0, 0, 0, 1], v: [0, 0, 0], w: [0, 0, 0] }],
   }])));
 
   it('is refused when it is cut short', () => {
@@ -121,9 +185,9 @@ describe('a snapshot put onto a world', () => {
     for (let i = 0; i < 120; i += 1) host.step();
 
     const before = client.fleet.list()[0].machine.corePosition().clone();
-    const moved = applySnapshot(client, decodeSnapshot(
+    const { moved } = correct(client, decodeSnapshot(
       new Uint8Array(encodeSnapshot(snapshotOf(host))),
-    ));
+    ), { blend: 1, adopt: 1, still: 0 });
     const after = client.fleet.list()[0].machine.corePosition();
 
     expect(moved).toBe(host.fleet.list()[0].machine.bodies.length);
@@ -141,7 +205,7 @@ describe('a snapshot put onto a world', () => {
     client.deploy({ blueprint: rover(), at: [0, 1.2, 0] });
     client.deploy({ blueprint: rover('Local'), at: [20, 1.2, 0] });
     const spare = client.fleet.list()[1].machine.corePosition().clone();
-    applySnapshot(client, snapshotOf(host));
+    correct(client, snapshotOf(host), { blend: 1 });
     expect(client.fleet.list()[1].machine.corePosition().distanceTo(spare)).toBe(0);
     host.dispose();
     client.dispose();
@@ -154,7 +218,7 @@ describe('a snapshot put onto a world', () => {
     const other = new Blueprint({ name: 'Different' });
     other.place('core', [0, 0, 0]);
     client.deploy({ blueprint: other, at: [0, 1.2, 0] });
-    expect(applySnapshot(client, snapshotOf(host))).toBe(0);
+    expect(correct(client, snapshotOf(host), { blend: 1 }).moved).toBe(0);
     host.dispose();
     client.dispose();
   }, 60000);
