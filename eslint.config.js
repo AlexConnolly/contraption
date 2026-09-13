@@ -57,7 +57,10 @@ export default [
         process: 'readonly',
         Float32Array: 'readonly',
         URL: 'readonly',
-        Blob: 'readonly',
+        queueMicrotask: 'readonly',
+        DOMException: 'readonly',
+        indexedDB: 'readonly',
+        structuredClone: 'readonly',
       },
     },
     rules: {

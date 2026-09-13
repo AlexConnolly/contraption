@@ -54,6 +54,14 @@ const text = (value, max) => (typeof value === 'string'
   }).join('').trim().slice(0, max)
   : '');
 
+// Degrees about the up axis, wrapped into a single turn so a vehicle spun
+// round five times saves as the angle it is actually facing.
+const turn = (value) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return ((n % 360) + 360) % 360;
+};
+
 const spot = (value) => {
   const fallback = [0, 2, 0];
   if (!Array.isArray(value) || value.length !== 3) return fallback;
@@ -88,7 +96,11 @@ export function sanitiseWorld(raw) {
       name: text(v.name, WORLD_LIMITS.name) || 'Machine',
       owner: text(v.owner, 32) || null,
       at: spot(v.at),
-      rot: Math.round(clamp(v.rot, 0, 23, 0)),
+      // Which way it is parked, in degrees about the up axis. A machine's own
+      // parts are turned in twenty-four fixed steps, because they clip to a
+      // grid; a machine standing in a world is not on anybody's grid and is
+      // parked facing down whatever street it is on.
+      yaw: turn(v.yaw),
       blueprint: v.blueprint && typeof v.blueprint === 'object' ? v.blueprint : null,
     }))
     .filter((v) => v.blueprint);
@@ -123,8 +135,12 @@ export function blankWorld() {
   };
 }
 
-export async function toWorldCode(world) {
-  const json = JSON.stringify({
+/**
+ * A world as plain data. A share code and a saved record are the same document
+ * carried two different ways, so both are made from here.
+ */
+export function worldJSON(world) {
+  return {
     v: WORLD_FORMAT,
     name: world.name,
     seed: world.seed,
@@ -133,7 +149,11 @@ export async function toWorldCode(world) {
     online: world.online,
     chunks: world.blocks ? world.blocks.toJSON() : {},
     vehicles: world.vehicles ?? [],
-  });
+  };
+}
+
+export async function toWorldCode(world) {
+  const json = JSON.stringify(worldJSON(world));
   const bytes = new TextEncoder().encode(json);
   const packed = await squeeze(bytes, 'deflate').catch(() => null);
   return packed && packed.length < bytes.length

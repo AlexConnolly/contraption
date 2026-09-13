@@ -81,7 +81,7 @@ export class Fleet {
    * put down.
    */
   deploy({
-    blueprint, spawn, level = null, name = null, owner = null, canSleep = true,
+    blueprint, spawn, yaw = 0, level = null, name = null, owner = null, canSleep = true,
   }) {
     const id = `v${this.nextId}`;
     this.nextId += 1;
@@ -91,6 +91,7 @@ export class Fleet {
       scene: this.scene,
       blueprint,
       spawn,
+      yaw,
       level,
       canSleep,
       headless: this.headless,
@@ -102,6 +103,7 @@ export class Fleet {
       id,
       name: name ?? blueprint.name,
       owner,
+      yaw,
       machine,
       bus: new SignalBus(IDLE_KEYS),
     };

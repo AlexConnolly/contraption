@@ -90,7 +90,7 @@ const POSITION_GAIN = 30;
 export class Machine {
   constructor({
     RAPIER, world, scene, blueprint, spawn, level,
-    canSleep = false, headless = false, contacts = 0,
+    canSleep = false, headless = false, contacts = 0, yaw = 0,
   }) {
     this.level = level ?? null;
     // A machine in a challenge must never sleep: it is the only thing in the
@@ -108,6 +108,23 @@ export class Machine {
     this.scene = scene;
     this.blueprint = blueprint;
     this.spawn = spawn.clone();
+    /**
+     * Which way it faces when it is put down, in radians about the up axis.
+     *
+     * A challenge has one spawn and everything starts on it facing the same
+     * way, so this was never needed. An open world is the other case: you
+     * park a delivery drone facing down a street, and the street does not run
+     * along +Z.
+     *
+     * It is put on the bodies rather than on the colliders inside them.
+     * Everything a machine works out about itself -- where a part is, which
+     * way a thruster pushes, what a joint turns about, where the core is
+     * looking -- is expressed in body-local space and then carried into the
+     * world by the body's own rotation. Turn the bodies and all of it comes
+     * out turned, with not one other line to change.
+     */
+    this.yaw = yaw;
+    this.facing = new THREE.Quaternion().setFromAxisAngle(UP, yaw);
     this.bodies = [];
     this.colliders = [];
     this.groups = [];
@@ -148,6 +165,9 @@ export class Machine {
     for (const group of this.grouping.bodies) {
       const desc = RAPIER.RigidBodyDesc.dynamic()
         .setTranslation(this.spawn.x, this.spawn.y, this.spawn.z)
+        .setRotation({
+          x: this.facing.x, y: this.facing.y, z: this.facing.z, w: this.facing.w,
+        })
         .setLinearDamping(0.05)
         .setAngularDamping(0.1)
         .setCanSleep(this.canSleep);
