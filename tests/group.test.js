@@ -10,6 +10,9 @@ import {
   groupExtent,
   moveGroup,
   removeGroup,
+  rotateGroup,
+  canRotateGroup,
+  pivotOf,
 } from '../src/core/group.js';
 import { IDENTITY_ORIENTATION, yawStep } from '../src/core/orientation.js';
 
@@ -228,5 +231,89 @@ describe('selecting everything attached to a part', () => {
     const bp = new Blueprint({ name: 't' });
     const ids = row(bp, { from: 0, to: 9 });
     expect(connectedTo(bp, ids[0], { limit: 4 }).length).toBeLessThanOrEqual(4);
+  });
+});
+
+describe('turning a whole selection', () => {
+  it('carries the parts round as well as turning them', () => {
+    // An arm in a line along +Z, turned a quarter about the up axis, has to
+    // end up in a line along an X axis. Turning each part where it stands
+    // would leave the line pointing the way it started.
+    const bp = new Blueprint({ name: 't' });
+    const ids = row(bp, { from: 0, to: 3 });
+
+    expect(rotateGroup(bp, ids, 'yaw', 1).ok).toBe(true);
+    const cells = ids.map((id) => bp.get(id).cell);
+    expect(new Set(cells.map((c) => c[2])).size).toBe(1);
+    expect(new Set(cells.map((c) => c[0])).size).toBe(4);
+  });
+
+  it('turns each part on the spot at the same time', () => {
+    const bp = new Blueprint({ name: 't' });
+    const wheel = bp.place('wheel', [0, 0, 0], IDENTITY_ORIENTATION).id;
+    rotateGroup(bp, [wheel], 'yaw', 1);
+    expect(bp.get(wheel).rot).toBe(yawStep(IDENTITY_ORIENTATION));
+  });
+
+  it('is back where it started after four quarter turns', () => {
+    const bp = new Blueprint({ name: 't' });
+    const ids = row(bp, { from: -2, to: 2 });
+    const before = ids.map((id) => ({ ...bp.get(id), cell: [...bp.get(id).cell] }));
+
+    for (let i = 0; i < 4; i += 1) expect(rotateGroup(bp, ids, 'yaw', 1).ok).toBe(true);
+
+    for (const was of before) {
+      const now = bp.get(was.id);
+      expect(now.cell).toEqual(was.cell);
+      expect(now.rot).toBe(was.rot);
+    }
+  });
+
+  it('turns about the middle of the selection by default', () => {
+    const bp = new Blueprint({ name: 't' });
+    const ids = row(bp, { from: -2, to: 2 });
+    expect(pivotOf(bp, ids)).toEqual([0, 0, 0]);
+    rotateGroup(bp, ids, 'yaw', 1);
+    // The middle part sits on the pivot, so it is the one that does not move.
+    expect(bp.get(ids[2]).cell).toEqual([0, 0, 0]);
+  });
+
+  it('turns about a pivot you name, so an arm can swing from its shoulder', () => {
+    const bp = new Blueprint({ name: 't' });
+    const ids = row(bp, { from: 0, to: 3 });
+    rotateGroup(bp, ids, 'yaw', 1, [0, 0, 0]);
+    expect(bp.get(ids[0]).cell).toEqual([0, 0, 0]);
+  });
+
+  it('takes all of it or none of it', () => {
+    const bp = new Blueprint({ name: 't' });
+    const ids = row(bp, { from: 0, to: 3 });
+
+    // Ask where the turn would put things, then stand something on one of
+    // those cells. Guessing the destination by hand gets the handedness wrong
+    // and quietly tests nothing.
+    const plan = canRotateGroup(bp, ids, 'yaw', 1);
+    expect(plan.ok).toBe(true);
+    const landing = plan.placements.find((n) => !ids.includes(bp.partAt(n.cell)?.id));
+    bp.place('block', landing.cell);
+
+    const before = bp.list().map((p) => [...p.cell]);
+    expect(rotateGroup(bp, ids, 'yaw', 1).ok).toBe(false);
+    expect(bp.list().map((p) => [...p.cell])).toEqual(before);
+  });
+
+  it('frees the cells it turned out of', () => {
+    const bp = new Blueprint({ name: 't' });
+    const ids = row(bp, { from: 0, to: 3 });
+    rotateGroup(bp, ids, 'yaw', 1);
+    // Nothing left stranded in the occupancy map from where the arm was.
+    const held = bp.list().flatMap((p) => occupiedCells(p.type, p.cell, p.rot).map(String));
+    for (const c of held) expect(bp.partAt(c.split(',').map(Number))).toBeTruthy();
+    expect(bp.canPlace('block', [0, 0, 3]).ok).toBe(true);
+  });
+
+  it('says so plainly when nothing is selected', () => {
+    const bp = new Blueprint({ name: 't' });
+    expect(canRotateGroup(bp, [], 'yaw', 1).reason).toMatch(/nothing selected/i);
   });
 });

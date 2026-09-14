@@ -1,4 +1,5 @@
 import { occupiedCells, key } from './blueprint.js';
+import { applyOrientation, turnStep, IDENTITY_ORIENTATION } from './orientation.js';
 import { getPart } from '../parts/registry.js';
 
 /**
@@ -162,6 +163,82 @@ export function cloneGroup(blueprint, ids, delta) {
     made.push(out.id);
   }
   return { ok: true, ids: made, cloned: made.length };
+}
+
+/**
+ * The cell a group turns about, when nobody has said otherwise.
+ *
+ * The middle of the box it fills, rounded to a cell. A group with an even
+ * number of cells across has no middle cell, so it lands half a cell off and
+ * the group shifts by that much as it turns. Every grid editor has this and
+ * the alternative — refusing to turn even-sized groups — is worse.
+ */
+export function pivotOf(blueprint, ids) {
+  const box = groupExtent(blueprint, ids);
+  if (!box) return null;
+  return [0, 1, 2].map((i) => Math.round((box.min[i] + box.max[i]) / 2));
+}
+
+/**
+ * Turning a whole selection, which is a different thing from turning each part
+ * where it stands.
+ *
+ * Two things have to happen together and agree: every part turns on the spot,
+ * and every part is carried round the pivot to where that turn puts it. Doing
+ * only the first leaves a crane arm pointing a new way with its pieces still in
+ * a line the old way; doing only the second leaves the pieces in the right
+ * places facing wrongly.
+ *
+ * Both use the same rotation so they cannot disagree: the quarter turn is taken
+ * as an orientation, that orientation moves each part's offset from the pivot,
+ * and the same step turns each part's own facing. There is one source of truth
+ * about what "a quarter turn about X" means and it is `turnStep`.
+ */
+export function canRotateGroup(blueprint, ids, axis = 'yaw', quarters = 1, pivot = null) {
+  const members = membersOf(blueprint, ids);
+  if (members.length === 0) return { ok: false, reason: 'Nothing selected' };
+
+  const about = pivot ?? pivotOf(blueprint, ids);
+  const spin = turnStep(IDENTITY_ORIENTATION, axis, quarters);
+  const moving = new Set(members.map((p) => p.id));
+
+  const placements = members.map((placed) => {
+    const offset = [0, 1, 2].map((i) => placed.cell[i] - about[i]);
+    const turned = applyOrientation(spin, offset).map((n) => Math.round(n));
+    return {
+      placed,
+      cell: [0, 1, 2].map((i) => about[i] + turned[i]),
+      rot: turnStep(placed.rot, axis, quarters),
+    };
+  });
+
+  for (const next of placements) {
+    const fits = blueprint.canPlace(next.placed.type, next.cell, next.rot, moving);
+    if (!fits.ok) return { ok: false, reason: fits.reason };
+  }
+  return { ok: true, members, placements, pivot: about };
+}
+
+/** Turns a selection about a pivot. All of it, or none of it. */
+export function rotateGroup(blueprint, ids, axis = 'yaw', quarters = 1, pivot = null) {
+  const check = canRotateGroup(blueprint, ids, axis, quarters, pivot);
+  if (!check.ok) return check;
+
+  // Lifted off the board first, exactly as a move is: a part set down early
+  // would land on a cell another part has not left yet.
+  for (const { placed } of check.placements) {
+    for (const c of occupiedCells(placed.type, placed.cell, placed.rot)) {
+      if (blueprint.occupancy.get(key(c)) === placed.id) blueprint.occupancy.delete(key(c));
+    }
+  }
+  for (const next of check.placements) {
+    next.placed.cell = next.cell;
+    next.placed.rot = next.rot;
+    for (const c of occupiedCells(next.placed.type, next.placed.cell, next.placed.rot)) {
+      blueprint.occupancy.set(key(c), next.placed.id);
+    }
+  }
+  return { ok: true, turned: check.placements.length, pivot: check.pivot };
 }
 
 /** Throws a selection away, and says how much of it was actually there. */
