@@ -1,4 +1,4 @@
-# Contraption
+# Construct It
 
 A building sandbox with a point. You get a problem — move this crate, lift that
 payload, stop on that mark — and you solve it by bolting a machine together in

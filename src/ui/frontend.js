@@ -245,7 +245,6 @@ export class FrontEnd {
     const worlds = worldsEntry();
     const campaign = LEVELS;
     const solved = store.solvedCount(campaign.map((l) => l.id));
-    const next = campaign.find((l) => !store.solved(l.id)) ?? campaign[campaign.length - 1];
 
     this.top.append(
       el('span', 'fe-spacer'),
@@ -255,7 +254,7 @@ export class FrontEnd {
     const hero = el('div', 'fe-hero');
     hero.append(
       el('div', 'fe-kicker', '<span class="fe-mark"><i></i></span><span>Build it · Drive it · Fix it</span>'),
-      el('div', null, '<h1 class="fe-logo">Contrap<i>tion</i></h1><div class="fe-rule"></div>'),
+      el('div', null, '<h1 class="fe-logo">Construct<i> It</i></h1><div class="fe-rule"></div>'),
     );
 
     const menu = el('nav', 'fe-menu');
@@ -268,7 +267,7 @@ export class FrontEnd {
         lead: true,
         meta: solved >= campaign.length
           ? '<b>All solved</b>'
-          : `<b>${solved} / ${campaign.length}</b> &nbsp;Next · ${next.name.split('—')[0].trim()}`,
+          : `<b>${solved} / ${campaign.length}</b>`,
         go: () => this.show('challenges'),
       },
       {

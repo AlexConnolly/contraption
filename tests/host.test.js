@@ -76,7 +76,7 @@ async function siteFolder() {
   const root = await mkdtemp(join(tmpdir(), 'contraption-site-'));
   folders.push(root);
   await mkdir(join(root, 'assets'), { recursive: true });
-  await writeFile(join(root, 'index.html'), '<!doctype html><title>Contraption</title>');
+  await writeFile(join(root, 'index.html'), '<!doctype html><title>Construct It</title>');
   await writeFile(join(root, 'assets', 'app.js'), '// the game would be here');
   return root;
 }
@@ -422,7 +422,7 @@ describe('the host also serves the game', () => {
     const page = await fetch(`http://127.0.0.1:${running.port}/`);
     expect(page.status).toBe(200);
     expect(page.headers.get('content-type')).toMatch(/text\/html/);
-    expect(await page.text()).toMatch(/Contraption/);
+    expect(await page.text()).toMatch(/Construct It/);
 
     const asset = await fetch(`http://127.0.0.1:${running.port}/assets/app.js`);
     expect(asset.status).toBe(200);
@@ -435,7 +435,7 @@ describe('the host also serves the game', () => {
     const running = await host({ serve: root });
     const deep = await fetch(`http://127.0.0.1:${running.port}/worlds/harbour`);
     expect(deep.status).toBe(200);
-    expect(await deep.text()).toMatch(/Contraption/);
+    expect(await deep.text()).toMatch(/Construct It/);
   }, 30000);
 
   it('refuses to hand out anything above the folder it was given', async () => {

@@ -254,14 +254,20 @@ export class Studio {
     }
   }
 
-  /** An outline around every selected part. Rebuilt only when it changes. */
+  /**
+   * An outline around every selected part. Rebuilt only when it changes.
+   *
+   * Drawn for one part as readily as for forty. It used to start at two, on
+   * the reasoning that the hover outline already showed a single part -- but
+   * hover follows the cursor, so the moment you moved the mouse away the thing
+   * you had selected looked exactly like the things you had not.
+   */
   markSelection() {
     for (const child of [...this.selectionMarks.children]) {
       this.selectionMarks.remove(child);
       child.geometry?.dispose();
       child.material?.dispose();
     }
-    if (this.selection.size < 2) return;
     for (const id of this.selection) {
       const placed = this.blueprint.get(id);
       if (!placed) continue;

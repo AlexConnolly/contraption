@@ -426,7 +426,7 @@ export const EXAMPLE_INDEX = Object.freeze({
   packs: [{
     id: 'harbour',
     name: 'Harbour',
-    author: 'Contraption',
+    author: 'Construct It',
     note: 'Six problems on the dockside. Cranes, mostly.',
     count: 6,
     file: 'packs/harbour.json',

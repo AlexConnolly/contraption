@@ -53,7 +53,7 @@ A pack file is a name, an author, and its levels:
 ```json
 {
   "name": "Harbour",
-  "author": "Contraption",
+  "author": "Construct It",
   "note": "Problems on the dockside. Cranes, mostly.",
   "levels": [ { "name": "Crane the crate", "objectives": [ ... ] } ]
 }

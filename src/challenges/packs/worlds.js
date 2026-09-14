@@ -38,14 +38,22 @@ export const WORLDS = [
       // stopped short and stood on a sheer sixty-centimetre lip -- taller than
       // a wheel, so nothing could climb it and a crate pushed at it simply
       // stopped dead, with nothing on screen to say why.
+      //
+      // Placed so its top surface finishes flush with the shelf. It used to end
+      // half a metre past the shelf's edge and stand 39 cm proud of it, which
+      // put a ridge across the full width of the course exactly where you
+      // arrive: a machine cresting it sat down on its belly with the wheels off
+      // the ground at both ends, and the ridge is the same brown as the ramp
+      // seen from above, so there was nothing to see. The same fault as the lip
+      // at the foot, at the other end.
       {
-        pos: [0, 1.77, -1.78], size: [9, 0.8, 13.6], rotX: -0.32, colour: 0x9a6b4b,
+        pos: [0, 1.381, -2.329], size: [9, 0.8, 13.6], rotX: -0.32, colour: 0x9a6b4b,
         belt: { dir: [0, -0.31, -0.95], speed: 3 },
       },
       // Walls down both sides of it, so the belt is the route rather than a
       // suggestion.
-      { pos: [-5.2, 2.4, -1.78], size: [0.6, 5, 13.6], colour: DARK },
-      { pos: [5.2, 2.4, -1.78], size: [0.6, 5, 13.6], colour: DARK },
+      { pos: [-5.2, 2.4, -2.329], size: [0.6, 5, 13.6], colour: DARK },
+      { pos: [5.2, 2.4, -2.329], size: [0.6, 5, 13.6], colour: DARK },
       // The shelf at the top, and a lip so an arriving crate stays arrived.
       { pos: [0, 3.5, 8], size: [9, 0.8, 8], colour: GREY },
       { pos: [0, 4.3, 11.8], size: [9, 0.8, 0.5], colour: DARK },
