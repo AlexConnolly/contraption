@@ -216,6 +216,23 @@ export class Studio {
     return this.selectedIds();
   }
 
+  /**
+   * Chooses a whole list at once.
+   *
+   * Selecting forty rollers one call at a time would redraw the outline, the
+   * inspector and the outlines forty times for one click, which is slow enough
+   * to feel broken. A row is one decision, so it is one change.
+   */
+  setSelection(ids, { add = false } = {}) {
+    const wanted = [...ids].filter((id) => this.blueprint.get(id));
+    if (!add) this.selection.clear();
+    for (const id of wanted) this.selection.add(id);
+    this.selectedId = wanted.at(-1) ?? this.selectedIds().at(-1) ?? null;
+    this.markSelection();
+    this.onChange({ reason: 'select' });
+    return this.selectedIds();
+  }
+
   /** This part and everything touching it, which is how a row gets picked. */
   selectConnected(id) {
     if (!id) return this.selectedIds();

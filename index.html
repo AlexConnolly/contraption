@@ -40,11 +40,21 @@
     </aside>
 
     <div id="rail">
-      <section id="brief">
-        <h2 id="brief-title"></h2>
-        <p id="brief-text"></p>
-        <p id="brief-hint" class="hint"></p>
+      <section id="brief" class="collapsed">
+        <button id="brief-toggle" class="brief-head" type="button" aria-expanded="false">
+          <span id="brief-title"></span>
+          <span class="brief-chev" aria-hidden="true"></span>
+        </button>
+        <div id="brief-detail">
+          <p id="brief-text"></p>
+          <p id="brief-hint" class="hint"></p>
+        </div>
       </section>
+
+      <aside id="outliner">
+        <div class="panel-title">Machine <span id="outliner-count"></span></div>
+        <div id="outliner-body" class="empty">Nothing on the plate yet.</div>
+      </aside>
 
       <aside id="inspector">
         <div class="panel-title">Inspector</div>

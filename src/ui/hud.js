@@ -141,6 +141,11 @@ export class Hud {
       briefTitle: document.getElementById('brief-title'),
       briefText: document.getElementById('brief-text'),
       briefHint: document.getElementById('brief-hint'),
+      brief: document.getElementById('brief'),
+      briefToggle: document.getElementById('brief-toggle'),
+      outliner: document.getElementById('outliner'),
+      outlinerBody: document.getElementById('outliner-body'),
+      outlinerCount: document.getElementById('outliner-count'),
       objectives: document.getElementById('objectives'),
       objectiveList: document.getElementById('objective-list'),
       clock: document.getElementById('run-clock'),
@@ -166,6 +171,11 @@ export class Hud {
 
   wire() {
     const { h, dom } = this;
+    dom.briefToggle.addEventListener('click', () => {
+      // Once it has been opened by hand, stop folding it automatically.
+      this.briefFolded = true;
+      this.setBriefOpen(dom.brief.classList.contains('collapsed'));
+    });
     document.getElementById('btn-challenges').addEventListener('click', async () => {
       // Where this actually goes depends on how you got here, and the question
       // has to say so — testing a level you are building goes back to the
@@ -262,6 +272,7 @@ export class Hud {
       document.getElementById('brief'),
       document.getElementById('help'),
       this.dom.palette,
+      this.dom.outliner,
       this.dom.inspector,
       this.dom.objectives,
     ]) {
@@ -282,6 +293,9 @@ export class Hud {
     // Building tools in the studio, the run panel in test, and in view just
     // the course and what it is asking of you.
     this.dom.palette.hidden = mode !== 'studio';
+    // The outliner is a building tool, so it keeps the palette's company:
+    // there is nothing to select during a run.
+    this.dom.outliner.hidden = mode !== 'studio';
     this.dom.inspector.hidden = mode !== 'studio';
     this.dom.objectives.hidden = mode === 'studio';
     this.dom.viewbar.hidden = mode !== 'view';
@@ -334,10 +348,19 @@ export class Hud {
     }
   }
 
+  setBriefOpen(open) {
+    this.dom.brief.classList.toggle('collapsed', !open);
+    this.dom.briefToggle.setAttribute('aria-expanded', String(open));
+  }
+
   setLevel(level) {
     this.applyBans(level);
     this.dom.viewGoal.textContent = level.brief;
     this.dom.briefTitle.textContent = level.name;
+    // Open on arrival, because the job is the one thing you have to be told.
+    // It folds itself away as soon as the first part goes down.
+    this.briefFolded = false;
+    this.setBriefOpen(true);
     // Said on the brief, not only on the menu you came through. Half an hour
     // later, wondering why the clock is not running, this is where you look.
     if (level.fun) {
@@ -346,6 +369,63 @@ export class Hud {
     }
     this.dom.briefText.textContent = level.brief;
     this.dom.briefHint.textContent = level.hint ?? '';
+  }
+
+  /** Folded once, the first time anything is built, and not again. */
+  foldBriefOnce() {
+    if (this.briefFolded) return;
+    this.briefFolded = true;
+    this.setBriefOpen(false);
+  }
+
+  /**
+   * The machine as rows you can act on.
+   *
+   * Each row is a decision rather than a part: a body, or all of one kind of
+   * part inside it. Clicking selects exactly what the row says, and the click
+   * carries its modifiers so shift and ctrl mean here what they mean on the
+   * plate.
+   */
+  renderOutline(outline, selected = new Set()) {
+    const body = this.dom.outlinerBody;
+    body.innerHTML = '';
+    this.dom.outlinerCount.textContent = outline.parts ? `${outline.parts} parts` : '';
+    if (!outline.parts) {
+      body.className = 'empty';
+      body.textContent = 'Nothing on the plate yet.';
+      return;
+    }
+    body.className = '';
+
+    const chosen = (ids) => ids.length > 0 && ids.every((id) => selected.has(id));
+
+    const row = (label, count, ids, opts = {}) => {
+      const button = el('button', `out-row${opts.child ? ' out-child' : ''}${opts.warn ? ' out-warn' : ''}`);
+      button.type = 'button';
+      if (chosen(ids)) button.classList.add('on');
+      button.append(el('span', 'out-name', label));
+      button.append(el('span', 'out-count', String(count)));
+      button.addEventListener('click', (event) => {
+        this.h.onOutlineSelect?.(ids, {
+          add: event.shiftKey || event.ctrlKey || event.metaKey,
+        });
+      });
+      body.append(button);
+      return button;
+    };
+
+    for (const group of outline.bodies) {
+      row(group.name, group.count, group.ids);
+      for (const kind of group.types) {
+        row(kind.name, kind.count, kind.ids, { child: true });
+      }
+    }
+    if (outline.loose) {
+      row('Not attached', outline.loose.count, outline.loose.ids, { warn: true });
+      for (const kind of outline.loose.types) {
+        row(kind.name, kind.count, kind.ids, { child: true, warn: true });
+      }
+    }
   }
 
   /**

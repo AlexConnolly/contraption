@@ -230,7 +230,7 @@ input[type="range"] { accent-color: var(--amber); }
 
 /* ------------------------------------------------------------- side panels */
 
-#palette, #inspector, #objectives, #brief {
+#palette, #inspector, #objectives, #brief, #outliner {
   background: var(--panel);
   backdrop-filter: blur(14px);
   border: 1px solid var(--edge);
@@ -449,13 +449,41 @@ input[type="range"] { accent-color: var(--amber); }
 
 /* ---------------------------------------------------------- level brief */
 
-#brief { flex: none; }
-#brief h2 {
-  margin: 0 0 6px;
-  font-size: 17px;
+#brief { flex: none; padding-bottom: 10px; }
+
+/* The brief is worth reading once and worth no space after that, so the title
+   is the control that opens it and the rest folds away behind it. */
+.brief-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+#brief-title {
+  font-size: 15px;
   font-weight: 600;
   letter-spacing: .02em;
 }
+.brief-chev {
+  flex: none;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid var(--faint);
+  transition: transform .15s ease;
+}
+#brief.collapsed .brief-chev { transform: rotate(-90deg); }
+#brief.collapsed #brief-detail { display: none; }
+#brief-detail { padding-top: 8px; }
 #brief p { margin: 0 0 7px; font-size: 12.5px; line-height: 1.45; color: var(--dim); }
 #brief .hint {
   font-family: var(--mono);
@@ -1321,3 +1349,61 @@ input[type="range"] { accent-color: var(--amber); }
   font-variant-numeric: tabular-nums;
 }
 .insp-wound-cost { color: var(--amber); font-size: 10px; letter-spacing: .04em; }
+
+
+/* ------------------------------------------------------------- outliner */
+
+/* The machine written out as rows you can act on. It takes the space the level
+   brief used to hold permanently, which is the better use of it: the job is
+   read once, the machine is worked on all the way through. */
+#outliner {
+  flex: 0 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+#outliner-count {
+  float: right;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--faint);
+  letter-spacing: .06em;
+}
+#outliner-body {
+  overflow-y: auto;
+  min-height: 0;
+  margin: 0 -4px;
+}
+#outliner-body.empty { color: var(--faint); font-size: 12px; line-height: 1.5; }
+
+.out-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  background: none;
+  border: 0;
+  border-radius: 3px;
+  padding: 4px 6px;
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  text-align: left;
+}
+.out-row:hover { background: rgba(125, 211, 252, .1); }
+.out-row.on { background: rgba(125, 211, 252, .18); color: #bae6fd; }
+.out-row.out-child {
+  padding-left: 18px;
+  font-size: 12px;
+  color: var(--dim);
+}
+.out-row.out-warn .out-name { color: #f0a825; }
+.out-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.out-count {
+  flex: none;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--faint);
+}

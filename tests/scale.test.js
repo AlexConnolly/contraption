@@ -71,10 +71,25 @@ const keys = (...codes) => ({
 });
 
 /** Milliseconds a step, averaged, after letting everything settle. */
-function costOf(session, steps = 200) {
-  const at = performance.now();
-  for (let i = 0; i < steps; i += 1) session.step();
-  return (performance.now() - at) / steps;
+/**
+ * What a step costs, as the cheapest of several runs rather than the average
+ * of them.
+ *
+ * Eight test files run side by side, so any one timing here is the simulation
+ * plus however much of the machine somebody else was using at that instant.
+ * Averaging keeps that noise; the floor throws it away, because the fastest
+ * run is the one that got the least interference and so the closest to what
+ * the step actually costs. Without this the ratio below fails when the machine
+ * is busy rather than when the game is slow, which it has done three times.
+ */
+function costOf(session, steps = 200, samples = 3) {
+  let best = Infinity;
+  for (let s = 0; s < samples; s += 1) {
+    const at = performance.now();
+    for (let i = 0; i < steps; i += 1) session.step();
+    best = Math.min(best, (performance.now() - at) / steps);
+  }
+  return best;
 }
 
 /** A flat town of `blocks` blocks, laid down straight into the store. */

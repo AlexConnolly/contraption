@@ -5,12 +5,14 @@ import RAPIER from './sim/rapier.js';
 import { Blueprint } from './core/blueprint.js';
 import { Input } from './core/input.js';
 import { Studio } from './studio/studio.js';
+import { outlineOf } from './studio/outliner.js';
 import { starterRover, quadcopter, openingMachine } from './studio/presets.js';
 import { crane } from './studio/showpiece.js';
 import { Machine } from './sim/machine.js';
 import { Arena } from './sim/arena.js';
 import { createWorld, gravityOf } from './sim/world.js';
 import { SignalBus } from './sim/signals.js';
+import { groupBlueprint } from './sim/grouping.js';
 import { controllerOf, firstController } from './sim/flight.js';
 import { getPart, findPart } from './parts/registry.js';
 import { loadPacks, usesPacks } from './parts/installed.js';
@@ -930,6 +932,23 @@ function refreshReadouts() {
     state.level.massCap,
     state.level.heightCap,
   );
+  // Folded in here rather than called alongside: the outliner wants redrawing
+  // at exactly the moments the budget does — a part placed, a design loaded, a
+  // level entered — and two lists of call sites would drift apart.
+  refreshOutline();
+}
+
+/**
+ * The machine written out as rows. Redrawn on every change because both halves
+ * of it move: the tree when parts come and go, and which rows read as chosen
+ * when the selection does.
+ */
+function refreshOutline() {
+  if (!studio || !hud) return;
+  hud.renderOutline(
+    outlineOf(state.blueprint, studio.grouping ?? groupBlueprint(state.blueprint)),
+    studio.selection ?? new Set(),
+  );
 }
 
 function refreshInspector() {
@@ -1344,9 +1363,12 @@ async function boot() {
       if (reason === 'place' || reason === 'turn') audio.place();
       else if (reason === 'delete') audio.remove();
       else if (reason === 'undo' || reason === 'redo') audio.click();
+      // The brief has been read by the time the first part is down.
+      if (reason === 'place') hud.foldBriefOnce();
       refreshReadouts();
       refreshInspector();
-      scheduleAutosave();
+      // Selecting changes nothing about the machine, so it is not worth a save.
+      if (reason !== 'select') scheduleAutosave();
     },
   });
 
@@ -1357,6 +1379,12 @@ async function boot() {
       selectTool('place');
     },
     onSelectTool: selectTool,
+    onOutlineSelect: (ids, { add = false } = {}) => {
+      // Picking a row is picking parts, so the tool has to be the one that
+      // holds a selection, or the next click on the plate would place a block.
+      if (studio.tool !== 'select') selectTool('select');
+      studio.setSelection(ids, { add });
+    },
     onModeChange: (mode) => {
       if (mode === 'test') enterTest();
       else if (mode === 'view') enterView();
