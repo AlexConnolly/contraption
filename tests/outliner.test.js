@@ -26,16 +26,34 @@ function machine() {
 const idsOf = (bp, type) => bp.list().filter((p) => p.type === type).map((p) => p.id);
 
 describe('an unorganised machine', () => {
-  it('is all one loose list', () => {
+  it('is all one list', () => {
     const out = outline(machine());
     expect(out.groups).toEqual([]);
-    expect(out.ungrouped.length).toBe(5);
+    expect(out.items.length).toBe(5);
     expect(out.parts).toBe(5);
   });
 
   it('lists parts one by one rather than gathering them by type', () => {
     const out = outline(machine());
-    expect(out.ungrouped.filter((p) => p.type === 'block').length).toBe(4);
+    expect(out.items.filter((p) => p.type === 'block').length).toBe(4);
+  });
+});
+
+describe('groups and loose parts share one list', () => {
+  it('puts a part outside every group at the top level, with no heading over it', () => {
+    const bp = machine();
+    const boom = createGroup(bp, { name: 'Boom' }).id;
+    setGroupOf(bp, idsOf(bp, 'block'), boom);
+
+    const out = outline(bp);
+    // One group row and one loose core, side by side in the same list.
+    expect(out.items.map((i) => i.kind)).toEqual(['group', 'part']);
+    expect(out.items[1].name).toBe('Control Core');
+    expect(out.items[1].depth).toBe(0);
+  });
+
+  it('has no separate ungrouped collection to keep in step', () => {
+    expect('ungrouped' in outline(machine())).toBe(false);
   });
 });
 
@@ -49,7 +67,7 @@ describe('a machine somebody has organised', () => {
     expect(out.groups.length).toBe(1);
     expect(out.groups[0].name).toBe('Boom');
     expect(out.groups[0].parts.length).toBe(4);
-    expect(out.ungrouped.length).toBe(1);
+    expect(out.items.filter((i) => i.kind === 'part').length).toBe(1);
   });
 
   it('nests, and a parent row acts on everything beneath it', () => {
@@ -105,12 +123,12 @@ describe('an empty plate', () => {
   it('is an empty tree rather than a crash', () => {
     const out = outline(new Blueprint({ name: 'empty' }));
     expect(out.groups).toEqual([]);
-    expect(out.ungrouped).toEqual([]);
+    expect(out.items).toEqual([]);
     expect(out.parts).toBe(0);
   });
 
   it('survives being handed nothing at all', () => {
-    expect(outlineOf(null).groups).toEqual([]);
+    expect(outlineOf(null).items).toEqual([]);
     expect(outlineOf(new Blueprint({ name: 'x' })).parts).toBe(0);
   });
 });

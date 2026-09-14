@@ -139,11 +139,6 @@ export class Hud {
       palette: document.getElementById('palette'),
       inspector: document.getElementById('inspector'),
       inspectorBody: document.getElementById('inspector-body'),
-      briefTitle: document.getElementById('brief-title'),
-      briefText: document.getElementById('brief-text'),
-      briefHint: document.getElementById('brief-hint'),
-      brief: document.getElementById('brief'),
-      briefToggle: document.getElementById('brief-toggle'),
       outliner: document.getElementById('outliner'),
       outlinerBody: document.getElementById('outliner-body'),
       outlinerCount: document.getElementById('outliner-count'),
@@ -174,11 +169,6 @@ export class Hud {
   wire() {
     const { h, dom } = this;
     dom.outlinerNew.addEventListener('click', () => h.onOutlineNewGroup?.());
-    dom.briefToggle.addEventListener('click', () => {
-      // Once it has been opened by hand, stop folding it automatically.
-      this.briefFolded = true;
-      this.setBriefOpen(dom.brief.classList.contains('collapsed'));
-    });
     document.getElementById('btn-challenges').addEventListener('click', async () => {
       // Where this actually goes depends on how you got here, and the question
       // has to say so — testing a level you are building goes back to the
@@ -272,7 +262,6 @@ export class Hud {
     this.chromeHidden = !visible;
     for (const node of [
       document.getElementById('topbar'),
-      document.getElementById('brief'),
       document.getElementById('help'),
       this.dom.palette,
       this.dom.outliner,
@@ -351,34 +340,16 @@ export class Hud {
     }
   }
 
-  setBriefOpen(open) {
-    this.dom.brief.classList.toggle('collapsed', !open);
-    this.dom.briefToggle.setAttribute('aria-expanded', String(open));
-  }
-
+  /**
+   * The rail is the two panels a builder actually works in: what the selected
+   * part does, and what the machine is made of. The level's own write-up used
+   * to sit above them and is gone -- it is on the card you picked the level
+   * from, it is the goal line in view mode, and it is the objective list
+   * during a run, none of which is the middle of building.
+   */
   setLevel(level) {
     this.applyBans(level);
     this.dom.viewGoal.textContent = level.brief;
-    this.dom.briefTitle.textContent = level.name;
-    // Open on arrival, because the job is the one thing you have to be told.
-    // It folds itself away as soon as the first part goes down.
-    this.briefFolded = false;
-    this.setBriefOpen(true);
-    // Said on the brief, not only on the menu you came through. Half an hour
-    // later, wondering why the clock is not running, this is where you look.
-    if (level.fun) {
-      const tag = el('span', 'brief-fun', 'Fun mode');
-      this.dom.briefTitle.append(tag);
-    }
-    this.dom.briefText.textContent = level.brief;
-    this.dom.briefHint.textContent = level.hint ?? '';
-  }
-
-  /** Folded once, the first time anything is built, and not again. */
-  foldBriefOnce() {
-    if (this.briefFolded) return;
-    this.briefFolded = true;
-    this.setBriefOpen(false);
   }
 
   /**
@@ -506,27 +477,26 @@ export class Hud {
       body.append(row);
     };
 
-    const walk = (groups) => {
-      for (const group of groups) {
-        groupRow(group);
-        if (folded.has(group.id)) continue;
-        for (const part of group.parts) partRow(part, group.depth + 1);
-        walk(group.children);
+    // One list. A group brings its contents with it; a part outside every
+    // group is simply a row at the same level, with no invented heading over
+    // it saying so.
+    // Dropping onto the list itself, clear of any group row, is how a part or
+    // a group comes back out to the top level.
+    dropOn(body, { kind: 'root' });
+
+    const walk = (items) => {
+      for (const item of items) {
+        if (item.kind !== 'group') {
+          partRow(item, item.depth ?? 0);
+          continue;
+        }
+        groupRow(item);
+        if (folded.has(item.id)) continue;
+        for (const part of item.parts) partRow(part, item.depth + 1);
+        walk(item.children);
       }
     };
-    walk(outline.groups);
-
-    if (outline.ungrouped.length) {
-      const head = el('div', 'out-row out-loose-head');
-      head.append(
-        el('span', 'out-name', 'Ungrouped'),
-        el('span', 'out-count', String(outline.ungrouped.length)),
-      );
-      // Dropping here is how anything comes back out of a group.
-      dropOn(head, { kind: 'root' });
-      body.append(head);
-      for (const part of outline.ungrouped) partRow(part, 0);
-    }
+    walk(outline.items);
 
     if (outline.detached) {
       body.append(el('div', 'out-note', `${outline.detached} part(s) not attached to the core`));

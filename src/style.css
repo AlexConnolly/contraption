@@ -230,7 +230,7 @@ input[type="range"] { accent-color: var(--amber); }
 
 /* ------------------------------------------------------------- side panels */
 
-#palette, #inspector, #objectives, #brief, #outliner {
+#palette, #inspector, #objectives, #outliner {
   background: var(--panel);
   backdrop-filter: blur(14px);
   border: 1px solid var(--edge);
@@ -375,9 +375,14 @@ input[type="range"] { accent-color: var(--amber); }
 
 /* ------------------------------------------------------------- inspector */
 
+/* The rail is two panels: what the selection does on top, what the machine is
+   made of underneath. Properties takes only the room it needs -- with nothing
+   selected that is almost none, and the tree gets the rest -- but never more
+   than half, so a wheel with every slider open cannot squeeze the tree away. */
 #inspector {
   min-height: 0;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
+  max-height: 52%;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--edge) transparent;
@@ -446,54 +451,6 @@ input[type="range"] { accent-color: var(--amber); }
 }
 
 .sensor-list { display: flex; flex-direction: column; gap: 4px; }
-
-/* ---------------------------------------------------------- level brief */
-
-#brief { flex: none; padding-bottom: 10px; }
-
-/* The brief is worth reading once and worth no space after that, so the title
-   is the control that opens it and the rest folds away behind it. */
-.brief-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  width: 100%;
-  background: none;
-  border: 0;
-  padding: 0;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-  text-align: left;
-}
-#brief-title {
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: .02em;
-}
-.brief-chev {
-  flex: none;
-  width: 0;
-  height: 0;
-  border-left: 4px solid transparent;
-  border-right: 4px solid transparent;
-  border-top: 5px solid var(--faint);
-  transition: transform .15s ease;
-}
-#brief.collapsed .brief-chev { transform: rotate(-90deg); }
-#brief.collapsed #brief-detail { display: none; }
-#brief-detail { padding-top: 8px; }
-#brief p { margin: 0 0 7px; font-size: 12.5px; line-height: 1.45; color: var(--dim); }
-#brief .hint {
-  font-family: var(--mono);
-  font-size: 11px;
-  line-height: 1.5;
-  color: var(--cyan);
-  border-left: 2px solid rgba(53, 208, 224, .35);
-  padding-left: 9px;
-  margin-bottom: 0;
-}
 
 /* ------------------------------------------------------------- objectives */
 
@@ -1388,6 +1345,8 @@ input[type="range"] { accent-color: var(--amber); }
   margin: 0 -4px;
 }
 #outliner-body.empty { color: var(--faint); font-size: 12px; line-height: 1.5; }
+/* The list itself is where you drop something to take it out of a group. */
+#outliner-body.out-over { box-shadow: inset 0 0 0 1px rgba(125, 211, 252, .5); border-radius: 3px; }
 
 .out-row {
   display: flex;
@@ -1440,17 +1399,6 @@ input[type="range"] { accent-color: var(--amber); }
   font: inherit;
   font-size: 12.5px;
   padding: 1px 4px;
-}
-.out-loose-head {
-  margin-top: 6px;
-  border-top: 1px solid var(--edge);
-  padding-top: 6px;
-  color: var(--faint);
-  font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  cursor: default;
 }
 .out-note {
   margin-top: 8px;

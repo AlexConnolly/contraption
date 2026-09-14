@@ -15,9 +15,13 @@ import { groupTree } from '../core/groups.js';
  * group called Bed are already one row when that group is folded, and gathering
  * them again underneath it would be answering a question nobody asked.
  *
+ * It is one list. A part that is in no group is just a part sitting at the top
+ * level next to the groups — heading it "Ungrouped" would be inventing a
+ * container that does not exist and making the reader learn it for nothing.
+ *
  * One thing is still worked out rather than organised: parts the core cannot
  * reach. That is the commonest way a machine is quietly broken, no amount of
- * tidying reveals it, and it gets a row of its own at the bottom.
+ * tidying reveals it, and it gets a note of its own at the bottom.
  */
 
 /** A part as the panel needs it: what it is called and whether it is adrift. */
@@ -44,12 +48,13 @@ const rows = (blueprint, ids, loose) => ids
  * arrangement.
  */
 export function outlineOf(blueprint, grouping = null) {
-  if (!blueprint) return { groups: [], ungrouped: [], detached: 0, parts: 0 };
+  if (!blueprint) return { items: [], groups: [], detached: 0, parts: 0 };
 
   const loose = new Set(grouping?.disconnected ?? []);
   const tree = groupTree(blueprint);
 
   const walk = (nodes) => nodes.map((node) => ({
+    kind: 'group',
     id: node.id,
     name: node.name,
     depth: node.depth,
@@ -63,9 +68,17 @@ export function outlineOf(blueprint, grouping = null) {
     children: walk(node.children),
   }));
 
+  // Groups and loose parts in one list at the top level. Groups first only
+  // because they are the headings; a part outside one is not in a container
+  // and is not given a fake one to sit in.
+  const items = [
+    ...walk(tree.groups),
+    ...rows(blueprint, tree.loose, loose).map((part) => ({ ...part, kind: 'part', depth: 0 })),
+  ];
+
   return {
-    groups: walk(tree.groups),
-    ungrouped: rows(blueprint, tree.loose, loose),
+    items,
+    groups: items.filter((i) => i.kind === 'group'),
     detached: [...loose].filter((id) => blueprint.get(id)).length,
     parts: blueprint.list().length,
   };
@@ -80,7 +93,7 @@ export function flatten(outline) {
       walk(group.children);
     }
   };
-  walk(outline.groups);
+  walk(outline.groups ?? []);
   return out;
 }
 

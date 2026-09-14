@@ -1398,8 +1398,6 @@ async function boot() {
       if (reason === 'place' || reason === 'turn') audio.place();
       else if (reason === 'delete') audio.remove();
       else if (reason === 'undo' || reason === 'redo') audio.click();
-      // The brief has been read by the time the first part is down.
-      if (reason === 'place') hud.foldBriefOnce();
       refreshReadouts();
       refreshInspector();
       // Selecting changes nothing about the machine, so it is not worth a save.

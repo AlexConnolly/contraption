@@ -40,28 +40,17 @@
     </aside>
 
     <div id="rail">
-      <section id="brief" class="collapsed">
-        <button id="brief-toggle" class="brief-head" type="button" aria-expanded="false">
-          <span id="brief-title"></span>
-          <span class="brief-chev" aria-hidden="true"></span>
-        </button>
-        <div id="brief-detail">
-          <p id="brief-text"></p>
-          <p id="brief-hint" class="hint"></p>
-        </div>
-      </section>
+      <aside id="inspector">
+        <div class="panel-title">Properties</div>
+        <div id="inspector-body" class="empty">Select a part to set its controls.</div>
+      </aside>
 
       <aside id="outliner">
         <div class="panel-title">
-          Machine <span id="outliner-count"></span>
+          Hierarchy <span id="outliner-count"></span>
           <button id="outliner-new" type="button" title="Put the selection in a new group">+ Group</button>
         </div>
         <div id="outliner-body" class="empty">Nothing on the plate yet.</div>
-      </aside>
-
-      <aside id="inspector">
-        <div class="panel-title">Inspector</div>
-        <div id="inspector-body" class="empty">Select a part with the Select tool to set its controls.</div>
       </aside>
     </div>
 
