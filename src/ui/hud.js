@@ -38,6 +38,7 @@ const HELP = {
     ['Shift+click', 'add to selection'],
     ['Ctrl+click', 'select what is attached'],
     ['G / Ctrl+D', 'move · copy selection'],
+    ['R / T / Y', 'turn the whole selection'],
     ['Delete', 'delete selection'],
     ['Ctrl+Z / Ctrl+Y', 'undo / redo'],
     ['Tab', 'test'],
@@ -146,6 +147,7 @@ export class Hud {
       outliner: document.getElementById('outliner'),
       outlinerBody: document.getElementById('outliner-body'),
       outlinerCount: document.getElementById('outliner-count'),
+      outlinerNew: document.getElementById('outliner-new'),
       objectives: document.getElementById('objectives'),
       objectiveList: document.getElementById('objective-list'),
       clock: document.getElementById('run-clock'),
@@ -171,6 +173,7 @@ export class Hud {
 
   wire() {
     const { h, dom } = this;
+    dom.outlinerNew.addEventListener('click', () => h.onOutlineNewGroup?.());
     dom.briefToggle.addEventListener('click', () => {
       // Once it has been opened by hand, stop folding it automatically.
       this.briefFolded = true;
@@ -379,14 +382,14 @@ export class Hud {
   }
 
   /**
-   * The machine as rows you can act on.
+   * The machine as a tree the builder arranged.
    *
-   * Each row is a decision rather than a part: a body, or all of one kind of
-   * part inside it. Clicking selects exactly what the row says, and the click
-   * carries its modifiers so shift and ctrl mean here what they mean on the
-   * plate.
+   * Every row is draggable and every group row is a target, because that is
+   * the whole interface: you organise the machine by putting things under
+   * other things. Clicking a row makes it the selection, so move, turn, copy
+   * and delete all work on it without the panel needing its own buttons.
    */
-  renderOutline(outline, selected = new Set()) {
+  renderOutline(outline, selected = new Set(), folded = new Set()) {
     const body = this.dom.outlinerBody;
     body.innerHTML = '';
     this.dom.outlinerCount.textContent = outline.parts ? `${outline.parts} parts` : '';
@@ -398,33 +401,135 @@ export class Hud {
     body.className = '';
 
     const chosen = (ids) => ids.length > 0 && ids.every((id) => selected.has(id));
+    // A drag carries the whole selection when the row it started on is part of
+    // it, so dragging four chosen parts into a group is one gesture.
+    const carried = (ids) => (ids.some((id) => selected.has(id)) ? [...selected] : ids);
 
-    const row = (label, count, ids, opts = {}) => {
-      const button = el('button', `out-row${opts.child ? ' out-child' : ''}${opts.warn ? ' out-warn' : ''}`);
-      button.type = 'button';
-      if (chosen(ids)) button.classList.add('on');
-      button.append(el('span', 'out-name', label));
-      button.append(el('span', 'out-count', String(count)));
-      button.addEventListener('click', (event) => {
-        this.h.onOutlineSelect?.(ids, {
+    const dropOn = (node, onto) => {
+      node.addEventListener('dragover', (event) => {
+        event.preventDefault();
+        node.classList.add('out-over');
+      });
+      node.addEventListener('dragleave', () => node.classList.remove('out-over'));
+      node.addEventListener('drop', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        node.classList.remove('out-over');
+        let payload;
+        try {
+          payload = JSON.parse(event.dataTransfer.getData('text/plain') || 'null');
+        } catch {
+          return;
+        }
+        if (payload) this.h.onOutlineDrop?.(payload, onto);
+      });
+    };
+
+    const dragFrom = (node, payload) => {
+      node.draggable = true;
+      node.addEventListener('dragstart', (event) => {
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', JSON.stringify(payload));
+        node.classList.add('out-dragging');
+      });
+      node.addEventListener('dragend', () => node.classList.remove('out-dragging'));
+    };
+
+    const groupRow = (group) => {
+      const row = el('div', 'out-row out-group');
+      row.style.paddingLeft = `${6 + group.depth * 12}px`;
+      if (chosen(group.ids)) row.classList.add('on');
+      if (group.detached) row.classList.add('out-warn');
+
+      const twist = el('button', 'out-twist', folded.has(group.id) ? '▸' : '▾');
+      twist.type = 'button';
+      twist.addEventListener('click', (event) => {
+        event.stopPropagation();
+        this.h.onOutlineFold?.(group.id);
+      });
+
+      const name = el('span', 'out-name', group.name);
+      // Renamed in place: a tree full of rows called Group is no better than
+      // no tree at all.
+      name.addEventListener('dblclick', (event) => {
+        event.stopPropagation();
+        const input = el('input', 'out-rename');
+        input.value = group.name;
+        let done = false;
+        const commit = () => {
+          if (done) return;
+          done = true;
+          this.h.onOutlineRename?.(group.id, input.value);
+        };
+        input.addEventListener('keydown', (e) => {
+          e.stopPropagation();
+          if (e.key === 'Enter') { e.preventDefault(); commit(); }
+          if (e.key === 'Escape') { done = true; this.h.onOutlineRefresh?.(); }
+        });
+        input.addEventListener('blur', commit);
+        name.replaceWith(input);
+        input.focus();
+        input.select();
+      });
+
+      const shed = el('button', 'out-shed', '×');
+      shed.type = 'button';
+      shed.title = 'Dissolve the group, keeping the parts';
+      shed.addEventListener('click', (event) => {
+        event.stopPropagation();
+        this.h.onOutlineDissolve?.(group.id);
+      });
+
+      row.append(twist, name, el('span', 'out-count', String(group.count)), shed);
+      row.addEventListener('click', (event) => {
+        this.h.onOutlineSelect?.(group.ids, {
           add: event.shiftKey || event.ctrlKey || event.metaKey,
         });
       });
-      body.append(button);
-      return button;
+      dragFrom(row, { kind: 'group', id: group.id });
+      dropOn(row, { kind: 'group', id: group.id });
+      body.append(row);
     };
 
-    for (const group of outline.bodies) {
-      row(group.name, group.count, group.ids);
-      for (const kind of group.types) {
-        row(kind.name, kind.count, kind.ids, { child: true });
+    const partRow = (part, depth) => {
+      const row = el('div', 'out-row out-part');
+      row.style.paddingLeft = `${20 + depth * 12}px`;
+      if (selected.has(part.id)) row.classList.add('on');
+      if (part.detached) row.classList.add('out-warn');
+      row.append(el('span', 'out-name', part.name));
+      row.addEventListener('click', (event) => {
+        this.h.onOutlineSelect?.([part.id], {
+          add: event.shiftKey || event.ctrlKey || event.metaKey,
+        });
+      });
+      dragFrom(row, { kind: 'parts', ids: carried([part.id]) });
+      body.append(row);
+    };
+
+    const walk = (groups) => {
+      for (const group of groups) {
+        groupRow(group);
+        if (folded.has(group.id)) continue;
+        for (const part of group.parts) partRow(part, group.depth + 1);
+        walk(group.children);
       }
+    };
+    walk(outline.groups);
+
+    if (outline.ungrouped.length) {
+      const head = el('div', 'out-row out-loose-head');
+      head.append(
+        el('span', 'out-name', 'Ungrouped'),
+        el('span', 'out-count', String(outline.ungrouped.length)),
+      );
+      // Dropping here is how anything comes back out of a group.
+      dropOn(head, { kind: 'root' });
+      body.append(head);
+      for (const part of outline.ungrouped) partRow(part, 0);
     }
-    if (outline.loose) {
-      row('Not attached', outline.loose.count, outline.loose.ids, { warn: true });
-      for (const kind of outline.loose.types) {
-        row(kind.name, kind.count, kind.ids, { child: true, warn: true });
-      }
+
+    if (outline.detached) {
+      body.append(el('div', 'out-note', `${outline.detached} part(s) not attached to the core`));
     }
   }
 

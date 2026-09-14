@@ -1,4 +1,5 @@
 import { applyOrientation, IDENTITY_ORIENTATION } from './orientation.js';
+import { sanitiseGroups } from './groups.js';
 import { getPart, findPart, partCost } from '../parts/registry.js';
 
 export const BLUEPRINT_VERSION = 1;
@@ -64,6 +65,9 @@ export class Blueprint {
     this.bounds = options.bounds ?? DEFAULT_BOUNDS;
     this.parts = new Map();
     this.occupancy = new Map();
+    // Named groups the builder made. An editing idea only: the physics still
+    // decides what actually moves together. See core/groups.js.
+    this.groups = new Map();
     this.missing = [];
   }
 
@@ -284,7 +288,13 @@ export class Blueprint {
         cell: [...p.cell],
         rot: p.rot,
         config: { ...p.config },
+        ...(p.group ? { group: p.group } : {}),
       })),
+      // Left off entirely when there are none, so nothing already saved grows
+      // a field and every older reader carries on ignoring what it cannot use.
+      ...(this.groups.size
+        ? { groups: [...this.groups.values()].map((g) => ({ ...g })) }
+        : {}),
     };
   }
 
@@ -310,10 +320,17 @@ export class Blueprint {
         rot: p.rot,
         config: { ...(p.config ?? {}) },
       };
+      if (p.group) placed.group = String(p.group).slice(0, 40);
       bp.parts.set(p.id, placed);
       for (const c of cells) bp.occupancy.set(key(c), p.id);
       const numeric = Number.parseInt(String(p.id).replace(/\D/g, ''), 10);
       if (Number.isFinite(numeric) && numeric >= nextId) nextId = numeric + 1;
+    }
+    bp.groups = sanitiseGroups(data.groups);
+    // A part naming a group that did not survive is simply ungrouped, rather
+    // than a part nothing can ever select.
+    for (const placed of bp.parts.values()) {
+      if (placed.group && !bp.groups.has(placed.group)) delete placed.group;
     }
     return bp;
   }

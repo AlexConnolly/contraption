@@ -154,6 +154,10 @@ export function cloneGroup(blueprint, ids, delta) {
     const out = blueprint.place(
       placed.type, shift(placed.cell, delta), placed.rot, { ...placed.config },
     );
+    // A copy of something organised is still organised. Copying a whole named
+    // group into a group of its own is the studio's business; what matters
+    // here is that the copies do not come out loose.
+    if (out.ok && placed.group) out.part.group = placed.group;
     if (!out.ok) {
       // Checked above, so this cannot normally happen; undo rather than leave
       // a half-made copy behind if it ever does.

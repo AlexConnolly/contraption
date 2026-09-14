@@ -11,6 +11,7 @@ import { aimAt } from '../core/aim.js';
 import { Blueprint, occupiedCells } from '../core/blueprint.js';
 import {
   canCloneGroup, canMoveGroup, cloneGroup, connectedTo, groupExtent, moveGroup, removeGroup,
+  rotateGroup,
 } from '../core/group.js';
 import { groupBlueprint } from '../sim/grouping.js';
 import { wouldConnect } from '../sim/connectivity.js';
@@ -392,6 +393,27 @@ export class Studio {
     this.rebuild();
     this.markSelection();
     this.onChange({ reason: kind });
+    return out;
+  }
+
+  /**
+   * Turns the whole selection as one thing, about its own middle.
+   *
+   * Distinct from turning each part where it stands: the parts are carried
+   * round the pivot as well as turned, so an arm ends up pointing a new way
+   * rather than staying in its old line with every piece facing differently.
+   */
+  turnSelection(axis = 'yaw', quarters = 1) {
+    if (this.selection.size === 0) return { ok: false };
+    this.snapshot();
+    const out = rotateGroup(this.blueprint, this.selectedIds(), axis, quarters);
+    if (!out.ok) {
+      this.undoStack.pop();
+      return out;
+    }
+    this.rebuild();
+    this.markSelection();
+    this.onChange({ reason: 'turn' });
     return out;
   }
 

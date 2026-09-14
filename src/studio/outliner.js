@@ -1,149 +1,90 @@
 import { getPart } from '../parts/registry.js';
+import { groupTree } from '../core/groups.js';
 
 /**
- * The machine as a list you can act on, rather than a thing you have to hunt
- * around the plate with a cursor.
+ * The machine as a tree you organise yourself.
  *
- * The obvious outliner is every part in a flat list, and it is useless: a
- * hundred rows reading "Block" tells you nothing you could not see, and
- * finding the one you want in it is worse than clicking the model.
+ * An earlier version of this grouped parts automatically — by rigid body, then
+ * by type — and it was the wrong idea. Automatic grouping tells you the game's
+ * view of the machine; what a builder wants is their own. "The crane arm" is
+ * not a category the engine can work out, it is a decision somebody made, and
+ * once it has a name it can be moved, turned, copied and put away as one thing.
  *
- * So it is grouped the way the machine is actually put together. The top level
- * is rigid bodies — what is welded to what, which is the thing that decides
- * how the machine behaves and the thing you cannot see by looking. Underneath
- * each body the parts are gathered by type with a count, because "the wheels"
- * is the unit anybody means: forty rollers on a conveyor are one decision, not
- * forty, and selecting them as one is the entire point of the panel.
+ * So the tree is whatever the builder dragged it into. Parts are listed one by
+ * one rather than gathered by type, because forty rollers you have put in a
+ * group called Bed are already one row when that group is folded, and gathering
+ * them again underneath it would be answering a question nobody asked.
  *
- * Bodies are named after the joint that carries them. "On the piston" says
- * where a group of parts is and what will move it, which an index number does
- * not. The body holding the core is the chassis, and anything the chassis
- * cannot reach is called out as not attached — the studio already tints those
- * orange on the plate, and this is the same warning in words.
+ * One thing is still worked out rather than organised: parts the core cannot
+ * reach. That is the commonest way a machine is quietly broken, no amount of
+ * tidying reveals it, and it gets a row of its own at the bottom.
  */
 
-/** A body with no joint above it and no core in it is floating free. */
-const CHASSIS = 'Chassis';
-
-function typeRows(blueprint, ids) {
-  const byType = new Map();
-  for (const id of ids) {
-    const placed = blueprint.get(id);
-    if (!placed) continue;
-    if (!byType.has(placed.type)) byType.set(placed.type, []);
-    byType.get(placed.type).push(id);
-  }
-  return [...byType.entries()]
-    .map(([type, members]) => ({
-      type,
-      name: getPart(type)?.name ?? type,
-      count: members.length,
-      ids: members,
-    }))
-    // Most of a thing first: the row you want to act on is usually the big one.
-    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+/** A part as the panel needs it: what it is called and whether it is adrift. */
+function partRow(blueprint, id, loose) {
+  const placed = blueprint.get(id);
+  if (!placed) return null;
+  return {
+    id,
+    type: placed.type,
+    name: getPart(placed.type)?.name ?? placed.type,
+    detached: loose.has(id),
+  };
 }
+
+const rows = (blueprint, ids, loose) => ids
+  .map((id) => partRow(blueprint, id, loose))
+  .filter(Boolean);
 
 /**
  * The tree the panel draws.
  *
- * Pure, so what it says can be checked without a browser: given a blueprint
- * and the grouping already worked out for the meshes, this is the whole of
- * what the panel knows.
+ * Pure, so what it says can be checked without a browser. `grouping` is only
+ * consulted for which parts are adrift; everything else is the builder's own
+ * arrangement.
  */
-export function outlineOf(blueprint, grouping) {
-  if (!blueprint || !grouping) return { bodies: [], loose: null, parts: 0 };
+export function outlineOf(blueprint, grouping = null) {
+  if (!blueprint) return { groups: [], ungrouped: [], detached: 0, parts: 0 };
 
-  const loose = new Set(grouping.disconnected ?? []);
-  const jointFor = new Map();
-  for (const joint of grouping.joints ?? []) jointFor.set(joint.childBody, joint);
+  const loose = new Set(grouping?.disconnected ?? []);
+  const tree = groupTree(blueprint);
 
-  const found = [];
-  for (const body of grouping.bodies ?? []) {
-    // Parts the chassis cannot reach are listed together at the bottom rather
-    // than as their own little bodies, because "not attached" is one problem
-    // however many islands it happens to be in.
-    const attached = body.members.filter((id) => !loose.has(id));
-    if (attached.length === 0) continue;
+  const walk = (nodes) => nodes.map((node) => ({
+    id: node.id,
+    name: node.name,
+    depth: node.depth,
+    // What acting on this row would take: the group and everything under it.
+    ids: node.all,
+    count: node.all.length,
+    parts: rows(blueprint, node.parts, loose),
+    // A group holding something adrift is worth marking, or the warning is
+    // buried at the bottom of a folded tree.
+    detached: node.all.some((id) => loose.has(id)),
+    children: walk(node.children),
+  }));
 
-    const joint = jointFor.get(body.index);
-    const carrier = joint ? blueprint.get(joint.partId) : null;
-    const isRoot = body.index === grouping.rootBody;
-    const types = typeRows(blueprint, attached);
-    found.push({
-      index: body.index,
-      isRoot,
-      carrier,
-      count: attached.length,
-      ids: attached,
-      types,
-      // Bodies built the same way are the same kind of thing, so they can be
-      // said once. Forty rollers on a conveyor are forty separate bodies and
-      // an outliner that lists them separately is the wall of identical rows
-      // this panel exists to avoid.
-      shape: types.map((t) => `${t.type}:${t.count}`).join('+'),
-    });
-  }
-
-  const bodies = [];
-  const root = found.find((b) => b.isRoot);
-  if (root) {
-    bodies.push({
-      ...root,
-      name: CHASSIS,
-      bodies: 1,
-      // One kind of part in the whole body is already said by the body row.
-      types: root.types.length > 1 ? root.types : [],
-    });
-  }
-
-  const buckets = new Map();
-  for (const body of found) {
-    if (body.isRoot) continue;
-    if (!buckets.has(body.shape)) buckets.set(body.shape, []);
-    buckets.get(body.shape).push(body);
-  }
-  for (const alike of buckets.values()) {
-    const first = alike[0];
-    const ids = alike.flatMap((b) => b.ids);
-    // A body that is just its own joint is named for the part; anything else
-    // is named for what carries it, because that is where it is on the machine.
-    const single = first.count === 1 && first.carrier
-      && first.ids[0] === first.carrier.id;
-    const base = first.carrier
-      ? (single ? getPart(first.carrier.type).name : `On the ${getPart(first.carrier.type).name}`)
-      : 'Loose group';
-    bodies.push({
-      index: first.index,
-      isRoot: false,
-      name: alike.length > 1 ? `${base} ×${alike.length}` : base,
-      via: first.carrier?.id ?? null,
-      bodies: alike.length,
-      count: ids.length,
-      ids,
-      types: first.types.length > 1 ? typeRows(blueprint, ids) : [],
-    });
-  }
-
-  const looseIds = [...loose].filter((id) => blueprint.get(id));
   return {
-    bodies,
-    loose: looseIds.length
-      ? { count: looseIds.length, ids: looseIds, types: typeRows(blueprint, looseIds) }
-      : null,
+    groups: walk(tree.groups),
+    ungrouped: rows(blueprint, tree.loose, loose),
+    detached: [...loose].filter((id) => blueprint.get(id)).length,
     parts: blueprint.list().length,
   };
 }
 
-/** Every id a row stands for, so clicking one selects exactly what it says. */
-export function idsOfRow(outline, { body = null, type = null, loose = false } = {}) {
-  if (loose) {
-    if (!outline.loose) return [];
-    if (!type) return [...outline.loose.ids];
-    return outline.loose.types.find((t) => t.type === type)?.ids ?? [];
-  }
-  const found = outline.bodies.find((b) => b.index === body);
-  if (!found) return [];
-  if (!type) return [...found.ids];
-  return found.types.find((t) => t.type === type)?.ids ?? [];
+/** Every row in the tree, flattened, for anything that wants to walk it. */
+export function flatten(outline) {
+  const out = [];
+  const walk = (groups) => {
+    for (const group of groups) {
+      out.push(group);
+      walk(group.children);
+    }
+  };
+  walk(outline.groups);
+  return out;
+}
+
+/** A group by id, wherever it sits. */
+export function findGroup(outline, id) {
+  return flatten(outline).find((g) => g.id === id) ?? null;
 }

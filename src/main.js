@@ -6,6 +6,9 @@ import { Blueprint } from './core/blueprint.js';
 import { Input } from './core/input.js';
 import { Studio } from './studio/studio.js';
 import { outlineOf } from './studio/outliner.js';
+import {
+  createGroup, dissolveGroup, renameGroup, setGroupOf, setGroupParent,
+} from './core/groups.js';
 import { starterRover, quadcopter, openingMachine } from './studio/presets.js';
 import { crane } from './studio/showpiece.js';
 import { Machine } from './sim/machine.js';
@@ -943,12 +946,38 @@ function refreshReadouts() {
  * of it move: the tree when parts come and go, and which rows read as chosen
  * when the selection does.
  */
+// Which groups are folded shut. Kept here rather than in the blueprint: it is
+// how the panel is being looked at, not part of the machine, and saving it
+// would put it in everybody's share code.
+const foldedGroups = new Set();
+
 function refreshOutline() {
   if (!studio || !hud) return;
   hud.renderOutline(
     outlineOf(state.blueprint, studio.grouping ?? groupBlueprint(state.blueprint)),
     studio.selection ?? new Set(),
+    foldedGroups,
   );
+}
+
+/**
+ * Anything that changes the groups is an undo step like any other edit, and
+ * has to be saved. Wrapped once so the six handlers below cannot each forget
+ * a different half of it.
+ */
+function editGroups(change) {
+  studio.snapshot();
+  const out = change();
+  if (out && out.ok === false) {
+    studio.undoStack.pop();
+    if (out.reason) hud.toast(out.reason, true);
+    audio.deny();
+    return out;
+  }
+  refreshReadouts();
+  refreshInspector();
+  scheduleAutosave();
+  return out;
 }
 
 function refreshInspector() {
@@ -1082,9 +1111,15 @@ function handleShortcuts() {
   const control = input.isDown('ControlLeft') || input.isDown('ControlRight');
   const quarters = (input.isDown('ShiftLeft') || input.isDown('ShiftRight')) ? -1 : 1;
   if (!control) {
-    if (input.wasPressed('KeyR')) studio.turn('yaw', quarters);
-    if (input.wasPressed('KeyT')) studio.turn('pitch', quarters);
-    if (input.wasPressed('KeyY')) studio.turn('roll', quarters);
+    // With several parts held, the turn keys turn the lot as one thing about
+    // its own middle. With one or none they mean what they always meant: the
+    // part in hand, or the part selected.
+    const asGroup = studio.selection.size > 1;
+    for (const [code, axis] of [['KeyR', 'yaw'], ['KeyT', 'pitch'], ['KeyY', 'roll']]) {
+      if (!input.wasPressed(code)) continue;
+      const out = asGroup ? studio.turnSelection(axis, quarters) : studio.turn(axis, quarters);
+      if (out && out.ok === false && out.reason) hud.toast(out.reason, true);
+    }
   }
   if (input.wasPressed('Digit1')) selectTool('place');
   if (input.wasPressed('Digit2')) selectTool('select');
@@ -1384,6 +1419,40 @@ async function boot() {
       // holds a selection, or the next click on the plate would place a block.
       if (studio.tool !== 'select') selectTool('select');
       studio.setSelection(ids, { add });
+    },
+    onOutlineRefresh: () => refreshOutline(),
+    onOutlineFold: (id) => {
+      if (foldedGroups.has(id)) foldedGroups.delete(id); else foldedGroups.add(id);
+      refreshOutline();
+    },
+    onOutlineNewGroup: () => {
+      const chosen = studio.selectedIds();
+      editGroups(() => {
+        const made = createGroup(state.blueprint, { name: 'New group' });
+        if (!made.ok) return made;
+        // Whatever was selected goes straight in, because making an empty
+        // group and then dragging things into it is two steps for one idea.
+        if (chosen.length) setGroupOf(state.blueprint, chosen, made.id);
+        return made;
+      });
+    },
+    onOutlineRename: (id, name) => {
+      editGroups(() => renameGroup(state.blueprint, id, name));
+    },
+    onOutlineDissolve: (id) => {
+      editGroups(() => dissolveGroup(state.blueprint, id));
+    },
+    onOutlineDrop: (payload, onto) => {
+      const target = onto.kind === 'group' ? onto.id : null;
+      editGroups(() => {
+        // A group dragged onto a group becomes its child; parts dragged
+        // anywhere simply change which group they are in.
+        if (payload.kind === 'group') {
+          if (payload.id === target) return { ok: false };
+          return setGroupParent(state.blueprint, payload.id, target);
+        }
+        return setGroupOf(state.blueprint, payload.ids ?? [], target);
+      });
     },
     onModeChange: (mode) => {
       if (mode === 'test') enterTest();
